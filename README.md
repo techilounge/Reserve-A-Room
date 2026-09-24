@@ -280,6 +280,46 @@ Reserve-A-Room can be installed on phones, tablets and desktops (manifest:
 - **Development:** the service worker is registered only in production builds
   (`npm run build && npm run start`), so `npm run dev` is never affected by caching.
 
-## Testing _(pending — Phase 11)_
+## Testing
+
+| Command | What it runs | Needs |
+| --- | --- | --- |
+| `npm test` | Unit tests (Vitest): validation, date/time and DST math, availability, policies, email templates, formatting | nothing |
+| `npm run test:db` | Database tests: the real migrations on [PGlite](https://pglite.dev) (Postgres compiled to WebAssembly). They cover RLS, grants (catalog-wide function allowlist), triggers, the exclusion constraint, the status machine, guest tokens, the email outbox, and TypeScript/SQL parity | nothing (no Docker) |
+| `npm run test:e2e` | Playwright end-to-end tests against a production build | Chromium (`npx playwright install chromium`) |
+| `npm run check` | Typecheck + lint + unit + database tests | nothing |
+
+**End-to-end suite** (`e2e/`):
+- **How it runs:** Playwright starts `e2e/support/mock-supabase.ts`, a **test-only** stand-in
+  for Supabase that runs the real migrations on PGlite, with a minimal auth server and
+  fixed test accounts. It then builds the app into `.next-e2e` and serves it on
+  port 3300. No network, credentials or email provider are involved. Emails are processed
+  and recorded as "Not sent".
+- **Guest flows:** instant reservation, the private-link cookie, guest cancellation (and
+  the released time), validation and focus, and unavailable rooms.
+- **Approval flows:** request → approve with a message → guest sees it, decline with a
+  private note that never reaches the guest, and the email log's "Send again".
+- **Double booking:** two visitors submit overlapping times at the same moment. Exactly
+  one wins, and the other is sent back with a clear message.
+- **Staff access:**
+  - sign-in (wrong password, redirect back, sign out) and off-site `next=` rejection;
+  - Admin vs Super Admin pages;
+  - the cron secret.
+- **Quality:**
+  - axe WCAG 2.2 AA on 23 pages in light and dark mode;
+  - no horizontal scrolling at 320, 768 and 1920 px;
+  - security headers.
+- **PWA:** manifest and icons, the offline fallback, and that nothing private is cached.
+
+To use an already-installed Chromium, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/path/to/chrome`.
+The mock can also be run by hand for manual QA: `npm run e2e:mock`. Then start the app with
+`NEXT_PUBLIC_SUPABASE_URL=http://localhost:54400`,
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=e2e-mock-anon-key` and
+`SUPABASE_SERVICE_ROLE_KEY=e2e-mock-service-key`. Test accounts are in
+`e2e/support/accounts.ts`.
+
+**CI:** `.github/workflows/ci.yml` runs `npm run check` and the end-to-end suite on every
+push to `main` or `claude/**` and on pull requests.
+
 ## Production deployment & domain _(pending — Phase 12)_
 ## Troubleshooting _(pending — Phase 12)_

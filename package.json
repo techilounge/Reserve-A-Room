@@ -14,6 +14,8 @@
     "check": "npm run typecheck && npm run lint && npm test && npm run test:db",
     "brand:generate": "node scripts/generate-brand-assets.mjs",
     "test:db": "vitest run --config vitest.db.config.mts",
+    "test:e2e": "playwright test",
+    "e2e:mock": "node e2e/support/mock-supabase.ts",
     "db:types": "node scripts/generate-db-types.ts",
     "bootstrap:super-admin": "node --env-file-if-exists=.env.local scripts/bootstrap-super-admin.ts"
   },
@@ -60,6 +62,6 @@
     "vitest": "^5.0.1"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18"
   }
 }

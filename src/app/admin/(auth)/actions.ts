@@ -10,31 +10,37 @@ import { clientIp } from "@/lib/security/request";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { emailField } from "@/lib/validation/text";
 
-export type AuthFormState = { status: "idle" | "error" | "success"; message?: string };
+export type AuthFormState = {
+  status: "idle" | "error" | "success";
+  message?: string;
+  /** Echoed back so the email field survives React's automatic form reset after an error. */
+  email?: string;
+};
 
 const GENERIC_SIGN_IN_ERROR = "That email and password don't match an administrator account.";
 
 export async function signIn(_prev: AuthFormState, form: FormData): Promise<AuthFormState> {
+  const email = String(form.get("email") ?? "").slice(0, 320);
   const parsed = z
     .object({ email: emailField, password: z.string().min(1).max(200) })
     .safeParse({ email: form.get("email"), password: form.get("password") });
-  if (!parsed.success) return { status: "error", message: "Please enter your email and password." };
+  if (!parsed.success) return { status: "error", message: "Please enter your email and password.", email };
 
   const ip = await clientIp();
   const [ipOk, emailOk] = await Promise.all([
     hitRateLimit(RATE_LIMITS.loginPerIp, ip),
     hitRateLimit(RATE_LIMITS.loginPerEmail, parsed.data.email),
   ]);
-  if (!ipOk || !emailOk) return { status: "error", message: "Too many sign-in attempts. Please wait a few minutes." };
+  if (!ipOk || !emailOk) return { status: "error", message: "Too many sign-in attempts. Please wait a few minutes.", email };
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) return { status: "error", message: GENERIC_SIGN_IN_ERROR };
+  if (error) return { status: "error", message: GENERIC_SIGN_IN_ERROR, email };
 
   const { data: profile } = await supabase.rpc("current_staff_profile").maybeSingle();
   if (!profile || !profile.active) {
     await supabase.auth.signOut();
-    return { status: "error", message: "This account doesn't have access to Reserve-A-Room administration." };
+    return { status: "error", message: "This account doesn't have access to Reserve-A-Room administration.", email };
   }
 
   redirect(safeNextPath(String(form.get("next") ?? "")));
@@ -42,7 +48,9 @@ export async function signIn(_prev: AuthFormState, form: FormData): Promise<Auth
 
 export async function requestPasswordReset(_prev: AuthFormState, form: FormData): Promise<AuthFormState> {
   const parsed = emailField.safeParse(form.get("email"));
-  if (!parsed.success) return { status: "error", message: "Please enter a valid email address." };
+  if (!parsed.success) {
+    return { status: "error", message: "Please enter a valid email address.", email: String(form.get("email") ?? "").slice(0, 320) };
+  }
 
   // Same response whether or not the account exists, so emails can't be probed.
   const success: AuthFormState = {

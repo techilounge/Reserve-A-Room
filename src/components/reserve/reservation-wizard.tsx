@@ -139,6 +139,19 @@ export function ReservationWizard({
     headingRef.current?.focus();
   }, [step]);
 
+  // The date picker and time selects are controlled (not registered), so react-hook-form
+  // can't focus them itself; move focus to the first invalid one in visual order.
+  function focusFirstScheduleError() {
+    const targets: [keyof ReservationInput, string][] = [
+      ["roomId", 'input[name="roomId"]'],
+      ["date", "#reserve-date"],
+      ["start", "#reserve-start"],
+      ["end", "#reserve-end"],
+    ];
+    const first = targets.find(([name]) => form.getFieldState(name).invalid);
+    if (first) document.querySelector<HTMLElement>(first[1])?.focus();
+  }
+
   function resetTimes() {
     setValue("start", "");
     setValue("end", "");
@@ -148,13 +161,16 @@ export function ReservationWizard({
     setSubmitError(null);
     if (step === "schedule") {
       const valid = await trigger([...STEP_FIELDS.schedule], { shouldFocus: true });
+      if (!valid) focusFirstScheduleError();
       const { start: s, end: e } = getValues();
       if (valid && !startOptions.includes(s)) {
         setError("start", { message: "That start time isn't available. Please choose another." });
+        document.getElementById("reserve-start")?.focus();
         return;
       }
       if (valid && !endOptions.includes(e)) {
         setError("end", { message: "That end time isn't available. Please choose another." });
+        document.getElementById("reserve-end")?.focus();
         return;
       }
       if (valid) setStep("details");

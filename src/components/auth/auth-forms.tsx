@@ -47,7 +47,7 @@ export function LoginForm({ next }: { next: string }) {
       <FormMessage state={state} />
       <div className="space-y-1.5">
         <Label htmlFor="email">Email</Label>
-        <Input id="email" name="email" type="email" autoComplete="username" required autoFocus />
+        <Input id="email" name="email" type="email" autoComplete="username" required autoFocus defaultValue={state.email} />
       </div>
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
@@ -70,7 +70,7 @@ export function ForgotPasswordForm() {
       <FormMessage state={state} />
       <div className="space-y-1.5">
         <Label htmlFor="email">Email</Label>
-        <Input id="email" name="email" type="email" autoComplete="username" required autoFocus />
+        <Input id="email" name="email" type="email" autoComplete="username" required autoFocus defaultValue={state.email} />
       </div>
       <SubmitButton pending={pending} idle="Send reset link" busy="Sending…" />
     </form>

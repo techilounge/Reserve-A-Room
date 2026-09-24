@@ -33,6 +33,8 @@ changing behavior; it records the decisions (ADRs) this code must follow.
 - `npm run dev` / `npm run build` / `npm run lint` / `npm run typecheck`
 - `npm test` (unit) · `npm run test:db` (migrations on PGlite: rules, RLS, grants)
 - `npm run check` (typecheck + lint + unit + DB tests)
+- `npm run test:e2e` — Playwright against a production build + the test-only mock Supabase
+  (`e2e/support/mock-supabase.ts`); `PLAYWRIGHT_CHROMIUM_EXECUTABLE` reuses a local Chromium
 - `npm run db:types` — regenerate `src/lib/supabase/database.types.ts` after any migration
 - `npm run brand:generate` — regenerate logos/icons from `assets/branding/`
 - Docker/WSL is unavailable on the dev machine: no `supabase start`. Never run
