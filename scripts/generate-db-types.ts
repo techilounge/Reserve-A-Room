@@ -75,15 +75,34 @@ const fks = (
 ).rows;
 
 const functions = (
-  await db.query<{ name: string; arg_names: string[] | null; arg_types: string[]; arg_defaults: number; return_type: string; returns_set: boolean }>(
-    `select p.proname as name, p.proargnames as arg_names,
-            array(select format_type(t, null) from unnest(p.proargtypes::oid[]) t) as arg_types,
+  await db.query<{
+    name: string;
+    arg_names: string[] | null;
+    arg_modes: string[] | null;
+    all_arg_types: string[];
+    arg_defaults: number;
+    return_type: string;
+    returns_set: boolean;
+  }>(
+    `select p.proname as name, p.proargnames as arg_names, p.proargmodes::text[] as arg_modes,
+            array(select format_type(t, null) from unnest(coalesce(p.proallargtypes, p.proargtypes::oid[])) t) as all_arg_types,
             p.pronargdefaults as arg_defaults, format_type(p.prorettype, null) as return_type, p.proretset as returns_set
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and format_type(p.prorettype, null) <> 'trigger'
      order by p.proname`,
   )
-).rows;
+).rows.map((fn) => {
+  // proargmodes is null when every argument is IN. 't'/'o' are RETURNS TABLE / OUT columns.
+  const modes = fn.arg_modes ?? fn.all_arg_types.map(() => "i");
+  const names = fn.arg_names ?? [];
+  const inputs = fn.all_arg_types
+    .map((type, i) => ({ type, name: names[i] ?? `arg${i}`, mode: modes[i] }))
+    .filter((a) => a.mode === "i" || a.mode === "b" || a.mode === "v");
+  const outputs = fn.all_arg_types
+    .map((type, i) => ({ type, name: names[i] ?? `col${i}`, mode: modes[i] }))
+    .filter((a) => a.mode === "t" || a.mode === "o" || a.mode === "b");
+  return { ...fn, inputs, outputs };
+});
 
 function tsType(udt: string, dataType: string): string {
   if (dataType === "ARRAY") return `${tsType(udt.replace(/^_/, ""), "")}[]`;
@@ -171,12 +190,13 @@ out("    };");
 out("    Views: { [_ in never]: never };");
 out("    Functions: {");
 for (const fn of functions) {
-  const names = fn.arg_names ?? [];
-  const firstOptional = fn.arg_types.length - fn.arg_defaults;
-  const args = fn.arg_types.map(
-    (t, i) => `${names[i] ?? `arg${i}`}${i >= firstOptional ? "?" : ""}: ${formatTypeToTs(t)}`,
-  );
-  const returns = formatTypeToTs(fn.return_type) + (fn.returns_set ? "[]" : "");
+  const firstOptional = fn.inputs.length - fn.arg_defaults;
+  const args = fn.inputs.map((a, i) => `${a.name}${i >= firstOptional ? "?" : ""}: ${formatTypeToTs(a.type)}`);
+  const rowType =
+    fn.outputs.length > 0
+      ? `{ ${fn.outputs.map((o) => `${o.name}: ${formatTypeToTs(o.type)}`).join("; ")} }`
+      : formatTypeToTs(fn.return_type);
+  const returns = rowType + (fn.returns_set ? "[]" : "");
   out(`      ${fn.name}: {`);
   out(`        Args: ${args.length ? `{ ${args.join("; ")} }` : "never"};`);
   out(`        Returns: ${returns};`);

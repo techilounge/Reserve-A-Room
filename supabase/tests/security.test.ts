@@ -357,7 +357,7 @@ describe("first Super Admin bootstrap", () => {
 describe("function privileges (catalog-wide allowlist)", () => {
   // Every function callable by an API role must be listed here on purpose.
   const EXPECTED: Record<"anon" | "authenticated", string[]> = {
-    anon: ["private.is_staff", "private.is_super_admin", "public.booking_horizon_date"],
+    anon: ["private.is_staff", "private.is_super_admin", "public.booking_horizon_date", "public.get_public_busy_blocks"],
     authenticated: [
       "private.is_staff",
       "private.is_super_admin",
@@ -366,6 +366,7 @@ describe("function privileges (catalog-wide allowlist)", () => {
       "private.is_valid_timezone",
       "public.booking_horizon_date",
       "public.get_admin_settings",
+      "public.get_public_busy_blocks",
     ],
   };
 

@@ -8,6 +8,11 @@
       "port": 3000
     },
     {
+      "name": "qa-attach",
+      "url": "http://localhost:3100",
+      "port": 3100
+    },
+    {
       "name": "next-start",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "start"],

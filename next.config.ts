@@ -17,6 +17,12 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  images: {
+    // Room photos live in the public `room-images` Supabase Storage bucket.
+    remotePatterns: [
+      { protocol: "https", hostname: "*.supabase.co", pathname: "/storage/v1/object/public/room-images/**" },
+    ],
+  },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

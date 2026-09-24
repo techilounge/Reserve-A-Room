@@ -14,8 +14,13 @@ import {
 import Link from "next/link";
 
 import { BrandLogo } from "@/components/brand/brand";
+import { CatalogUnavailable } from "@/components/feedback/catalog-unavailable";
+import { RoomCard } from "@/components/rooms/room-card";
 import { Button } from "@/components/ui/button";
+import { loadCatalog } from "@/lib/data/catalog";
 import { site } from "@/lib/site";
+
+export const revalidate = 300;
 
 const STEPS: { icon: LucideIcon; title: string; body: string }[] = [
   {
@@ -68,7 +73,9 @@ const GOOD_TO_KNOW: { icon: LucideIcon; title: string; body: string }[] = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const catalog = await loadCatalog();
+
   return (
     <>
       <section className="relative isolate overflow-hidden bg-hero text-hero-foreground">
@@ -111,6 +118,37 @@ export default function HomePage() {
               <BrandLogo variant="on-dark" priority sizes="(min-width: 1024px) 32rem, 90vw" />
             </div>
           </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="rooms-heading" className="page-container py-14 sm:py-20">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 id="rooms-heading" className="text-2xl font-bold sm:text-3xl">
+              Rooms
+            </h2>
+            <p className="mt-2 text-muted-foreground">Capacity and policies for each room, before you reserve.</p>
+          </div>
+          <Link
+            href="/availability"
+            className="inline-flex items-center gap-1 text-sm font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            See today&apos;s availability
+            <ArrowRight className="size-4" aria-hidden />
+          </Link>
+        </div>
+        <div className="mt-8">
+          {!catalog.ok ? (
+            <CatalogUnavailable reason={catalog.reason} />
+          ) : catalog.catalog.rooms.length === 0 ? (
+            <p className="text-muted-foreground">Rooms will be listed here soon.</p>
+          ) : (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {catalog.catalog.rooms.map((room) => (
+                <RoomCard key={room.id} room={room} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

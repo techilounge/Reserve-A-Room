@@ -602,6 +602,10 @@ export type Database = {
         Args: never;
         Returns: Database["public"]["Tables"]["app_settings"]["Row"];
       };
+      get_public_busy_blocks: {
+        Args: { p_from: string; p_to: string; p_room_ids?: string[] };
+        Returns: { room_id: string; start_at: string; end_at: string }[];
+      };
     };
     Enums: {
       actor_kind: "guest" | "staff" | "system";
