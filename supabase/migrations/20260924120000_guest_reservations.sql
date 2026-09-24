@@ -72,6 +72,7 @@ create function public.create_guest_reservation(
   p_purpose text,
   p_estimated_attendance integer,
   p_token_hash bytea,
+  p_token_seed bytea,
   -- Exactly one of p_ministry_id / p_other_ministry_name ("Other / Not Listed").
   p_ministry_id uuid default null,
   p_other_ministry_name text default null,
@@ -113,7 +114,7 @@ begin
         ministry_id, other_ministry_name, purpose, estimated_attendance,
         setup_requirements, requester_notes,
         approval_required_at_submission, food_drinks_allowed_at_submission, room_capacity_at_submission,
-        guest_token_hash
+        guest_token_hash, guest_token_seed
       ) values (
         v_reference, v_status, 'guest', p_room_id, p_start_at, p_end_at,
         btrim(p_first_name), btrim(p_last_name), lower(btrim(p_email)), p_phone,
@@ -121,7 +122,7 @@ begin
         nullif(btrim(p_setup_requirements), ''), nullif(btrim(p_requester_notes), ''),
         -- Placeholders; the validation trigger replaces them from the room.
         v_room.approval_required, v_room.food_drinks_allowed, v_room.capacity,
-        p_token_hash
+        p_token_hash, p_token_seed
       )
       returning reservations.id into v_id;
       exit;
@@ -299,7 +300,7 @@ $$;
 -- Grants: service role only
 -- ---------------------------------------------------------------------------
 
-revoke execute on function public.create_guest_reservation(uuid, timestamptz, timestamptz, text, text, text, text, text, integer, bytea, uuid, text, text, text) from public, anon, authenticated;
+revoke execute on function public.create_guest_reservation(uuid, timestamptz, timestamptz, text, text, text, text, text, integer, bytea, bytea, uuid, text, text, text) from public, anon, authenticated;
 revoke execute on function public.get_guest_reservation(text, bytea) from public, anon, authenticated;
 revoke execute on function public.cancel_guest_reservation(text, bytea) from public, anon, authenticated;
 revoke execute on function public.hit_rate_limit(text, text, integer, integer) from public, anon, authenticated;
@@ -308,7 +309,7 @@ revoke execute on function private.queue_email(uuid, text, text) from public, an
 revoke execute on function private.queue_staff_emails(uuid, text) from public, anon, authenticated;
 revoke execute on function private.notify_staff(text, text, text, uuid) from public, anon, authenticated;
 
-grant execute on function public.create_guest_reservation(uuid, timestamptz, timestamptz, text, text, text, text, text, integer, bytea, uuid, text, text, text) to service_role;
+grant execute on function public.create_guest_reservation(uuid, timestamptz, timestamptz, text, text, text, text, text, integer, bytea, bytea, uuid, text, text, text) to service_role;
 grant execute on function public.get_guest_reservation(text, bytea) to service_role;
 grant execute on function public.cancel_guest_reservation(text, bytea) to service_role;
 grant execute on function public.hit_rate_limit(text, text, integer, integer) to service_role;

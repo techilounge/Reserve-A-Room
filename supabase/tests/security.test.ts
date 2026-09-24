@@ -134,6 +134,9 @@ describe("admins", () => {
     await expect(
       asRole(db, "authenticated", (tx) => tx.query("select guest_token_hash from public.reservations"), admin),
     ).rejects.toMatchObject(PERMISSION_DENIED);
+    await expect(
+      asRole(db, "authenticated", (tx) => tx.query("select guest_token_seed from public.reservations"), admin),
+    ).rejects.toMatchObject(PERMISSION_DENIED);
   });
 
   it("cannot write reservations directly", async () => {
@@ -358,15 +361,29 @@ describe("function privileges (catalog-wide allowlist)", () => {
   // Every function callable by an API role must be listed here on purpose.
   const EXPECTED: Record<"anon" | "authenticated", string[]> = {
     anon: ["private.is_staff", "private.is_super_admin", "public.booking_horizon_date", "public.get_public_busy_blocks"],
+    // Staff functions re-check the caller's role inside (RAR09 for non-staff).
     authenticated: [
       "private.is_staff",
       "private.is_super_admin",
       "private.is_valid_advance",
       "private.is_valid_email",
       "private.is_valid_timezone",
+      "private.require_staff",
+      "public.admin_calendar",
+      "public.admin_dashboard",
+      "public.admin_get_reservation",
+      "public.admin_list_reservations",
+      "public.admin_reservation_emails",
+      "public.approve_reservation",
       "public.booking_horizon_date",
+      "public.cancel_reservation",
+      "public.create_staff_reservation",
+      "public.current_staff_profile",
+      "public.decline_reservation",
       "public.get_admin_settings",
       "public.get_public_busy_blocks",
+      "public.update_admin_notes",
+      "public.update_reservation",
     ],
   };
 

@@ -168,8 +168,10 @@ create table public.reservations (
   cancelled_at timestamptz,
   cancelled_by_requester boolean not null default false,
 
-  -- sha256 of the guest management token. The token itself is never stored.
+  -- Guest management link (ADR-9): token = HMAC(GUEST_LINK_SECRET, seed). Only the
+  -- seed and sha256(token) are stored; without the server secret neither yields a link.
   guest_token_hash bytea not null,
+  guest_token_seed bytea not null,
 
   -- Lower-cased haystack for indexed admin search.
   search_text text generated always as (
@@ -198,6 +200,7 @@ create table public.reservations (
   constraint reservations_admin_notes_length check (admin_notes is null or char_length(admin_notes) <= 4000),
   constraint reservations_requester_message_length check (requester_message is null or char_length(requester_message) <= 1000),
   constraint reservations_token_hash_length check (octet_length(guest_token_hash) = 32),
+  constraint reservations_token_seed_length check (octet_length(guest_token_seed) = 16),
   constraint reservations_status_timestamps check (
     (status <> 'approved' or approved_at is not null)
     and (status <> 'declined' or declined_at is not null)

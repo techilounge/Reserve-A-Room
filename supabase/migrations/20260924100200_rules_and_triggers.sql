@@ -126,6 +126,13 @@ begin
     raise exception 'New reservations must be pending or approved.' using errcode = 'RAR05';
   end if;
 
+  -- An UPDATE that lists room/time but doesn't change them (e.g. editing notes on a past
+  -- reservation) is not a reschedule and must not be re-validated.
+  if tg_op = 'UPDATE'
+     and new.room_id = old.room_id and new.start_at = old.start_at and new.end_at = old.end_at then
+    return new;
+  end if;
+
   -- Checked here (before the generated range column is computed) so the caller gets a
   -- clear error instead of a range-construction failure.
   if new.end_at <= new.start_at then

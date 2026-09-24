@@ -126,12 +126,12 @@ export async function insertReservation(db: Queryable, input: ReservationInput):
        requester_first_name, requester_last_name, requester_email, requester_phone,
        other_ministry_name, purpose, estimated_attendance,
        approval_required_at_submission, food_drinks_allowed_at_submission, room_capacity_at_submission,
-       guest_token_hash)
+       guest_token_hash, guest_token_seed)
      values (private.generate_reference_code(), $1, $2, $3, $4,
        'Test', 'Guest', 'guest@example.org', '+15125550123',
        'Test Group', 'Planning meeting', 10,
        false, false, 0,
-       sha256(convert_to(gen_random_uuid()::text, 'UTF8')))
+       sha256(convert_to(gen_random_uuid()::text, 'UTF8')), uuid_send(gen_random_uuid()))
      returning id, reference_code`,
     [input.status ?? "pending", input.roomId, input.startAt, input.endAt],
   );

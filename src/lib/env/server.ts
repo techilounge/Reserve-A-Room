@@ -21,6 +21,7 @@ const serverSchema = z.object({
   RESEND_FROM_EMAIL: optionalString,
   RESEND_REPLY_TO: optionalString,
   RATE_LIMIT_SECRET: optionalString,
+  GUEST_LINK_SECRET: optionalString,
   TURNSTILE_SECRET_KEY: optionalString,
   CRON_SECRET: optionalString,
   APP_TIMEZONE: z.string().trim().default("America/Chicago"),

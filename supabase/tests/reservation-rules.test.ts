@@ -292,9 +292,9 @@ describe("status state machine", () => {
         `insert into public.reservations (reference_code, status, room_id, start_at, end_at, requester_first_name,
            requester_last_name, requester_email, requester_phone, other_ministry_name, purpose, estimated_attendance,
            approval_required_at_submission, food_drinks_allowed_at_submission, room_capacity_at_submission,
-           guest_token_hash, cancelled_at)
+           guest_token_hash, guest_token_seed, cancelled_at)
          values (private.generate_reference_code(), 'cancelled', $1, $2, $3, 'A', 'B', 'a@example.org', '+15125550123',
-           'X', 'Y', 1, false, false, 1, sha256('x'::bytea), now())`,
+           'X', 'Y', 1, false, false, 1, sha256('x'::bytea), uuid_send(gen_random_uuid()), now())`,
         [room, await localTime(db, 12, "09:00"), await localTime(db, 12, "10:00")],
       ),
     ).rejects.toMatchObject({ code: "RAR05" });

@@ -5,10 +5,10 @@ import { CatalogUnavailable } from "@/components/feedback/catalog-unavailable";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { ReservationWizard } from "@/components/reserve/reservation-wizard";
-import type { ReservePrefill, ReserveRoom } from "@/components/reserve/types";
-import { compareLocalDates, isLocalDate, isLocalTime, todayInZone } from "@/lib/datetime";
+import type { ReservePrefill } from "@/components/reserve/types";
+import { compareLocalDates, isLocalDate, isLocalTime } from "@/lib/datetime";
 import { loadCatalog } from "@/lib/data/catalog";
-import { horizonDate } from "@/lib/domain/rooms/advance-booking";
+import { reserveContext } from "@/lib/reservations/reserve-context";
 
 // "Today" and each room's horizon must be computed per request.
 export const dynamic = "force-dynamic";
@@ -38,22 +38,8 @@ export default async function ReservePage({ searchParams }: PageProps<"/reserve"
     );
   }
 
-  const { settings, ministries } = catalog.catalog;
-  const today = todayInZone(settings.timeZone);
-  const rooms: ReserveRoom[] = catalog.catalog.rooms
-    .filter((r) => r.reservable)
-    .map((r) => ({
-      id: r.id,
-      slug: r.slug,
-      name: r.name,
-      description: r.description,
-      location: r.location,
-      capacity: r.capacity,
-      approvalRequired: r.approvalRequired,
-      foodDrinksAllowed: r.foodDrinksAllowed,
-      advance: r.advance,
-      horizon: horizonDate(today, r.advance),
-    }));
+  const { ministries } = catalog.catalog;
+  const { rooms, settings, today } = reserveContext(catalog.catalog);
 
   if (rooms.length === 0) {
     return (
@@ -89,13 +75,7 @@ export default async function ReservePage({ searchParams }: PageProps<"/reserve"
       <ReservationWizard
         rooms={rooms}
         ministries={ministries}
-        settings={{
-          timeZone: settings.timeZone,
-          dayStart: settings.dayStart,
-          dayEnd: settings.dayEnd,
-          intervalMinutes: settings.intervalMinutes,
-          leadMinutes: settings.leadMinutes,
-        }}
+        settings={settings}
         today={today}
         prefill={prefill}
       />

@@ -50,6 +50,7 @@ async function createGuest(room: string, day: number, from: string, to: string, 
     p_setup_requirements: "",
     p_requester_notes: null,
     p_token_hash: hash,
+    p_token_seed: randomBytes(16),
     ...overrides,
   };
   const names = Object.keys(args);
@@ -146,7 +147,7 @@ describe("guest access by secure token", () => {
       (await tx.query<Record<string, unknown>>("select * from public.get_guest_reservation($1, $2)", [r.reference_code.toLowerCase(), r.hash])).rows[0],
     );
     expect(row).toMatchObject({ reference_code: r.reference_code, status: "pending", requester_notes: "Bring extension cords", can_cancel: true });
-    for (const privateField of ["admin_notes", "guest_token_hash", "requester_email", "requester_phone", "requester_last_name"]) {
+    for (const privateField of ["admin_notes", "guest_token_hash", "guest_token_seed", "requester_email", "requester_phone", "requester_last_name"]) {
       expect(row).not.toHaveProperty(privateField);
     }
 

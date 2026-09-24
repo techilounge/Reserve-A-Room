@@ -1,13 +1,24 @@
+import { AccountMenu } from "@/components/admin/account-menu";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { ADMIN_NAV } from "@/lib/navigation";
+import { requireStaffPage } from "@/lib/auth/guards";
+import { navigationFor } from "@/lib/navigation";
 
-/*
- * Phase 1: layout only. There is no authentication yet and these pages contain no data.
- * Phase 5 adds the session/role guard here and replaces `allHrefs` with the items from
- * navigationFor(actor) for the signed-in user.
- */
-const allHrefs = ADMIN_NAV.flatMap((group) => group.items.map((item) => item.href));
+export const dynamic = "force-dynamic";
 
-export default function AdminPortalLayout({ children }: LayoutProps<"/admin">) {
-  return <AdminShell allowedHrefs={allHrefs}>{children}</AdminShell>;
+const ROLE_LABEL = { admin: "Admin", super_admin: "Super Admin" } as const;
+
+export default async function AdminPortalLayout({ children }: LayoutProps<"/admin">) {
+  const profile = await requireStaffPage();
+  const allowedHrefs = navigationFor({ kind: "staff", role: profile.role, active: profile.active }).flatMap((g) =>
+    g.items.map((i) => i.href),
+  );
+
+  return (
+    <AdminShell
+      allowedHrefs={allowedHrefs}
+      headerActions={<AccountMenu name={profile.fullName} email={profile.email} roleLabel={ROLE_LABEL[profile.role]} />}
+    >
+      {children}
+    </AdminShell>
+  );
 }

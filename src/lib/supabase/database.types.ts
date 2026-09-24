@@ -373,6 +373,7 @@ export type Database = {
           cancelled_at: string | null;
           cancelled_by_requester: boolean;
           guest_token_hash: string;
+          guest_token_seed: string;
           search_text: string | null;
           created_at: string;
           updated_at: string;
@@ -410,6 +411,7 @@ export type Database = {
           cancelled_at?: string | null;
           cancelled_by_requester?: boolean;
           guest_token_hash: string;
+          guest_token_seed: string;
           search_text?: never;
           created_at?: string;
           updated_at?: string;
@@ -447,6 +449,7 @@ export type Database = {
           cancelled_at?: string | null;
           cancelled_by_requester?: boolean;
           guest_token_hash?: string;
+          guest_token_seed?: string;
           search_text?: never;
           created_at?: string;
           updated_at?: string;
@@ -590,6 +593,30 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
+      admin_calendar: {
+        Args: { p_from: string; p_to: string; p_room_id?: string; p_include_cancelled?: boolean };
+        Returns: { id: string; reference_code: string; status: Database["public"]["Enums"]["reservation_status"]; room_id: string; room_name: string; start_at: string; end_at: string; requester_first_name: string; requester_last_name: string; ministry_name: string; purpose: string }[];
+      };
+      admin_dashboard: {
+        Args: never;
+        Returns: { pending_count: number; approved_today_count: number; upcoming_count: number; week_count: number }[];
+      };
+      admin_get_reservation: {
+        Args: { p_id: string };
+        Returns: { id: string; reference_code: string; status: Database["public"]["Enums"]["reservation_status"]; source: Database["public"]["Enums"]["reservation_source"]; room_id: string; room_name: string; room_slug: string; room_capacity: number; room_food_drinks_allowed: boolean; room_approval_required: boolean; start_at: string; end_at: string; requester_first_name: string; requester_last_name: string; requester_email: string; requester_phone: string; ministry_id: string; ministry_name: string; other_ministry_name: string; purpose: string; estimated_attendance: number; setup_requirements: string; requester_notes: string; admin_notes: string; requester_message: string; approval_required_at_submission: boolean; food_drinks_allowed_at_submission: boolean; room_capacity_at_submission: number; created_by_name: string; approved_by_name: string; approved_at: string; declined_by_name: string; declined_at: string; cancelled_by_name: string; cancelled_at: string; cancelled_by_requester: boolean; created_at: string; updated_at: string }[];
+      };
+      admin_list_reservations: {
+        Args: { p_search?: string; p_statuses?: Database["public"]["Enums"]["reservation_status"][]; p_room_id?: string; p_ministry_id?: string; p_from?: string; p_to?: string; p_approval?: string; p_sort?: string; p_limit?: number; p_offset?: number };
+        Returns: { id: string; reference_code: string; status: Database["public"]["Enums"]["reservation_status"]; source: Database["public"]["Enums"]["reservation_source"]; room_id: string; room_name: string; room_capacity: number; start_at: string; end_at: string; requester_first_name: string; requester_last_name: string; requester_email: string; requester_phone: string; ministry_name: string; purpose: string; estimated_attendance: number; approval_required_at_submission: boolean; approved_by: string; created_at: string; total_count: number }[];
+      };
+      admin_reservation_emails: {
+        Args: { p_id: string };
+        Returns: { id: string; recipient: string; event_type: string; status: Database["public"]["Enums"]["email_status"]; error_message: string; attempt_count: number; sent_at: string; created_at: string }[];
+      };
+      approve_reservation: {
+        Args: { p_id: string; p_message?: string };
+        Returns: Database["public"]["Enums"]["reservation_status"];
+      };
       booking_horizon_date: {
         Args: { p_room_id: string; p_at?: string };
         Returns: string;
@@ -602,9 +629,25 @@ export type Database = {
         Args: { p_reference: string; p_token_hash: string };
         Returns: Database["public"]["Enums"]["reservation_status"];
       };
+      cancel_reservation: {
+        Args: { p_id: string; p_message?: string };
+        Returns: Database["public"]["Enums"]["reservation_status"];
+      };
       create_guest_reservation: {
-        Args: { p_room_id: string; p_start_at: string; p_end_at: string; p_first_name: string; p_last_name: string; p_email: string; p_phone: string; p_purpose: string; p_estimated_attendance: number; p_token_hash: string; p_ministry_id?: string; p_other_ministry_name?: string; p_setup_requirements?: string; p_requester_notes?: string };
+        Args: { p_room_id: string; p_start_at: string; p_end_at: string; p_first_name: string; p_last_name: string; p_email: string; p_phone: string; p_purpose: string; p_estimated_attendance: number; p_token_hash: string; p_token_seed: string; p_ministry_id?: string; p_other_ministry_name?: string; p_setup_requirements?: string; p_requester_notes?: string };
         Returns: { id: string; reference_code: string; status: Database["public"]["Enums"]["reservation_status"] }[];
+      };
+      create_staff_reservation: {
+        Args: { p_room_id: string; p_start_at: string; p_end_at: string; p_first_name: string; p_last_name: string; p_email: string; p_phone: string; p_purpose: string; p_estimated_attendance: number; p_token_hash: string; p_token_seed: string; p_ministry_id?: string; p_other_ministry_name?: string; p_setup_requirements?: string; p_requester_notes?: string; p_admin_notes?: string; p_notify?: boolean };
+        Returns: { id: string; reference_code: string }[];
+      };
+      current_staff_profile: {
+        Args: never;
+        Returns: { id: string; email: string; full_name: string; role: Database["public"]["Enums"]["app_role"]; active: boolean; email_notifications: boolean }[];
+      };
+      decline_reservation: {
+        Args: { p_id: string; p_message?: string; p_admin_note?: string };
+        Returns: Database["public"]["Enums"]["reservation_status"];
       };
       get_admin_settings: {
         Args: never;
@@ -620,6 +663,14 @@ export type Database = {
       };
       hit_rate_limit: {
         Args: { p_bucket: string; p_key_hash: string; p_limit: number; p_window_seconds: number };
+        Returns: boolean;
+      };
+      update_admin_notes: {
+        Args: { p_id: string; p_admin_notes: string };
+        Returns: undefined;
+      };
+      update_reservation: {
+        Args: { p_id: string; p_room_id: string; p_start_at: string; p_end_at: string; p_first_name: string; p_last_name: string; p_email: string; p_phone: string; p_purpose: string; p_estimated_attendance: number; p_ministry_id?: string; p_other_ministry_name?: string; p_setup_requirements?: string; p_requester_notes?: string; p_admin_notes?: string; p_notify?: boolean };
         Returns: boolean;
       };
     };

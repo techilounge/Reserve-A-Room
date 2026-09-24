@@ -5,7 +5,7 @@ import { getBusyBlocks } from "@/lib/data/availability";
 import { loadCatalog } from "@/lib/data/catalog";
 import { isRangeAvailable, type BusyBlock, type DayWindow } from "@/lib/domain/availability";
 import { friendlyMessage, toAppError, type AppErrorKind } from "@/lib/domain/errors";
-import { generateGuestToken, hashGuestToken } from "@/lib/domain/guest-token";
+import { newGuestToken } from "@/lib/domain/guest-token";
 import { advanceLabel, advanceLimitMessage, isWithinHorizon } from "@/lib/domain/rooms/advance-booking";
 import { hitRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
 import { clientIp } from "@/lib/security/request";
@@ -132,7 +132,7 @@ export async function createGuestReservation(raw: unknown, meta: SubmissionMeta)
   }
 
   // 6. Create atomically in the database.
-  const token = generateGuestToken();
+  const link = newGuestToken();
   const { data, error } = await createSupabaseServiceClient()
     .rpc("create_guest_reservation", {
       p_room_id: room.id,
@@ -148,7 +148,8 @@ export async function createGuestReservation(raw: unknown, meta: SubmissionMeta)
       p_estimated_attendance: input.estimatedAttendance,
       p_setup_requirements: input.setupRequirements,
       p_requester_notes: input.requesterNotes,
-      p_token_hash: hashGuestToken(token),
+      p_token_hash: link.hash,
+      p_token_seed: link.seed,
     })
     .single();
 
@@ -163,5 +164,5 @@ export async function createGuestReservation(raw: unknown, meta: SubmissionMeta)
     return fail(appError.kind, appError.message, SCHEDULE_KINDS.has(appError.kind) ? "schedule" : "review");
   }
 
-  return { ok: true, reference: data.reference_code, status: data.status, token };
+  return { ok: true, reference: data.reference_code, status: data.status, token: link.token };
 }

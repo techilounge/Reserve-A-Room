@@ -17,6 +17,9 @@ export const RATE_LIMITS = {
   reservationPerEmail: { bucket: "reserve:email", limit: 8, windowSeconds: 24 * 60 * 60 },
   guestCancelPerIp: { bucket: "cancel:ip", limit: 20, windowSeconds: 60 * 60 },
   guestLookupPerIp: { bucket: "lookup:ip", limit: 60, windowSeconds: 60 * 60 },
+  loginPerIp: { bucket: "login:ip", limit: 10, windowSeconds: 10 * 60 },
+  loginPerEmail: { bucket: "login:email", limit: 10, windowSeconds: 60 * 60 },
+  passwordResetPerIp: { bucket: "reset:ip", limit: 5, windowSeconds: 60 * 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 function secret(): string {
