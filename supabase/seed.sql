@@ -1,0 +1,4 @@
+-- DEV-ONLY seed. Runs only on a local `supabase db reset`; never on the hosted project.
+--
+-- Real reference data (the Conference Room, ministries, amenities, settings) ships in
+-- migrations. Automated tests create their own fixtures, so nothing is needed here.

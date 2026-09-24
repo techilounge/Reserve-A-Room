@@ -15,7 +15,7 @@ phase builds on. When a decision changes, update this file in the same commit.
 | Remote `techilounge/Reserve-A-Room` | Empty, **public** repository, no default branch yet. |
 | Vercel | Connected to the repo (per owner). Production branch: `main`. The development branch deploys as a Vercel **Preview** for owner testing. |
 | Package manager | **npm** (only manager installed; Node 24.19, npm 11.17). |
-| Docker | Available → local Supabase stack + pgTAP database tests are possible. |
+| Docker | Installed, but cannot start on this machine (WSL is not installed). Database tests therefore run on PGlite instead (ADR-22). |
 | Supabase CLI | Not installed globally → used via the `supabase` npm dev dependency (`npx supabase`). |
 | Development branch | `claude/reserve-a-room-build` |
 
@@ -41,7 +41,7 @@ files (other than `.env.example`), no keys, no real member data in seeds or fixt
 | Email | Resend + React Email | Server-only. |
 | PWA | Hand-written service worker (`public/sw.js`) + `app/manifest.ts` | See ADR-12. No PWA plugin. |
 | Unit tests | Vitest 5 | Co-located `*.test.ts`. Component-test libraries are added when a phase needs them. |
-| DB tests | pgTAP via `supabase test db` | RLS, constraints, functions. |
+| DB tests | Vitest + PGlite (in-process Postgres) running the real migrations | RLS, constraints, triggers, grants (ADR-22). |
 | E2E | Playwright | Against local Supabase + `next start`. |
 | Hosting | Vercel (Fluid compute / Node runtime) | Node 24 locally; `engines.node >= 22`. |
 | Fonts | Inter (body), Plus Jakarta Sans (headings) via `next/font` | Self-hosted at build time; no runtime requests to Google. |
@@ -97,7 +97,7 @@ is enforced in Postgres, and mirrored in TypeScript only to give good feedback e
 │  ├─ config.toml
 │  ├─ migrations/                  ← every schema change, timestamped
 │  ├─ seed.sql                     ← DEV-ONLY data (local `db reset` only; never production)
-│  └─ tests/                       ← pgTAP: RLS, constraints, functions
+│  └─ tests/                       ← DB tests (PGlite): rules, RLS, grants
 ├─ src/
 │  ├─ app/
 │  │  ├─ (public)/                 ← public layout: header, footer, install prompt
@@ -134,7 +134,7 @@ is enforced in Postgres, and mirrored in TypeScript only to give good feedback e
 │  │  ├─ validation/               ← shared Zod schemas
 │  │  ├─ datetime/                 ← tz-aware helpers (single source of tz)
 │  │  ├─ email/  notifications/  audit/  rate-limit/  settings/
-│  │  └─ env.ts                    ← validated env (server vs public split)
+│  │  └─ env/                      ← public.ts (NEXT_PUBLIC_*) + server.ts (server-only secrets)
 │  └─ proxy.ts
 ├─ tests/e2e/                      ← Playwright specs
 │  (unit tests are co-located as *.test.ts)
@@ -162,7 +162,7 @@ Roles: `guest` (unauthenticated, no record), `admin`, `super_admin` (Postgres en
 
 ## 6. Database model
 
-Extensions: `btree_gist`, `citext`, `pgcrypto`. Enums: `app_role`,
+Extensions: `btree_gist`, `pg_trgm` (no `citext`/`pgcrypto`; see ADR-23). Enums: `app_role`,
 `reservation_status (pending, approved, declined, cancelled)`,
 `advance_unit (day, week, month)`, `reservation_source (guest, admin)`,
 `email_status (queued, sent, failed, skipped)`.
@@ -173,7 +173,7 @@ Extensions: `btree_gist`, `citext`, `pgcrypto`. Enums: `app_role`,
 | --- | --- | --- |
 | id | uuid PK | |
 | name | text, 1–100 | |
-| slug | citext unique | URL-safe, generated from name, editable |
+| slug | text unique, lowercase (CHECK) | URL-safe, generated from name, editable |
 | description | text ≤ 2000, null | |
 | location | text ≤ 200, null | e.g. "Lower level, east wing" |
 | **capacity** | int NOT NULL, > 0 | Drives the capacity warning |
@@ -198,13 +198,13 @@ computed by one SQL function and one mirrored TS function, both covered by the s
 test fixtures.
 
 ### 6.2 `ministries`
-`id, name (citext unique), active, sort_order, created_at, updated_at`. The starter
+`id, name (unique on lower(name)), active, sort_order, created_at, updated_at`. The starter
 list from the brief ships in a migration (real reference data, idempotent). "Other /
 Not Listed" is **not** a row; it is represented by `ministry_id IS NULL` +
 `other_ministry_name`.
 
 ### 6.3 `profiles` (admins only)
-`id (PK → auth.users), full_name, email (citext), role app_role, active,
+`id (PK → auth.users), full_name, email (lowercase text, unique), role app_role, active,
 email_notifications bool default true, invited_by, created_at, updated_at`.
 Last sign-in is read from `auth.users.last_sign_in_at` through a Super-Admin-only function.
 
@@ -221,7 +221,7 @@ Last sign-in is read from `auth.users.last_sign_in_at` through a Super-Admin-onl
 | reservation_range | tstzrange GENERATED `[start_at, end_at)` STORED | |
 | **requester_first_name** | text 1–80 | |
 | **requester_last_name** | text 1–80 | |
-| **requester_email** | citext ≤ 254 | |
+| **requester_email** | text ≤ 254, lowercase (CHECK) | |
 | **requester_phone** | text | Normalized E.164 (`+15125550123`); formatted on display |
 | **ministry_id** | uuid FK ministries, null | |
 | **other_ministry_name** | text ≤ 120, null | CHECK: exactly one of ministry_id / other_ministry_name |
@@ -372,7 +372,7 @@ Exclusion constraint (Section 6.4) with `[)` ranges, so 9–10 and 10–11 do no
 `pending` and `approved` hold the room. The pre-submit availability check is for UX only;
 a `23P01` from the insert or reschedule is mapped to: "That room was just reserved or
 requested by someone else for this time. Please select another time or room." Race
-behavior is proven by a pgTAP test and a concurrent-request test.
+behavior is proven by database tests (overlap, adjacency, release on cancel/decline, reschedule onto a held slot).
 
 ### ADR-7 · Time rules
 - Stored as `timestamptz` (UTC). The timezone lives in `app_settings.timezone` (seeded from
@@ -534,3 +534,68 @@ Routes for later phases exist now so navigation and layout can be reviewed on th
 Each shows an honest `<UpcomingFeature>` notice and never pretends to work. Each phase
 removes the notices for what it implements. The launch checklist requires
 `grep -r UpcomingFeature src` to return nothing.
+
+---
+
+## 10. Phase 2 decisions
+
+### ADR-22 · Database tests on PGlite
+Docker Desktop can't run on the development machine because WSL isn't installed, so the local
+Supabase stack (and `supabase test db`) is unavailable. Database tests use **PGlite**, the real
+Postgres engine compiled to WASM, running in-process:
+- `supabase/tests/support/supabase-stub.sql` emulates the Supabase platform pieces our
+  migrations touch:
+  - the API roles `anon`, `authenticated` and `service_role`
+  - `auth.users` and `auth.uid()` (reads `request.jwt.claims` like PostgREST)
+  - the `extensions` schema
+  - Supabase's *permissive* default grants, so the tests prove that our revokes work
+- Every test DB applies the **real** migration files in order.
+- `asRole()` runs queries exactly as PostgREST does (`SET LOCAL ROLE` + JWT claims), so RLS
+  and column grants are exercised for real.
+- `npm run db:types` generates `src/lib/supabase/database.types.ts` from the same PGlite
+  catalog, in the Supabase CLI's format.
+
+PGlite is Postgres 18 and Supabase runs 17. The migrations use nothing 17 lacks.
+
+Limitation: PGlite is single-connection, so true two-session race tests need a real server.
+The exclusion constraint's concurrency guarantee is a core Postgres property; the Phase 11
+race test runs against a real Supabase database when one is configured.
+
+### ADR-23 · No citext/pgcrypto; explicit function privileges
+- Emails and slugs are stored lowercase with CHECK constraints instead of `citext`. Inside
+  `search_path = ''` security-definer functions, citext operators silently fall back to
+  case-sensitive text comparison.
+- Randomness uses core `gen_random_uuid()`, and token hashes use core `sha256()`.
+- Postgres grants EXECUTE on new functions to PUBLIC. Supabase-style *per-schema* default
+  revokes can't remove that, a finding caught by our tests. So the foundation migration
+  revokes it globally.
+- Every function grants EXECUTE explicitly. A catalog-wide test asserts the exact
+  allowlist of functions `anon` and `authenticated` can execute, so an accidental grant
+  fails the test suite.
+
+### ADR-24 · Environment and clients
+- `src/lib/env/public.ts`: browser-safe `NEXT_PUBLIC_*` config.
+- `src/lib/env/server.ts`: marked `server-only`; secrets are parsed with Zod.
+- Supabase clients:
+  - `supabase/server.ts`: user session, RLS applies.
+  - `supabase/browser.ts`: staff sign-in.
+  - `supabase/service.ts`: `server-only`, bypasses RLS, used only for guest/system flows.
+- Missing configuration raises a clear `ConfigurationError` when used, not at import, so
+  builds without secrets still succeed.
+
+### ADR-25 · Custom error codes
+Business-rule violations raise custom SQLSTATEs, which `src/lib/domain/errors.ts` maps to
+friendly messages. Raw database errors are never shown.
+
+| Code | Meaning |
+| --- | --- |
+| `RAR01` | Room not reservable |
+| `RAR02` | Beyond the advance-booking limit |
+| `RAR03` | Start is in the past or too soon |
+| `RAR04` | Invalid time (hours, increments, order) |
+| `RAR05` | Invalid status change |
+| `RAR06` | Last active Super Admin |
+| `RAR07` | Rate limited |
+| `RAR08` | Not found |
+| `RAR09` | Not authorized |
+| `23P01` | Time slot already held (exclusion constraint) |

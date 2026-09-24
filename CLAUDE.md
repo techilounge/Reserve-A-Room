@@ -31,10 +31,23 @@ changing behavior; it records the decisions (ADRs) this code must follow.
 
 ## Commands
 - `npm run dev` / `npm run build` / `npm run lint` / `npm run typecheck`
-- `npm test` (Vitest) · `npm run check` (typecheck + lint + tests)
+- `npm test` (unit) · `npm run test:db` (migrations on PGlite: rules, RLS, grants)
+- `npm run check` (typecheck + lint + unit + DB tests)
+- `npm run db:types` — regenerate `src/lib/supabase/database.types.ts` after any migration
 - `npm run brand:generate` — regenerate logos/icons from `assets/branding/`
-- Later phases: `npm run test:db` (pgTAP), `npm run test:e2e` (Playwright),
-  `npx supabase start` / `npx supabase db reset`
+- Docker/WSL is unavailable on the dev machine: no `supabase start`. Never run
+  `supabase db push` against the hosted project without the owner's approval.
+
+## Database conventions
+- New migration per change (`supabase/migrations/<timestamp>_<name>.sql`); never edit one
+  that has been applied to the hosted project.
+- Every new function: `set search_path = ''`, fully qualified names, and explicit
+  `grant execute` to exactly the roles that need it. Update the allowlist test in
+  `supabase/tests/security.test.ts` when a role legitimately gains a function.
+- Business-rule errors use custom SQLSTATEs (`RAR01`–`RAR09`) mapped in
+  `src/lib/domain/errors.ts`.
+- Never write shell commands with backticks inside double quotes (bash runs them). Use
+  file-edit tools for prose/SQL.
 
 ## UI conventions
 - Pages for unbuilt phases use `<UpcomingFeature>`. Remove it when the phase lands.
