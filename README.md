@@ -5,8 +5,9 @@ Room reservations for **Stonehill Seventh-day Adventist Church**
 
 Production: https://reservearoom.stonehillchurch.org
 
-> **Status:** Phases 0–8 complete: public room browsing and availability, guest
-> reservations, the staff portal, Super Admin management, in-app notifications and email.
+> **Status:** Phases 0–9 complete: public room browsing and availability, guest
+> reservations, the staff portal, Super Admin management, in-app notifications, email and
+> the installable PWA.
 > Sections marked _(pending)_ are filled in by the phase that implements them.
 
 ## What it does
@@ -250,7 +251,35 @@ Other Super Admin areas:
   active Super Admin can't be demoted or disabled.
 - **Settings:** timezone, bookable hours, time increments, minimum notice, default
   advance limit, guest cancellation, and extra notification emails.
-## PWA behavior _(pending — Phase 9)_
+## PWA behavior
+
+Reserve-A-Room can be installed on phones, tablets and desktops (manifest:
+`src/app/manifest.ts`, icons in `public/icons/`).
+
+- **Installing:**
+  - **Chrome, Edge and Android:** a small "Install this app" card appears on public pages
+    a few seconds after loading.
+  - **iPhone and iPad:** the same card opens step-by-step "Add to Home Screen"
+    instructions.
+  - **Where it's hidden:** during a reservation (`/reserve`, `/reservation/...`) and when
+    already running as an installed app.
+  - **Dismissing:** "Not now" hides the card for 30 days. The footer's **Install app**
+    link stays available.
+- **Offline:**
+  - The service worker (`public/sw.js`) pre-caches only the offline page, the assets it
+    needs and the brand images.
+  - When a page can't load, "You're offline" is shown, and it reloads by itself when the
+    connection returns.
+  - Availability, reservations and the staff portal are never cached, and nothing can be
+    submitted offline. The reservation form also disables submission while offline.
+  - Private reservation links (`/reservation/...`) are never handled by the service
+    worker.
+- **Updates:** each deployment registers `/sw.js?v=<commit>`, which installs a fresh
+  worker and removes the previous version's caches. `/sw.js` is served with `no-cache`
+  headers.
+- **Development:** the service worker is registered only in production builds
+  (`npm run build && npm run start`), so `npm run dev` is never affected by caching.
+
 ## Testing _(pending — Phase 11)_
 ## Production deployment & domain _(pending — Phase 12)_
 ## Troubleshooting _(pending — Phase 12)_

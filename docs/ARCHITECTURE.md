@@ -430,6 +430,13 @@ they add build coupling (Turbopack) for little benefit here. The reservation for
 submission when `navigator.onLine` is false and shows the offline message.
 Install UX: a `beforeinstallprompt` button (dismissal remembered), an iOS "Add to Home
 Screen" sheet, and hidden in standalone mode.
+**As built (Phase 9):**
+- The worker is registered as `/sw.js?v=<build id>` (`NEXT_PUBLIC_BUILD_ID`, from the commit
+  SHA), so each deployment installs a new worker with its own caches.
+- On install it fetches `/offline` and caches every `/_next/static` asset that page
+  references, so the fallback renders styled.
+- `/reservation/*`, `/admin/auth/*` and `/api/*` are never intercepted.
+- Registration happens in production builds only.
 
 ### ADR-13 · Authentication & bootstrap
 Supabase Auth email + password for staff only. Public signup is disabled in the

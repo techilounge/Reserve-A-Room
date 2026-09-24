@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 
+import { ServiceWorkerRegistration } from "@/components/pwa/service-worker";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { getAppUrl } from "@/lib/app-url";
@@ -29,6 +30,7 @@ export const metadata: Metadata = {
   description: site.description,
   applicationName: site.appName,
   formatDetection: { telephone: false },
+  appleWebApp: { capable: true, title: site.appName, statusBarStyle: "default" },
   openGraph: {
     type: "website",
     siteName: `${site.appName} · ${site.churchShortName}`,
@@ -55,6 +57,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ThemeProvider>
           {children}
           <Toaster position="top-center" richColors closeButton />
+          <ServiceWorkerRegistration />
         </ThemeProvider>
       </body>
     </html>

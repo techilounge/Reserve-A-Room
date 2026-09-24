@@ -2,6 +2,7 @@ import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 import { BrandLogo } from "@/components/brand/brand";
+import { InstallFooterButton } from "@/components/pwa/install-prompt";
 import { site } from "@/lib/site";
 
 export function SiteFooter() {
@@ -28,6 +29,7 @@ export function SiteFooter() {
           >
             Staff sign in
           </Link>
+          <InstallFooterButton />
           <p className="text-muted-foreground">
             © {new Date().getFullYear()} {site.churchShortName}
           </p>
