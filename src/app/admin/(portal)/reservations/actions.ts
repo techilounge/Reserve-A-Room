@@ -8,6 +8,7 @@ import { localToUtc } from "@/lib/datetime";
 import { loadCatalog } from "@/lib/data/catalog";
 import { toAppError, type AppError } from "@/lib/domain/errors";
 import { newGuestToken } from "@/lib/domain/guest-token";
+import { scheduleEmailDelivery } from "@/lib/email/schedule";
 import { advanceLabel } from "@/lib/domain/rooms/advance-booking";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { OTHER_MINISTRY } from "@/lib/validation/reservation";
@@ -46,6 +47,7 @@ export async function approveReservationAction(id: string, input: { message?: st
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc("approve_reservation", { p_id: id, p_message: parsed.data.message || undefined });
   if (error) return failure(error);
+  scheduleEmailDelivery(id);
   refresh(id);
   return { ok: true, message: "Reservation approved." };
 }
@@ -63,6 +65,7 @@ export async function declineReservationAction(id: string, input: { message?: st
     p_admin_note: parsed.data.adminNote || undefined,
   });
   if (error) return failure(error);
+  scheduleEmailDelivery(id);
   refresh(id);
   return { ok: true, message: "Reservation declined." };
 }
@@ -76,6 +79,7 @@ export async function cancelReservationAction(id: string, input: { message?: str
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc("cancel_reservation", { p_id: id, p_message: parsed.data.message || undefined });
   if (error) return failure(error);
+  scheduleEmailDelivery(id);
   refresh(id);
   return { ok: true, message: "Reservation cancelled." };
 }
@@ -157,6 +161,7 @@ export async function updateReservationAction(id: string, input: unknown): Promi
     p_notify: data.notify,
   });
   if (error) return failure(error, { advanceLimitLabel });
+  scheduleEmailDelivery(id);
   refresh(id);
   redirect(`/admin/reservations/${id}?updated=1`);
 }
@@ -194,7 +199,20 @@ export async function createStaffReservationAction(input: unknown): Promise<Acti
     })
     .single();
   if (error || !created) return failure(error, { advanceLimitLabel });
+  scheduleEmailDelivery(created.id);
   refresh();
   redirect(`/admin/reservations/${created.id}?created=1`);
 }
 
+export async function retryEmailAction(reservationId: string, emailId: string): Promise<ActionResult> {
+  const denied = await guard("reservations.edit");
+  if (denied) return denied;
+  if (!UUID.test(reservationId) || !UUID.test(emailId)) return { ok: false, message: "Email not found." };
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("retry_email", { p_id: emailId });
+  if (error) return failure(error);
+  scheduleEmailDelivery(reservationId);
+  refresh(reservationId);
+  return { ok: true, message: "Email queued to send again." };
+}

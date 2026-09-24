@@ -653,6 +653,14 @@ export type Database = {
         Args: { p_id: string; p_message?: string };
         Returns: Database["public"]["Enums"]["reservation_status"];
       };
+      claim_emails: {
+        Args: { p_limit?: number; p_reservation_id?: string };
+        Returns: string[];
+      };
+      complete_email: {
+        Args: { p_id: string; p_status: Database["public"]["Enums"]["email_status"]; p_provider_message_id?: string; p_error?: string };
+        Returns: undefined;
+      };
       create_guest_reservation: {
         Args: { p_room_id: string; p_start_at: string; p_end_at: string; p_first_name: string; p_last_name: string; p_email: string; p_phone: string; p_purpose: string; p_estimated_attendance: number; p_token_hash: string; p_token_seed: string; p_ministry_id?: string; p_other_ministry_name?: string; p_setup_requirements?: string; p_requester_notes?: string };
         Returns: { id: string; reference_code: string; status: Database["public"]["Enums"]["reservation_status"] }[];
@@ -672,6 +680,10 @@ export type Database = {
       decline_reservation: {
         Args: { p_id: string; p_message?: string; p_admin_note?: string };
         Returns: Database["public"]["Enums"]["reservation_status"];
+      };
+      email_context: {
+        Args: { p_email_id: string };
+        Returns: { email_id: string; recipient: string; event_type: string; attempt_count: number; reservation_id: string; reference_code: string; status: Database["public"]["Enums"]["reservation_status"]; room_name: string; room_capacity: number; start_at: string; end_at: string; requester_first_name: string; requester_last_name: string; requester_email: string; requester_phone: string; ministry_name: string; purpose: string; estimated_attendance: number; setup_requirements: string; requester_notes: string; requester_message: string; food_drinks_allowed: boolean; approval_required: boolean; cancelled_by_requester: boolean; guest_token_seed: string; church_name: string; app_name: string; timezone: string; contact_email: string; contact_phone: string; email_sender_name: string }[];
       };
       get_admin_settings: {
         Args: never;
@@ -696,6 +708,10 @@ export type Database = {
       my_notifications: {
         Args: { p_unread_only?: boolean; p_limit?: number; p_offset?: number };
         Returns: { id: string; type: string; title: string; message: string; reservation_id: string; read_at: string; created_at: string; total_count: number }[];
+      };
+      retry_email: {
+        Args: { p_id: string };
+        Returns: undefined;
       };
       save_amenity: {
         Args: { p_name: string; p_icon: string; p_active?: boolean; p_id?: string };

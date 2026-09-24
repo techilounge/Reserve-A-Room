@@ -9,6 +9,7 @@ import { hitRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
 import { clientIp } from "@/lib/security/request";
 import type { Database } from "@/lib/supabase/database.types";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { scheduleEmailDelivery } from "@/lib/email/schedule";
 
 /** Requester-safe view of a reservation (no admin notes, contact details or tokens). */
 export type GuestReservation = Database["public"]["Functions"]["get_guest_reservation"]["Returns"][number];
@@ -60,5 +61,6 @@ export async function cancelGuestReservation(rawReference: string): Promise<{ ok
     if (appError.kind === "unexpected") console.error("[guest] cancel failed", error);
     return { ok: false, error: appError };
   }
+  scheduleEmailDelivery();
   return { ok: true };
 }

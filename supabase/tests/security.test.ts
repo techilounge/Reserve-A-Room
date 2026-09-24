@@ -391,6 +391,7 @@ describe("function privileges (catalog-wide allowlist)", () => {
       "public.get_public_busy_blocks",
       "public.mark_notifications_read",
       "public.my_notifications",
+      "public.retry_email",
       "public.save_amenity",
       "public.save_ministry",
       "public.save_room",

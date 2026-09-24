@@ -48,3 +48,6 @@ Thumbs.db
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Rendered email previews (npx vitest run src/lib/email)
+/email-previews

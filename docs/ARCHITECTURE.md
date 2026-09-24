@@ -638,3 +638,28 @@ browser is redirected to `/reservation/<REF>?submitted=1`.
 - The capacity warning is a live region.
 - Submission is disabled while offline and while pending ("Reserving…" / "Submitting…").
 - Links can pre-fill the form: `/reserve?room=<slug>&date=YYYY-MM-DD&start=HH:mm&end=HH:mm`.
+
+### ADR-28 · Email implementation (Phase 8)
+- **Templates:** `src/emails/` holds React Email components: one branded layout and eight
+  event templates. Styles are inline literals, because email clients ignore CSS variables.
+  Every template also gets a plain-text version; the details table uses html-to-text's
+  `dataTable` format so its columns stay readable.
+- **Worker:** `src/lib/email/outbox.ts` works through the queue:
+  1. `claim_emails()` claims up to N queued rows (plus rows stuck in `sending` for 10+
+     minutes, at most 5 attempts) with `FOR UPDATE SKIP LOCKED`.
+  2. `email_context()` loads the reservation, room, settings and link seed.
+  3. The worker renders and sends the email.
+  4. `complete_email()` records the result. All three functions are service-role only.
+- **Triggers:** `scheduleEmailDelivery(reservationId)` wraps the worker in `after()`. Every
+  action that can queue email calls it: guest submit and cancel, staff approve, decline,
+  cancel, edit and create, and retry.
+- **Safety net:** `/api/cron/email-outbox` runs daily. It requires `Bearer $CRON_SECRET`,
+  compared in constant time.
+- **Links:** the requester's link is rebuilt from the stored seed (ADR-9). Staff emails link
+  to `/admin/reservations/<id>` and never contain the requester's token.
+- **Idempotency:** the key is `email-log-<id>-<attempt>`, so a network retry within one
+  claim can't send a second copy.
+- **Failures:** a failure is stored on the row, truncated to 500 characters. Failed
+  requester emails raise an `email_failed` notification to staff. `retry_email()`
+  (staff, audited) re-queues failed or skipped rows.
+- **No key:** development and previews mark emails `skipped`. Production records a failure.

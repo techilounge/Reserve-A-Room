@@ -5,10 +5,9 @@ Room reservations for **Stonehill Seventh-day Adventist Church**
 
 Production: https://reservearoom.stonehillchurch.org
 
-> **Status:** Phases 1–2 complete: foundation, database schema, security rules and tests.
-> Reservations, rooms and staff sign-in are built in later phases. Pages for them
-> currently show an "on the way" notice. Sections marked _(pending)_ are filled in by
-> the phase that implements them.
+> **Status:** Phases 0–8 complete: public room browsing and availability, guest
+> reservations, the staff portal, Super Admin management, in-app notifications and email.
+> Sections marked _(pending)_ are filled in by the phase that implements them.
 
 ## What it does
 
@@ -169,7 +168,60 @@ The script refuses to create a second Super Admin. Add further administrators fr
 **Users & Roles** inside the app. Re-running it for the same email prints a fresh link if
 the first one expired.
 
-## Resend setup _(pending — Phase 8)_
+## Resend setup
+
+Reservation emails are sent through [Resend](https://resend.com) from the verified domain
+`reservearoom.stonehillchurch.org`.
+
+1. **Domain:** in Resend → Domains, confirm `reservearoom.stonehillchurch.org` shows
+   **Verified** (SPF and DKIM records). Adding a DMARC record for the domain is recommended.
+2. **API key:** Resend → API Keys → create a key with **Sending access**, limited to that
+   domain. Set it as `RESEND_API_KEY` in Vercel (Production and Preview).
+3. **Sender:** set `RESEND_FROM_EMAIL` to an address on the verified domain, for example
+   `reservations@reservearoom.stonehillchurch.org`. The display name comes from
+   **Settings → Email sender name** in the app, so staff can change it without a redeploy.
+4. **Replies:** optionally set `RESEND_REPLY_TO` (e.g. the church office inbox). Without it,
+   replies to requester emails go to the contact email from Settings. Staff notification
+   emails always reply to the requester.
+5. **Staff sign-in emails:** in Supabase → Authentication → Emails → SMTP, enter Resend's
+   SMTP details: host `smtp.resend.com`, port `465`, user `resend`, password = a Resend API
+   key, sender = an address on the verified domain.
+6. **Cron:** set `CRON_SECRET` in Vercel (any long random string). `vercel.json` schedules a
+   daily sweep of `/api/cron/email-outbox`, and Vercel sends the secret automatically.
+
+**How sending works.** A reservation change queues its emails in `email_logs` in the same
+database transaction. Right after the response is sent, the server renders the React Email
+template (`src/emails/`) and sends it. Every email is recorded on the reservation page as
+Sent, Sending…, Not delivered (with the provider's error) or Not sent (email not
+configured). Staff can press **Send again** on any email that wasn't delivered. A failed
+requester email also creates an in-app notification. Anything left queued is picked up by
+the daily sweep.
+
+Emails sent:
+
+| Event | Recipient |
+| --- | --- |
+| Request received (approval-required room) | Requester |
+| New request to review | Staff (active staff with email notifications on, plus extra addresses from Settings) |
+| Reservation confirmed (instant room or created by staff) | Requester |
+| Request approved / not approved | Requester |
+| Reservation updated by staff (date, time or room of an approved reservation) | Requester |
+| Reservation cancelled (by the requester or by staff) | Requester |
+| Cancelled by requester | Staff |
+
+**Without a key.** In local development and previews without `RESEND_API_KEY`, emails are
+marked "Not sent" and their subject is logged (locally, the whole plain-text body
+including the private link is printed to the terminal). In production a missing key is
+recorded as a delivery failure, so staff are alerted.
+
+**Previewing templates:**
+
+```bash
+EMAIL_PREVIEW_DIR=./email-previews npx vitest run src/lib/email
+```
+
+This writes each template as HTML and plain text to `./email-previews` (gitignored).
+
 ## Room policy configuration
 
 Super Admins manage rooms under **Admin → Rooms**. Each room has:

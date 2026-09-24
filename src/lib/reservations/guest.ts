@@ -13,6 +13,7 @@ import { verifyTurnstile } from "@/lib/security/turnstile";
 import type { Enums } from "@/lib/supabase/database.types";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { fieldErrors, OTHER_MINISTRY, reservationSchema } from "@/lib/validation/reservation";
+import { scheduleEmailDelivery } from "@/lib/email/schedule";
 
 /** Anti-bot metadata sent alongside the form (never stored). */
 export type SubmissionMeta = {
@@ -164,5 +165,6 @@ export async function createGuestReservation(raw: unknown, meta: SubmissionMeta)
     return fail(appError.kind, appError.message, SCHEDULE_KINDS.has(appError.kind) ? "schedule" : "review");
   }
 
+  scheduleEmailDelivery(data.id);
   return { ok: true, reference: data.reference_code, status: data.status, token: link.token };
 }

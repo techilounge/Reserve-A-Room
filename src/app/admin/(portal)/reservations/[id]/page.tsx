@@ -5,13 +5,14 @@ import { notFound } from "next/navigation";
 
 import { AdminNotesForm } from "@/components/admin/admin-notes-form";
 import { ReservationActions } from "@/components/admin/reservation-actions";
+import { RetryEmailButton } from "@/components/admin/retry-email-button";
 import { ApprovalBadge, FoodPolicyBadge } from "@/components/rooms/policy-badges";
 import { CapacityWarning } from "@/components/reservations/capacity-warning";
 import { DetailList } from "@/components/reservations/detail-list";
 import { StatusBadge } from "@/components/reservations/status-badge";
 import { Button } from "@/components/ui/button";
 import { formatInstant, formatLongDate, formatTimeRange, toLocalParts } from "@/lib/datetime";
-import { getReservation, getReservationEmails } from "@/lib/data/admin";
+import { getReservation, getReservationEmails, type EmailLogRow } from "@/lib/data/admin";
 import { loadCatalog } from "@/lib/data/catalog";
 import { formatPhone } from "@/lib/format";
 import { approvalLabel, EMAIL_EVENT_LABELS } from "@/lib/reservations/labels";
@@ -186,14 +187,23 @@ export default async function AdminReservationPage({ params, searchParams }: Pag
               <p className="text-sm text-muted-foreground">No emails for this reservation.</p>
             ) : (
               <ul className="space-y-3">
-                {emails.map((e) => (
-                  <li key={e.id} className="text-sm">
-                    <p className="font-medium">{EMAIL_EVENT_LABELS[e.event_type] ?? e.event_type}</p>
-                    <p className="break-all text-muted-foreground">
-                      {e.recipient} · {e.status === "sent" ? `Sent ${formatInstant(e.sent_at ?? e.created_at, timeZone)}` : e.status}
-                    </p>
-                  </li>
-                ))}
+                {emails.map((e) => {
+                  const label = EMAIL_EVENT_LABELS[e.event_type] ?? e.event_type;
+                  return (
+                    <li key={e.id} className="text-sm">
+                      <p className="font-medium">{label}</p>
+                      <p className="break-all text-muted-foreground">{e.recipient}</p>
+                      <p className={e.status === "failed" ? "font-medium text-destructive" : "text-muted-foreground"}>
+                        {emailStatusText(e, timeZone)}
+                      </p>
+                      {e.status === "failed" || e.status === "skipped" ? (
+                        <div className="mt-2">
+                          <RetryEmailButton reservationId={r.id} emailId={e.id} label={label} />
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>
@@ -201,4 +211,18 @@ export default async function AdminReservationPage({ params, searchParams }: Pag
       </div>
     </div>
   );
+}
+
+function emailStatusText(e: EmailLogRow, timeZone: string): string {
+  switch (e.status) {
+    case "sent":
+      return `Sent ${formatInstant(e.sent_at ?? e.created_at, timeZone)}`;
+    case "queued":
+    case "sending":
+      return "Sending…";
+    case "skipped":
+      return "Not sent: email delivery isn't configured.";
+    case "failed":
+      return `Not delivered${e.error_message ? `: ${e.error_message}` : "."}`;
+  }
 }
