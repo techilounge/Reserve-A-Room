@@ -7,7 +7,9 @@ import { CapacityWarning } from "@/components/reservations/capacity-warning";
 import { DetailList } from "@/components/reservations/detail-list";
 import { Button } from "@/components/ui/button";
 import { formatLongDate, formatTimeRange } from "@/lib/datetime";
+import { formatPhone } from "@/lib/format";
 import { OTHER_MINISTRY, type ReservationInput } from "@/lib/validation/reservation";
+import { normalizePhone } from "@/lib/validation/text";
 
 import { ApprovalNotice, FoodNotice } from "./room-notices";
 import type { ReserveRoom } from "./types";
@@ -66,7 +68,7 @@ export function ReviewStep({
           items={[
             { label: "Name", value: `${v.firstName ?? ""} ${v.lastName ?? ""}`.trim() },
             { label: "Email", value: v.email },
-            { label: "Phone", value: v.phone },
+            { label: "Phone", value: displayPhone(v.phone) },
             { label: "Ministry / group", value: ministry },
             { label: "Purpose", value: v.purpose, wide: true },
             { label: "Estimated attendance", value: `${v.estimatedAttendance} ${estimated === 1 ? "person" : "people"}` },
@@ -79,4 +81,11 @@ export function ReviewStep({
       <CapacityWarning estimated={Number.isFinite(estimated) ? estimated : 0} capacity={room.capacity} />
     </div>
   );
+}
+
+/** Shows the number the way it will be saved, e.g. "5125550123" → "(512) 555-0123". */
+function displayPhone(value: string | undefined): string | undefined {
+  if (!value) return value;
+  const normalized = normalizePhone(value);
+  return normalized ? formatPhone(normalized) : value;
 }

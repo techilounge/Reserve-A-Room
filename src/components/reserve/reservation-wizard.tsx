@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { FormProvider, useForm, useWatch } from "react-hook-form";
 
 import { fetchDayAvailability, submitReservation } from "@/app/(public)/reserve/actions";
+import { TurnstileWidget } from "@/components/security/turnstile-widget";
 import { Button } from "@/components/ui/button";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import type { LocalDate, LocalTime } from "@/lib/datetime";
@@ -38,12 +39,15 @@ export function ReservationWizard({
   settings,
   today,
   prefill,
+  turnstileSiteKey,
 }: {
   rooms: ReserveRoom[];
   ministries: { id: string; name: string }[];
   settings: ReserveSettings;
   today: LocalDate;
   prefill: ReservePrefill;
+  /** Set only when Turnstile is fully configured (site + secret key). */
+  turnstileSiteKey: string | null;
 }) {
   const form = useForm<ReservationInput, unknown, ReservationValues>({
     resolver: zodResolver(reservationSchema),
@@ -73,6 +77,9 @@ export function ReservationWizard({
   const [refreshKey, setRefreshKey] = useState(0);
   const [availability, setAvailability] = useState<Availability | null>(null);
   const online = useOnlineStatus();
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileKey, setTurnstileKey] = useState(0);
+  const needsVerification = Boolean(turnstileSiteKey) && !turnstileToken;
   const startedAt = useRef<number>(0);
   const honeypot = useRef<HTMLInputElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -163,14 +170,24 @@ export function ReservationWizard({
 
   function submit() {
     if (!online || pending) return;
+    if (needsVerification) {
+      setSubmitError("Please complete the verification check above the button.");
+      return;
+    }
     setSubmitError(null);
     startTransition(async () => {
       const result = await submitReservation(getValues(), {
         website: honeypot.current?.value ?? "",
         startedAt: startedAt.current,
+        turnstileToken: turnstileToken ?? undefined,
       });
       // On success the action redirects; anything returned is a failure.
       if (!result) return;
+      // Turnstile tokens are single-use: get a fresh one for the next attempt.
+      if (turnstileSiteKey) {
+        setTurnstileToken(null);
+        setTurnstileKey((k) => k + 1);
+      }
       setSubmitError(result.message);
       for (const [field, message] of Object.entries(result.fieldErrors ?? {})) {
         setError(field as keyof ReservationInput, { message });
@@ -254,7 +271,12 @@ export function ReservationWizard({
           ) : step === "details" ? (
             <DetailsStep room={room} ministries={ministries} />
           ) : room ? (
-            <ReviewStep room={room} ministries={ministries} onEdit={setStep} />
+            <>
+              <ReviewStep room={room} ministries={ministries} onEdit={setStep} />
+              {turnstileSiteKey ? (
+                <TurnstileWidget key={turnstileKey} siteKey={turnstileSiteKey} onToken={setTurnstileToken} />
+              ) : null}
+            </>
           ) : null}
 
           {/* Honeypot: invisible to people, tempting to bots. */}

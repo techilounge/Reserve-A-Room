@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { NotificationsList } from "@/components/admin/notifications-list";
+import { PaginationLink } from "@/components/admin/pagination-link";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
-import { Button } from "@/components/ui/button";
 import { formatInstant } from "@/lib/datetime";
 import { loadCatalog } from "@/lib/data/catalog";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -72,21 +72,17 @@ export default async function AdminNotificationsPage({ searchParams }: PageProps
 
       {pages > 1 ? (
         <nav aria-label="Pagination" className="flex items-center justify-between">
-          <Button asChild variant="outline" size="sm" className={page <= 1 ? "pointer-events-none opacity-50" : ""}>
-            <Link href={href({ page: String(page - 1) })}>
-              <ChevronLeft data-icon="inline-start" aria-hidden />
-              Newer
-            </Link>
-          </Button>
+          <PaginationLink href={page > 1 ? href({ page: String(page - 1) }) : null}>
+            <ChevronLeft data-icon="inline-start" aria-hidden />
+            Newer
+          </PaginationLink>
           <span className="text-sm text-muted-foreground">
             Page {page} of {pages}
           </span>
-          <Button asChild variant="outline" size="sm" className={page >= pages ? "pointer-events-none opacity-50" : ""}>
-            <Link href={href({ page: String(page + 1) })}>
-              Older
-              <ChevronRight data-icon="inline-end" aria-hidden />
-            </Link>
-          </Button>
+          <PaginationLink href={page < pages ? href({ page: String(page + 1) }) : null}>
+            Older
+            <ChevronRight data-icon="inline-end" aria-hidden />
+          </PaginationLink>
         </nav>
       ) : null}
     </div>

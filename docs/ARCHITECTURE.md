@@ -670,3 +670,37 @@ browser is redirected to `/reservation/<REF>?submitted=1`.
   requester emails raise an `email_failed` notification to staff. `retry_email()`
   (staff, audited) re-queues failed or skipped rows.
 - **No key:** development and previews mark emails `skipped`. Production records a failure.
+
+### ADR-29 · Content-Security-Policy and the Phase 10 audit
+- **CSP** (built in `next.config.ts` from the configured origins):
+  - `default-src 'self'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'` and
+    `frame-ancestors 'none'`.
+  - `connect-src` and `img-src` allow only the Supabase project, plus Cloudflare Turnstile
+    when its keys are set.
+  - `upgrade-insecure-requests` is added on Vercel.
+  - `script-src` includes `'unsafe-inline'`. Next.js streams inline bootstrap scripts and
+    next-themes applies the theme inline before paint. Per-request nonces would make every
+    page dynamic, including the cached public room pages. The remaining directives still
+    block third-party scripts, exfiltration to unknown origins, clickjacking and form
+    hijacking.
+  - Also sent: `Cross-Origin-Opener-Policy: same-origin`.
+- **Turnstile:** the widget (`TurnstileWidget`) renders on the review step when both keys are
+  configured. Tokens are single-use, so the widget remounts after each attempt. Before this
+  audit, enabling Turnstile would have rejected every guest submission.
+- **Accessibility** (axe-core, WCAG 2.2 A/AA, light and dark):
+  - Scope: 26 public and admin pages, plus the open states of the mobile menu, date
+    picker, theme and account menus, approve/decline/cancel dialogs, notifications and
+    invite dialog. All pass.
+  - Fixed: the room-policy `<dl>` structure; disabled day-step and pagination controls
+    are now real disabled buttons instead of faded links or spans; the theme and account
+    menus are non-modal, so the page is no longer `aria-hidden` while focusable.
+- **Responsive:** every page was measured at 320, 768 and 1920 px with no horizontal
+  overflow.
+- **Security review:**
+  - Every server action checks the staff permission before calling the database, which
+    checks again.
+  - `npm audit --omit=dev` reports 0 vulnerabilities.
+  - No server secret names appear in client bundles.
+  - The cron endpoint returns 401 without the secret.
+  - The guest cookie is HttpOnly, path-scoped, SameSite=Lax and Secure on HTTPS, and is
+    set on a `no-referrer` redirect.

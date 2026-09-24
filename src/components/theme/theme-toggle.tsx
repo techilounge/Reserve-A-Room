@@ -21,7 +21,8 @@ export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();
 
   return (
-    <DropdownMenu>
+    // Non-modal: keeps the rest of the page out of aria-hidden while it stays reachable.
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className={className} aria-label="Change color theme">
           {/* Icons swap purely with CSS so server and client render identical markup. */}

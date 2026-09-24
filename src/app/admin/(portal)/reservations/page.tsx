@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, Plus, SearchX, TriangleAlert } from "lucide-
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { PaginationLink } from "@/components/admin/pagination-link";
 import { ReservationFilters } from "@/components/admin/reservation-filters";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -154,21 +155,17 @@ export default async function AdminReservationsPage({ searchParams }: PageProps<
 
           {pages > 1 ? (
             <nav aria-label="Pagination" className="flex items-center justify-between gap-2">
-              <Button asChild variant="outline" size="sm" className={page <= 1 ? "pointer-events-none opacity-50" : ""}>
-                <Link href={pageHref(page - 1)} aria-disabled={page <= 1}>
-                  <ChevronLeft data-icon="inline-start" aria-hidden />
-                  Previous
-                </Link>
-              </Button>
+              <PaginationLink href={page > 1 ? pageHref(page - 1) : null}>
+                <ChevronLeft data-icon="inline-start" aria-hidden />
+                Previous
+              </PaginationLink>
               <span className="text-sm text-muted-foreground">
                 Page {page} of {pages}
               </span>
-              <Button asChild variant="outline" size="sm" className={page >= pages ? "pointer-events-none opacity-50" : ""}>
-                <Link href={pageHref(page + 1)} aria-disabled={page >= pages}>
-                  Next
-                  <ChevronRight data-icon="inline-end" aria-hidden />
-                </Link>
-              </Button>
+              <PaginationLink href={page < pages ? pageHref(page + 1) : null}>
+                Next
+                <ChevronRight data-icon="inline-end" aria-hidden />
+              </PaginationLink>
             </nav>
           ) : null}
         </>

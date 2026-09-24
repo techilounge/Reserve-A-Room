@@ -16,7 +16,8 @@ import {
 
 export function AccountMenu({ name, email, roleLabel }: { name: string; email: string; roleLabel: string }) {
   return (
-    <DropdownMenu>
+    // Non-modal: keeps the rest of the page out of aria-hidden while it stays reachable.
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" aria-label={`Account menu for ${name}`}>
           <UserRound className="size-5" aria-hidden />

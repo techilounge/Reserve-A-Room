@@ -55,17 +55,17 @@ export function AvailabilityFilters({
         <div className="space-y-1.5">
           <Label htmlFor="availability-date">Date</Label>
           <div className="flex gap-2">
-            <Button asChild variant="outline" size="icon" aria-label="Previous day" className="shrink-0">
-              {query.date > minDate ? (
+            {query.date > minDate ? (
+              <Button asChild variant="outline" size="icon" aria-label="Previous day" className="shrink-0">
                 <Link href={toSearch({ ...query, date: prev })} scroll={false} onClick={() => setQuery({ ...query, date: prev })}>
                   <ChevronLeft aria-hidden />
                 </Link>
-              ) : (
-                <span aria-disabled="true" className="pointer-events-none opacity-40">
-                  <ChevronLeft aria-hidden />
-                </span>
-              )}
-            </Button>
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" size="icon" aria-label="Previous day" className="shrink-0" disabled>
+                <ChevronLeft aria-hidden />
+              </Button>
+            )}
             <DatePicker
               id="availability-date"
               name="date"
@@ -74,17 +74,17 @@ export function AvailabilityFilters({
               maxDate={maxDate}
               onChange={(date) => apply({ ...query, date })}
             />
-            <Button asChild variant="outline" size="icon" aria-label="Next day" className="shrink-0">
-              {query.date < maxDate ? (
+            {query.date < maxDate ? (
+              <Button asChild variant="outline" size="icon" aria-label="Next day" className="shrink-0">
                 <Link href={toSearch({ ...query, date: next })} scroll={false} onClick={() => setQuery({ ...query, date: next })}>
                   <ChevronRight aria-hidden />
                 </Link>
-              ) : (
-                <span aria-disabled="true" className="pointer-events-none opacity-40">
-                  <ChevronRight aria-hidden />
-                </span>
-              )}
-            </Button>
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" size="icon" aria-label="Next day" className="shrink-0" disabled>
+                <ChevronRight aria-hidden />
+              </Button>
+            )}
           </div>
         </div>
 

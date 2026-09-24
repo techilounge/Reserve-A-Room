@@ -8,6 +8,8 @@ import { ReservationWizard } from "@/components/reserve/reservation-wizard";
 import type { ReservePrefill } from "@/components/reserve/types";
 import { compareLocalDates, isLocalDate, isLocalTime } from "@/lib/datetime";
 import { loadCatalog } from "@/lib/data/catalog";
+import { getTurnstileSiteKey } from "@/lib/env/public";
+import { isTurnstileEnabled } from "@/lib/security/turnstile";
 import { reserveContext } from "@/lib/reservations/reserve-context";
 
 // "Today" and each room's horizon must be computed per request.
@@ -78,6 +80,7 @@ export default async function ReservePage({ searchParams }: PageProps<"/reserve"
         settings={settings}
         today={today}
         prefill={prefill}
+        turnstileSiteKey={isTurnstileEnabled() ? getTurnstileSiteKey() : null}
       />
     </div>
   );

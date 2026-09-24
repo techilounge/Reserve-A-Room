@@ -8,14 +8,16 @@ import { APPROVAL_COPY, FOOD_COPY, roomPolicySummary } from "@/lib/domain/rooms/
 
 function Row({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children: ReactNode }) {
   return (
-    <div className="flex gap-3">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
-        <Icon className="size-4.5" aria-hidden />
-      </span>
-      <div>
-        <dt className="font-medium">{title}</dt>
-        <dd className="text-sm text-muted-foreground">{children}</dd>
-      </div>
+    // dt/dd must be direct children of the row <div> (valid <dl> structure), so the icon
+    // sits inside the <dt>, positioned in the left gutter.
+    <div className="relative min-h-9 pl-12">
+      <dt className="font-medium">
+        <span className="absolute top-0 left-0 flex size-9 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+          <Icon className="size-4.5" aria-hidden />
+        </span>
+        {title}
+      </dt>
+      <dd className="text-sm text-muted-foreground">{children}</dd>
     </div>
   );
 }
