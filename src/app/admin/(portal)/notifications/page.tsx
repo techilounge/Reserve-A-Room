@@ -1,17 +1,94 @@
+import { BellOff, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 
+import { NotificationsList } from "@/components/admin/notifications-list";
+import { EmptyState } from "@/components/feedback/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
-import { UpcomingFeature } from "@/components/layout/upcoming-feature";
+import { Button } from "@/components/ui/button";
+import { formatInstant } from "@/lib/datetime";
+import { loadCatalog } from "@/lib/data/catalog";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Notifications",
 };
 
-export default function AdminNotificationsPage() {
+const PAGE_SIZE = 25;
+
+export default async function AdminNotificationsPage({ searchParams }: PageProps<"/admin/notifications">) {
+  const raw = await searchParams;
+  const unreadOnly = raw.filter === "unread";
+  const page = Math.max(1, Number.parseInt(String(raw.page ?? "1"), 10) || 1);
+
+  const supabase = await createSupabaseServerClient();
+  const [{ data, error }, unreadCount, catalog] = await Promise.all([
+    supabase.rpc("my_notifications", { p_unread_only: unreadOnly, p_limit: PAGE_SIZE, p_offset: (page - 1) * PAGE_SIZE }),
+    supabase.rpc("unread_notification_count"),
+    loadCatalog(),
+  ]);
+  if (error) throw error;
+  const tz = catalog.ok ? catalog.catalog.settings.timeZone : "America/Chicago";
+  const total = Number(data[0]?.total_count ?? 0);
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const href = (changes: Record<string, string>) =>
+    `/admin/notifications?${new URLSearchParams({ ...(unreadOnly ? { filter: "unread" } : {}), ...changes }).toString()}`;
+
   return (
-    <div className="flex flex-col gap-8">
-      <PageHeader title="Notifications" description="Updates about reservations that need attention." />
-      <UpcomingFeature title="Notifications are on the way">New requests, cancellations and email delivery problems will be listed here.</UpcomingFeature>
+    <div className="flex max-w-3xl flex-col gap-6">
+      <PageHeader title="Notifications" description="Updates about reservations that need your attention." />
+
+      <nav aria-label="Filter" className="flex w-fit rounded-lg border p-0.5">
+        {[
+          ["All", "/admin/notifications", !unreadOnly],
+          [`Unread (${unreadCount.data ?? 0})`, "/admin/notifications?filter=unread", unreadOnly],
+        ].map(([label, link, active]) => (
+          <Link
+            key={String(link)}
+            href={String(link)}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "min-h-9 rounded-md px-3 py-1.5 text-sm font-medium",
+              active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent",
+            )}
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
+
+      {data.length === 0 ? (
+        <EmptyState icon={BellOff} title="You're all caught up.">
+          {unreadOnly ? "There are no unread notifications." : "Notifications about new requests and changes will appear here."}
+        </EmptyState>
+      ) : (
+        <NotificationsList
+          items={data}
+          hasUnread={(unreadCount.data ?? 0) > 0}
+          dates={Object.fromEntries(data.map((n) => [n.id, formatInstant(n.created_at, tz)]))}
+        />
+      )}
+
+      {pages > 1 ? (
+        <nav aria-label="Pagination" className="flex items-center justify-between">
+          <Button asChild variant="outline" size="sm" className={page <= 1 ? "pointer-events-none opacity-50" : ""}>
+            <Link href={href({ page: String(page - 1) })}>
+              <ChevronLeft data-icon="inline-start" aria-hidden />
+              Newer
+            </Link>
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {page} of {pages}
+          </span>
+          <Button asChild variant="outline" size="sm" className={page >= pages ? "pointer-events-none opacity-50" : ""}>
+            <Link href={href({ page: String(page + 1) })}>
+              Older
+              <ChevronRight data-icon="inline-end" aria-hidden />
+            </Link>
+          </Button>
+        </nav>
+      ) : null}
     </div>
   );
 }

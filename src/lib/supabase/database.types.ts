@@ -689,6 +689,14 @@ export type Database = {
         Args: { p_bucket: string; p_key_hash: string; p_limit: number; p_window_seconds: number };
         Returns: boolean;
       };
+      mark_notifications_read: {
+        Args: { p_ids?: string[] };
+        Returns: number;
+      };
+      my_notifications: {
+        Args: { p_unread_only?: boolean; p_limit?: number; p_offset?: number };
+        Returns: { id: string; type: string; title: string; message: string; reservation_id: string; read_at: string; created_at: string; total_count: number }[];
+      };
       save_amenity: {
         Args: { p_name: string; p_icon: string; p_active?: boolean; p_id?: string };
         Returns: string;
@@ -712,6 +720,10 @@ export type Database = {
       set_user_role: {
         Args: { p_user_id: string; p_role: Database["public"]["Enums"]["app_role"] };
         Returns: undefined;
+      };
+      unread_notification_count: {
+        Args: never;
+        Returns: number;
       };
       update_admin_notes: {
         Args: { p_id: string; p_admin_notes: string };

@@ -28,7 +28,7 @@ export function AdminShell({
       <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
         <div className="flex h-16 items-center gap-2 px-4 sm:px-6">
           <AdminMobileNav allowedHrefs={allowedHrefs} />
-          <BrandLockup href="/admin" subtitle="Administration" />
+          <BrandLockup href="/admin" subtitle="Administration" compactOnMobile />
           <div className="ml-auto flex items-center gap-1">
             {headerActions}
             <ThemeToggle />

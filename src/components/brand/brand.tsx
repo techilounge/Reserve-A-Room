@@ -8,10 +8,13 @@ import { site } from "@/lib/site";
 export function BrandLockup({
   href = "/",
   subtitle = site.churchShortName,
+  compactOnMobile = false,
   className,
 }: {
   href?: string;
   subtitle?: string;
+  /** Show only the mark below the sm breakpoint (crowded headers). */
+  compactOnMobile?: boolean;
   className?: string;
 }) {
   return (
@@ -24,7 +27,8 @@ export function BrandLockup({
         priority
         className="size-9 shrink-0 sm:size-10"
       />
-      <span className="flex min-w-0 flex-col leading-none">
+      {compactOnMobile ? <span className="sr-only sm:hidden">{site.appName}</span> : null}
+      <span className={cn("min-w-0 flex-col leading-none", compactOnMobile ? "hidden sm:flex" : "flex")}>
         <span className="font-heading text-base font-extrabold tracking-tight whitespace-nowrap text-primary sm:text-lg dark:text-foreground">
           Reserve-<span className="text-gold-text">A</span>-Room
         </span>
