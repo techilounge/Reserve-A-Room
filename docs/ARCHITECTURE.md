@@ -598,4 +598,43 @@ friendly messages. Raw database errors are never shown.
 | `RAR07` | Rate limited |
 | `RAR08` | Not found |
 | `RAR09` | Not authorized |
+| `RAR10` | Invalid input (e.g. an inactive ministry) |
 | `23P01` | Time slot already held (exclusion constraint) |
+
+---
+
+## 11. Phase 4 decisions
+
+### ADR-26 · Guest submission pipeline
+`submitReservation` (server action) → `createGuestReservation` (`src/lib/reservations/guest.ts`).
+The steps run in this order:
+1. **Bot traps:** a honeypot field and a minimum fill time of 3 seconds. Failures get a
+   deliberately vague error.
+2. **Validation:** the shared Zod schema (`src/lib/validation/reservation.ts`). The browser
+   form uses the same schema, so the rules can't drift apart.
+3. **Abuse limits:** optional Turnstile, then Postgres rate limits keyed by an HMAC of the
+   IP (10/hour) and of the email (8/day).
+4. **Friendly pre-checks:** room reservable, advance limit, DST gap, and a fresh
+   availability check.
+5. **Creation:** `create_guest_reservation()` via the service role. In one transaction it
+   decides the status from the room, retries reference codes, queues emails, notifies
+   staff and writes the audit entry.
+
+On success the token goes into an HttpOnly cookie scoped to `/reservation/<REF>`, and the
+browser is redirected to `/reservation/<REF>?submitted=1`.
+
+- **Emailed links:** they carry `?token=`. `src/proxy.ts` moves the token into the same
+  path-scoped cookie and redirects to the clean URL, before any page renders.
+- **Guest page:** `/reservation/[reference]` verifies the cookie token's hash with
+  `get_guest_reservation()`, which returns requester-safe fields only.
+- **Cancellation:** `cancel_guest_reservation()` checks the setting, the status and that the
+  start time hasn't passed.
+
+### ADR-27 · Guest form UX
+- Three steps: Room & time → Your details → Review & submit.
+- Start and end options come from live occupied times; a conflict reported by the server
+  clears the times and returns to step 1.
+- Focus moves to each step heading, and to the first invalid field when a step fails.
+- The capacity warning is a live region.
+- Submission is disabled while offline and while pending ("Reserving…" / "Submitting…").
+- Links can pre-fill the form: `/reserve?room=<slug>&date=YYYY-MM-DD&start=HH:mm&end=HH:mm`.

@@ -33,6 +33,7 @@ export function DatePicker({
   placeholder = "Choose a date",
   invalid,
   describedBy,
+  disabled = false,
   className,
 }: {
   id?: string;
@@ -44,6 +45,7 @@ export function DatePicker({
   placeholder?: string;
   invalid?: boolean;
   describedBy?: string;
+  disabled?: boolean;
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -60,6 +62,7 @@ export function DatePicker({
             id={id}
             type="button"
             variant="outline"
+            disabled={disabled}
             aria-invalid={invalid || undefined}
             aria-describedby={describedBy}
             className={cn("w-full min-w-0 flex-1 shrink justify-start font-normal", !value && "text-muted-foreground", className)}

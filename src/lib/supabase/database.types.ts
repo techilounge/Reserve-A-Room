@@ -598,13 +598,29 @@ export type Database = {
         Args: { p_user_id: string; p_full_name: string };
         Returns: undefined;
       };
+      cancel_guest_reservation: {
+        Args: { p_reference: string; p_token_hash: string };
+        Returns: Database["public"]["Enums"]["reservation_status"];
+      };
+      create_guest_reservation: {
+        Args: { p_room_id: string; p_start_at: string; p_end_at: string; p_first_name: string; p_last_name: string; p_email: string; p_phone: string; p_purpose: string; p_estimated_attendance: number; p_token_hash: string; p_ministry_id?: string; p_other_ministry_name?: string; p_setup_requirements?: string; p_requester_notes?: string };
+        Returns: { id: string; reference_code: string; status: Database["public"]["Enums"]["reservation_status"] }[];
+      };
       get_admin_settings: {
         Args: never;
         Returns: Database["public"]["Tables"]["app_settings"]["Row"];
       };
+      get_guest_reservation: {
+        Args: { p_reference: string; p_token_hash: string };
+        Returns: { id: string; reference_code: string; status: Database["public"]["Enums"]["reservation_status"]; room_name: string; room_slug: string; room_capacity: number; start_at: string; end_at: string; requester_first_name: string; ministry_name: string; purpose: string; estimated_attendance: number; setup_requirements: string; requester_notes: string; requester_message: string; approval_required_at_submission: boolean; food_drinks_allowed_at_submission: boolean; room_capacity_at_submission: number; created_at: string; approved_at: string; declined_at: string; cancelled_at: string; cancelled_by_requester: boolean; can_cancel: boolean }[];
+      };
       get_public_busy_blocks: {
         Args: { p_from: string; p_to: string; p_room_ids?: string[] };
         Returns: { room_id: string; start_at: string; end_at: string }[];
+      };
+      hit_rate_limit: {
+        Args: { p_bucket: string; p_key_hash: string; p_limit: number; p_window_seconds: number };
+        Returns: boolean;
       };
     };
     Enums: {
