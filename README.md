@@ -5,10 +5,8 @@ Room reservations for **Stonehill Seventh-day Adventist Church**
 
 Production: https://reservearoom.stonehillchurch.org
 
-> **Status:** Phases 0–9 complete: public room browsing and availability, guest
-> reservations, the staff portal, Super Admin management, in-app notifications, email and
-> the installable PWA.
-> Sections marked _(pending)_ are filled in by the phase that implements them.
+> **Status:** feature-complete (build phases 0–12). See
+> [Production deployment & domain](#production-deployment--domain) for the go-live checklist.
 
 ## What it does
 
@@ -38,12 +36,12 @@ The design and every major decision are documented in
 
 ## Local setup
 
-Requirements: Node.js 22 or newer (developed on 24) and npm. Docker is optional: the
+Requirements: Node.js 22.18 or newer (developed on 24) and npm. Docker is optional: the
 database tests run on an in-process Postgres, so no local Supabase stack is needed.
 
 ```bash
 npm install
-cp .env.example .env.local   # fill in values as later phases require them
+cp .env.example .env.local   # then fill in the Supabase values (see below)
 npm run dev                  # http://localhost:3000
 ```
 
@@ -58,6 +56,8 @@ npm run dev                  # http://localhost:3000
 | `npm test` | Unit tests (Vitest) |
 | `npm run test:db` | Database tests: real migrations on in-process Postgres (PGlite), covering conflicts, booking rules, RLS and grants |
 | `npm run check` | Typecheck + lint + unit tests + database tests |
+| `npm run test:e2e` | End-to-end tests (Playwright) against a production build and a test-only mock Supabase |
+| `npm run e2e:mock` | Start the test-only mock Supabase by hand (manual QA without Docker) |
 | `npm run db:types` | Regenerate database TypeScript types from the migrations |
 | `npm run bootstrap:super-admin` | One-time creation of the first Super Admin (see below) |
 | `npm run brand:generate` | Rebuild logos and icons from `assets/branding/` |
@@ -78,15 +78,40 @@ npm run dev                  # http://localhost:3000
 
 ## Environment variables
 
-See [.env.example](.env.example). Copy it to `.env.local` for local development.
-Never commit real values. This repository is public.
+See [.env.example](.env.example). Copy it to `.env.local` for local development and set
+the same variables in Vercel → Settings → Environment Variables for **Production** and
+**Preview**. Never commit real values. This repository is public.
+
+| Variable | Needed in production | Where it's used |
+| --- | --- | --- |
+| `NEXT_PUBLIC_APP_URL` | Yes: `https://reservearoom.stonehillchurch.org` | Links in emails and metadata. Previews use their own branch URL automatically. |
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL (browser-safe) |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes | Supabase publishable/anon key (browser-safe) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | **Server only.** Guest reservations, invitations, email outbox |
+| `GUEST_LINK_SECRET` | Yes (the app refuses to run without it in production) | Derives guest management links. Changing it invalidates every emailed link. |
+| `RATE_LIMIT_SECRET` | Yes (the app refuses to run without it in production) | HMAC for rate-limit keys, so no raw IPs or emails are stored |
+| `RESEND_API_KEY` | Yes | Sending email |
+| `RESEND_FROM_EMAIL` | Yes, e.g. `reservations@reservearoom.stonehillchurch.org` | Sender address (the display name comes from Settings) |
+| `RESEND_REPLY_TO` | Optional | Reply-to for requester emails (defaults to the Settings contact email) |
+| `CRON_SECRET` | Recommended | Enables the daily sweep for unsent emails |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Optional (both or neither) | Cloudflare Turnstile on the guest form |
+| `INITIAL_SUPER_ADMIN_EMAIL` / `INITIAL_SUPER_ADMIN_NAME` | Only in `.env.local`, for the one-time bootstrap | `npm run bootstrap:super-admin` |
+
+Generate each secret with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+```
 
 ## Deployments
 
-- `main` is the Vercel **production** branch.
-- The development branch `claude/reserve-a-room-build` deploys as a Vercel **Preview**
-  for testing.
-- Nothing is merged to `main` without the owner's approval.
+- **Production:** `main` is meant to be the Vercel production branch, served at
+  `https://reservearoom.stonehillchurch.org`.
+- **Development:** `claude/reserve-a-room-build` is the development branch. Each push
+  creates a Vercel deployment for testing.
+- **Merging:** nothing is merged to `main` without the owner's approval. See
+  [Production deployment & domain](#production-deployment--domain) for the one-time
+  switch-over.
 
 ## Supabase setup
 
@@ -321,5 +346,89 @@ The mock can also be run by hand for manual QA: `npm run e2e:mock`. Then start t
 **CI:** `.github/workflows/ci.yml` runs `npm run check` and the end-to-end suite on every
 push to `main` or `claude/**` and on pull requests.
 
-## Production deployment & domain _(pending — Phase 12)_
-## Troubleshooting _(pending — Phase 12)_
+## Production deployment & domain
+
+Follow these steps in order the first time. Each one is done by the owner, in the
+relevant dashboard.
+
+**1. Database (Supabase)**
+1. Apply the migrations (see [Database migrations](#database-migrations)):
+   `npx supabase login`, then `npx supabase link --project-ref atnwrwrehexnwgqqnyek`,
+   then `npx supabase db push`.
+2. Complete [Supabase setup](#supabase-setup):
+   - sign-ups off
+   - Site URL and redirect URLs
+   - the two email templates
+   - custom SMTP through Resend
+3. In Supabase → Storage, confirm the `room-images` bucket exists. The migrations create
+   it.
+
+**2. Vercel project**
+1. **Environment variables:** set every variable in the table above for Production (and
+   Preview, if previews should work fully).
+2. **Branches:** when you're happy with the preview, create `main` from the reviewed
+   commit of `claude/reserve-a-room-build`, for example with a pull request on GitHub.
+   Then:
+   - make `main` the GitHub default branch (GitHub → Settings → General);
+   - make `main` the production branch (Vercel → Settings → Git → Production Branch).
+
+   The project currently deploys `claude/reserve-a-room-build` as production, so this
+   switch must happen before the custom domain is attached.
+3. **Deploy:** redeploy `main` so the new variables take effect.
+
+**3. Custom domain**
+1. In Vercel → Settings → Domains, add `reservearoom.stonehillchurch.org`.
+2. Vercel shows the exact DNS record to create, usually a `CNAME` for `reservearoom`.
+   Add it where `stonehillchurch.org`'s DNS is managed. Use the value Vercel displays,
+   not one copied from elsewhere.
+3. Wait for Vercel to show the domain as valid. HTTPS is issued automatically.
+4. Set `NEXT_PUBLIC_APP_URL=https://reservearoom.stonehillchurch.org` and redeploy.
+
+**4. First administrator**
+1. Run `npm run bootstrap:super-admin` from your computer (see
+   [First Super Admin bootstrap](#first-super-admin-bootstrap)). Then open the link and
+   choose a password.
+2. Sign in at `/admin`, review **Settings**: contact email and phone, sender name,
+   booking hours, and extra notification emails.
+3. Review the **Conference Room** and add any other rooms.
+4. Invite other administrators from **Users & Roles**.
+
+**5. Smoke test (about 10 minutes)**
+- [ ] `/rooms` and `/availability` load and show the Conference Room.
+- [ ] Make a guest reservation with your own email. The confirmation email arrives, and
+      its "View or cancel" link opens the reservation.
+- [ ] Cancel it from the link. The cancellation email arrives, and the time is free again.
+- [ ] For an approval-required room (create a test room if needed): submit a request →
+      staff get the "New request" email and an in-app notification → approve it → the
+      requester gets the approval email.
+- [ ] On the reservation page, the email log shows every email as **Sent**.
+- [ ] On a phone, the site fits the screen with no sideways scrolling, and "Install app"
+      works.
+- [ ] Sign out, and confirm `/admin` asks you to sign in.
+- [ ] Delete or deactivate any test rooms.
+
+**Ongoing**
+- **Schema changes:** add a new file in `supabase/migrations/`, run `npm run db:types`,
+  then `npx supabase db push`, then deploy.
+- **Supabase Free:** projects pause after a week without activity. Normal use keeps the
+  project active. If it pauses, restore it from the Supabase dashboard.
+- **Backups:** Supabase Free keeps daily backups for a short period. Export important data
+  (Supabase → Database → Backups, or `pg_dump`) if you need longer retention.
+
+## Troubleshooting
+
+| Symptom | Likely cause and fix |
+| --- | --- |
+| Pages say rooms can't be loaded right now | Supabase variables missing or wrong, migrations not applied (`npx supabase db push`), or the Supabase project is paused (restore it in the dashboard). |
+| Guest submission fails with a server error in logs mentioning `GUEST_LINK_SECRET` or `RATE_LIMIT_SECRET` | Set both secrets in Vercel and redeploy. |
+| Emails show "Not delivered: … domain is not verified" | `RESEND_FROM_EMAIL` must use the verified domain `reservearoom.stonehillchurch.org`. Fix it, redeploy, then press **Send again** on the reservation. |
+| Emails show "Not delivered: Email delivery is not configured" | `RESEND_API_KEY` or `RESEND_FROM_EMAIL` is missing in production. |
+| Emails show "Not sent: email delivery isn't configured" | Expected in local development and in previews without a Resend key. |
+| Email links point at the wrong site | Set `NEXT_PUBLIC_APP_URL` for Production and redeploy. Previews link to their own URL on purpose. |
+| Invitation or reset links open the home page, or say the link is invalid | Update the two Supabase email templates to use `/admin/auth/confirm?token_hash=…` (see Supabase setup), and add the site to the Redirect URLs. Links are single-use and expire; send a new one. |
+| "This account doesn't have access" after signing in | The account has no active staff profile. A Super Admin can re-enable it in **Users & Roles**. |
+| A time slot can't be chosen although it looks free | It's too soon (minimum notice), outside bookable hours, or beyond the room's advance limit. Check Settings and the room's rules. |
+| "That room was just reserved…" | Someone else took the time a moment earlier. Pick another time. The database never allows two reservations to overlap. |
+| The installed app shows an old version | Close and reopen it. Each deployment installs a fresh service worker on the next visit. |
+| Turnstile widget missing or failing | Both Turnstile keys must be set (or neither), and the site key must allow the production domain. |
+| `npm run test:e2e` can't find a browser | Run `npx playwright install chromium`, or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE`. |

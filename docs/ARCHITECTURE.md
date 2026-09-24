@@ -375,8 +375,8 @@ requested by someone else for this time. Please select another time or room." Ra
 behavior is proven by database tests (overlap, adjacency, release on cancel/decline, reschedule onto a held slot).
 
 ### ADR-7 · Time rules
-- Stored as `timestamptz` (UTC). The timezone lives in `app_settings.timezone` (seeded from
-  `APP_TIMEZONE`, default `America/Chicago`); all formatting goes through `lib/datetime`.
+- Stored as `timestamptz` (UTC). The timezone lives in `app_settings.timezone` (seeded as
+  `America/Chicago`, changeable in Settings); all formatting goes through `lib/datetime`.
 - Users pick a **date + start time + end time** in church local time; the server converts
   with `@date-fns/tz`, so DST is handled. A non-existent local time (spring-forward gap)
   is rejected, not silently moved.
@@ -541,6 +541,8 @@ Routes for later phases exist now so navigation and layout can be reviewed on th
 Each shows an honest `<UpcomingFeature>` notice and never pretends to work. Each phase
 removes the notices for what it implements. The launch checklist requires
 `grep -r UpcomingFeature src` to return nothing.
+**Resolved (Phase 12):** every notice has been replaced by the real feature, and the
+component itself was deleted.
 
 ---
 

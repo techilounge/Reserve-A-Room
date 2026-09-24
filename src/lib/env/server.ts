@@ -24,7 +24,6 @@ const serverSchema = z.object({
   GUEST_LINK_SECRET: optionalString,
   TURNSTILE_SECRET_KEY: optionalString,
   CRON_SECRET: optionalString,
-  APP_TIMEZONE: z.string().trim().default("America/Chicago"),
   VERCEL_ENV: optionalString,
 });
 
