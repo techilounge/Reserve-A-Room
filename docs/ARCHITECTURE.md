@@ -2,7 +2,7 @@
 
 Stonehill Seventh-day Adventist Church · `https://reservearoom.stonehillchurch.org`
 
-This document is the Phase 0 architecture plan. It records the decisions every later
+This document started as the Phase 0 architecture plan. It records the decisions every later
 phase builds on. When a decision changes, update this file in the same commit.
 
 ---
@@ -13,7 +13,7 @@ phase builds on. When a decision changes, update this file in the same commit.
 | --- | --- |
 | Local repo | Empty — no commits, no files. Nothing to preserve. |
 | Remote `techilounge/Reserve-A-Room` | Empty, **public** repository, no default branch yet. |
-| Vercel | Connected to the repo (per owner). Production branch assumed to be `main`. |
+| Vercel | Connected to the repo (per owner). Production branch: `main`. The development branch deploys as a Vercel **Preview** for owner testing. |
 | Package manager | **npm** (only manager installed; Node 24.19, npm 11.17). |
 | Docker | Available → local Supabase stack + pgTAP database tests are possible. |
 | Supabase CLI | Not installed globally → used via the `supabase` npm dev dependency (`npx supabase`). |
@@ -28,10 +28,10 @@ files (other than `.env.example`), no keys, no real member data in seeds or fixt
 
 | Concern | Choice | Notes |
 | --- | --- | --- |
-| Framework | Next.js **16.3.x** (App Router), React 19 | Stable `latest` tag only; no canary. Next 16 uses `proxy.ts` (formerly `middleware.ts`). |
-| Language | TypeScript, `strict` | Use the version `create-next-app@16.3` pins. TS 7 (native compiler) is `latest`; if `next build` type-checking has problems with it, pin 6.x and record why here. |
+| Framework | Next.js **16.3.6** (App Router, Turbopack), React 19.2 | Stable `latest` tag only; no canary. Next 16 uses `proxy.ts` (formerly `middleware.ts`). |
+| Language | TypeScript **5.x**, `strict` | Pinned by `create-next-app@16.3.6` (the combination Next 16.3 is tested with). TS 7 is not adopted yet. |
 | Styling | Tailwind CSS 4 + CSS-variable design tokens | Tokens in `globals.css`; no hard-coded colors in components. |
-| Components | shadcn/ui (Radix primitives), Lucide icons | Copied into `src/components/ui`, owned by the project. |
+| Components | shadcn/ui 4 (`radix-nova` style, Radix primitives), Lucide icons | Copied into `src/components/ui`, owned by the project. Button sizes raised to 40–44px for touch. |
 | Forms / validation | React Hook Form + Zod 4 | Zod schemas shared by client and server. |
 | Dates | date-fns 4 + `@date-fns/tz` | All wall-clock math in the church timezone. |
 | Phone numbers | `libphonenumber-js` (min metadata) | Validation + E.164 normalization; small, well-maintained. |
@@ -40,10 +40,11 @@ files (other than `.env.example`), no keys, no real member data in seeds or fixt
 | Backend | Supabase (Postgres 17, Auth, Storage) | Migrations in `supabase/migrations`. |
 | Email | Resend + React Email | Server-only. |
 | PWA | Hand-written service worker (`public/sw.js`) + `app/manifest.ts` | See ADR-12. No PWA plugin. |
-| Unit tests | Vitest | |
+| Unit tests | Vitest 5 | Co-located `*.test.ts`. Component-test libraries are added when a phase needs them. |
 | DB tests | pgTAP via `supabase test db` | RLS, constraints, functions. |
 | E2E | Playwright | Against local Supabase + `next start`. |
-| Hosting | Vercel (Fluid compute / Node runtime) | |
+| Hosting | Vercel (Fluid compute / Node runtime) | Node 24 locally; `engines.node >= 22`. |
+| Fonts | Inter (body), Plus Jakarta Sans (headings) via `next/font` | Self-hosted at build time; no runtime requests to Google. |
 
 ---
 
@@ -95,7 +96,7 @@ is enforced in Postgres, and mirrored in TypeScript only to give good feedback e
 ├─ supabase/
 │  ├─ config.toml
 │  ├─ migrations/                  ← every schema change, timestamped
-│  ├─ seed.sql                     ← DEV-ONLY sample rooms (runs on local `db reset` only)
+│  ├─ seed.sql                     ← DEV-ONLY data (local `db reset` only; never production)
 │  └─ tests/                       ← pgTAP: RLS, constraints, functions
 ├─ src/
 │  ├─ app/
@@ -484,9 +485,52 @@ theme toggle, the bell and the install prompt.
 
 | Env | Supabase | Email | URL |
 | --- | --- | --- | --- |
-| Local | `supabase start` (Docker), seeded with DEV rooms | Console / Mailpit | `http://localhost:3000` |
-| Preview (Vercel) | Staging project (recommended) | Resend test sender | Vercel preview URL |
+| Local | `supabase start` (Docker) + migrations; tests create their own fixtures | Console / Mailpit | `http://localhost:3000` |
+| Preview (Vercel) | Same free-tier project as production for now (owner decision); a separate staging project can be added later | Resend | Vercel branch URL (email links point at the preview) |
 | Production | Production project | Resend, verified `stonehillchurch.org` domain | `https://reservearoom.stonehillchurch.org` |
 
 `supabase/seed.sql` only runs on local `supabase db reset`. `supabase db push` (production)
 never runs it.
+
+---
+
+## 9. Phase 1 decisions
+
+### ADR-19 · Branding assets and color tokens
+- The official files supplied by the church live in `assets/branding/` (`logo-source.png`,
+  `favicon-source.png`) and are **not** served. `npm run brand:generate` (sharp) derives every
+  web asset from them:
+  - trimmed logo, plus a dark-mode logo (navy wordmark recolored to white, gold kept)
+  - rounded mark, favicon and app icons
+  - maskable PWA icons (artwork inside the 80% safe zone)
+  - Apple touch icon and the OpenGraph image
+
+  The outputs are committed. To replace the logo, overwrite the source file and re-run
+  the script.
+- Brand colors: navy `#031e47` and gold `#dea621`. Every color is a token in
+  `src/app/globals.css`.
+  - Light mode: navy primary on a cool off-white.
+  - Dark mode: deep navy background with a **gold primary** (navy text on gold, about 8:1).
+  - Gold on white is only about 2:1, so gold *text* in light mode uses `--gold-text`
+    (`#87600a`, about 5.6:1).
+- Status and feedback colors come in soft background, foreground and border sets
+  (`success`, `warning`, `danger`, `info`, `neutral`). Status badges and warnings always
+  pair color with an icon and text.
+
+### ADR-20 · Initial reference data
+Per the owner, production starts with **one room, the Conference Room**. Its settings come
+from the master brief: capacity 15, no approval required (instant), 4 weeks maximum
+advance reservation, no food or drinks.
+
+The **ministry list** starts with the 11 ministries named in the brief.
+
+Both are real reference data, so they ship in a Phase 2 **migration** (idempotent, safe on
+production), not in `seed.sql`. Super Admins add, edit and archive rooms and ministries
+from the admin UI afterwards. Automated tests create any other rooms they need (for
+example an approval-required room) as fixtures and never touch production.
+
+### ADR-21 · Phase placeholders
+Routes for later phases exist now so navigation and layout can be reviewed on the Preview.
+Each shows an honest `<UpcomingFeature>` notice and never pretends to work. Each phase
+removes the notices for what it implements. The launch checklist requires
+`grep -r UpcomingFeature src` to return nothing.

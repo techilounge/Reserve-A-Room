@@ -1,0 +1,263 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design tokens — the ONLY place colors are defined.
+ * Brand: Stonehill navy #031e47 and gold #dea621.
+ * Components use semantic tokens (bg-primary, text-muted-foreground, bg-warning-soft…),
+ * never raw hex values, so the palette can be tuned here without touching components.
+ *
+ * Contrast notes:
+ * - Gold on white is ~2:1, so gold is used as a surface/accent color in light mode and
+ *   --gold-text (a darker gold) is used whenever gold text is needed.
+ * - In dark mode gold becomes the primary action color with navy text on it (~8:1).
+ */
+:root {
+  --brand-navy: #031e47;
+  --brand-gold: #dea621;
+
+  --background: #f7f9fc;
+  --foreground: #0b1b33;
+  --card: #ffffff;
+  --card-foreground: #0b1b33;
+  --popover: #ffffff;
+  --popover-foreground: #0b1b33;
+  --primary: #031e47;
+  --primary-foreground: #ffffff;
+  --secondary: #eaf0f8;
+  --secondary-foreground: #031e47;
+  --muted: #eef2f7;
+  --muted-foreground: #4b5a72;
+  --accent: #e6edf7;
+  --accent-foreground: #031e47;
+  --destructive: #c0262d;
+  --border: #dbe2ec;
+  --input: #c9d3e1;
+  --ring: #2459c4;
+
+  --highlight: #dea621;
+  --highlight-foreground: #031e47;
+  --gold-text: #87600a;
+  --hero: #031e47;
+  --hero-foreground: #ffffff;
+
+  --success-soft: #e7f6ed;
+  --success-soft-foreground: #14532d;
+  --success-border: #9fd9b4;
+  --warning-soft: #fff4d6;
+  --warning-soft-foreground: #6e4400;
+  --warning-border: #eec463;
+  --danger-soft: #fdeceb;
+  --danger-soft-foreground: #8f1c1f;
+  --danger-border: #f2aeae;
+  --info-soft: #e7eefb;
+  --info-soft-foreground: #1c3a80;
+  --info-border: #a9c0ee;
+  --neutral-soft: #eef1f5;
+  --neutral-soft-foreground: #3c485b;
+  --neutral-border: #cdd5e0;
+
+  --chart-1: #031e47;
+  --chart-2: #dea621;
+  --chart-3: #2459c4;
+  --chart-4: #4b5a72;
+  --chart-5: #9fb3d1;
+  --radius: 0.75rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0b1b33;
+  --sidebar-primary: #031e47;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eaf0f8;
+  --sidebar-accent-foreground: #031e47;
+  --sidebar-border: #dbe2ec;
+  --sidebar-ring: #2459c4;
+}
+
+.dark {
+  --background: #051328;
+  --foreground: #e9eef6;
+  --card: #0a1c38;
+  --card-foreground: #e9eef6;
+  --popover: #0c2141;
+  --popover-foreground: #e9eef6;
+  --primary: #dea621;
+  --primary-foreground: #031e47;
+  --secondary: #132a4c;
+  --secondary-foreground: #e9eef6;
+  --muted: #0f2445;
+  --muted-foreground: #a6b4c9;
+  --accent: #163157;
+  --accent-foreground: #f2f5fa;
+  --destructive: #f38a8a;
+  --border: #1d365c;
+  --input: #27436d;
+  --ring: #dea621;
+
+  --highlight: #dea621;
+  --highlight-foreground: #031e47;
+  --gold-text: #ecc25a;
+  --hero: #081a36;
+  --hero-foreground: #ffffff;
+
+  --success-soft: #0e2e22;
+  --success-soft-foreground: #8ee6ae;
+  --success-border: #1f6a45;
+  --warning-soft: #33260a;
+  --warning-soft-foreground: #f7d27a;
+  --warning-border: #7a5a14;
+  --danger-soft: #37141a;
+  --danger-soft-foreground: #fca9a9;
+  --danger-border: #7d2a31;
+  --info-soft: #0f2a52;
+  --info-soft-foreground: #a8c8fb;
+  --info-border: #2d5796;
+  --neutral-soft: #16263e;
+  --neutral-soft-foreground: #cbd5e3;
+  --neutral-border: #334766;
+
+  --chart-1: #dea621;
+  --chart-2: #6f9be8;
+  --chart-3: #a6b4c9;
+  --chart-4: #ecc25a;
+  --chart-5: #2d5796;
+  --sidebar: #081a36;
+  --sidebar-foreground: #e9eef6;
+  --sidebar-primary: #dea621;
+  --sidebar-primary-foreground: #031e47;
+  --sidebar-accent: #132a4c;
+  --sidebar-accent-foreground: #e9eef6;
+  --sidebar-border: #1d365c;
+  --sidebar-ring: #dea621;
+}
+
+@theme inline {
+  --font-sans: var(--font-inter);
+  --font-heading: var(--font-jakarta);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-gold: var(--brand-gold);
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
+  --color-gold-text: var(--gold-text);
+  --color-hero: var(--hero);
+  --color-hero-foreground: var(--hero-foreground);
+
+  --color-success-soft: var(--success-soft);
+  --color-success-soft-foreground: var(--success-soft-foreground);
+  --color-success-border: var(--success-border);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-soft-foreground: var(--warning-soft-foreground);
+  --color-warning-border: var(--warning-border);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-soft-foreground: var(--danger-soft-foreground);
+  --color-danger-border: var(--danger-border);
+  --color-info-soft: var(--info-soft);
+  --color-info-soft-foreground: var(--info-soft-foreground);
+  --color-info-border: var(--info-border);
+  --color-neutral-soft: var(--neutral-soft);
+  --color-neutral-soft-foreground: var(--neutral-soft-foreground);
+  --color-neutral-border: var(--neutral-border);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground;
+    overflow-x: clip;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-heading tracking-tight text-balance;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  /* Visible keyboard focus for plain links and elements that don't style their own. */
+  a:focus-visible,
+  summary:focus-visible {
+    @apply rounded-sm outline-2 outline-offset-2 outline-ring;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Centered, gutter-padded content column used by every page. */
+@utility page-container {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 72rem;
+  padding-inline: 1rem;
+  @media (width >= 40rem) {
+    padding-inline: 1.5rem;
+  }
+  @media (width >= 64rem) {
+    padding-inline: 2rem;
+  }
+}

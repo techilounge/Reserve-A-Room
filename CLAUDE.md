@@ -1,3 +1,5 @@
+@AGENTS.md
+
 # CLAUDE.md — Reserve-A-Room
 
 Room reservation app for Stonehill SDA Church. Read `docs/ARCHITECTURE.md` before
@@ -27,10 +29,18 @@ changing behavior; it records the decisions (ADRs) this code must follow.
 - Colors come from design tokens in `globals.css`, not hard-coded in components.
 - Status, approval and food policy are always conveyed by icon + text, never color alone.
 
-## Commands (available from Phase 1)
+## Commands
 - `npm run dev` / `npm run build` / `npm run lint` / `npm run typecheck`
-- `npm test` (Vitest) · `npm run test:db` (pgTAP) · `npm run test:e2e` (Playwright)
-- `npx supabase start` / `npx supabase db reset` (local DB with DEV seed data)
+- `npm test` (Vitest) · `npm run check` (typecheck + lint + tests)
+- `npm run brand:generate` — regenerate logos/icons from `assets/branding/`
+- Later phases: `npm run test:db` (pgTAP), `npm run test:e2e` (Playwright),
+  `npx supabase start` / `npx supabase db reset`
+
+## UI conventions
+- Pages for unbuilt phases use `<UpcomingFeature>`. Remove it when the phase lands.
+- Use `page-container` for public page width; admin pages render inside `AdminShell`.
+- Buttons/controls must stay ≥ 40px tall (touch targets). Test at 320px width: no
+  horizontal scroll.
 
 ## Commits
 Format: `phase-NN: short description`. Run typecheck, lint, unit tests and build before
