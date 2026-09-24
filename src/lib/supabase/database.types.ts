@@ -593,6 +593,10 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
+      admin_audit_log: {
+        Args: { p_search?: string; p_entity_type?: string; p_limit?: number; p_offset?: number };
+        Returns: { id: number; created_at: string; actor_kind: Database["public"]["Enums"]["actor_kind"]; actor_name: string; action: string; entity_type: string; entity_id: string; metadata: Json; total_count: number }[];
+      };
       admin_calendar: {
         Args: { p_from: string; p_to: string; p_room_id?: string; p_include_cancelled?: boolean };
         Returns: { id: string; reference_code: string; status: Database["public"]["Enums"]["reservation_status"]; room_id: string; room_name: string; start_at: string; end_at: string; requester_first_name: string; requester_last_name: string; ministry_name: string; purpose: string }[];
@@ -605,9 +609,25 @@ export type Database = {
         Args: { p_id: string };
         Returns: { id: string; reference_code: string; status: Database["public"]["Enums"]["reservation_status"]; source: Database["public"]["Enums"]["reservation_source"]; room_id: string; room_name: string; room_slug: string; room_capacity: number; room_food_drinks_allowed: boolean; room_approval_required: boolean; start_at: string; end_at: string; requester_first_name: string; requester_last_name: string; requester_email: string; requester_phone: string; ministry_id: string; ministry_name: string; other_ministry_name: string; purpose: string; estimated_attendance: number; setup_requirements: string; requester_notes: string; admin_notes: string; requester_message: string; approval_required_at_submission: boolean; food_drinks_allowed_at_submission: boolean; room_capacity_at_submission: number; created_by_name: string; approved_by_name: string; approved_at: string; declined_by_name: string; declined_at: string; cancelled_by_name: string; cancelled_at: string; cancelled_by_requester: boolean; created_at: string; updated_at: string }[];
       };
+      admin_list_amenities: {
+        Args: never;
+        Returns: { id: string; name: string; icon: string; active: boolean; sort_order: number }[];
+      };
+      admin_list_ministries: {
+        Args: never;
+        Returns: { id: string; name: string; active: boolean; sort_order: number; reservation_count: number }[];
+      };
       admin_list_reservations: {
         Args: { p_search?: string; p_statuses?: Database["public"]["Enums"]["reservation_status"][]; p_room_id?: string; p_ministry_id?: string; p_from?: string; p_to?: string; p_approval?: string; p_sort?: string; p_limit?: number; p_offset?: number };
         Returns: { id: string; reference_code: string; status: Database["public"]["Enums"]["reservation_status"]; source: Database["public"]["Enums"]["reservation_source"]; room_id: string; room_name: string; room_capacity: number; start_at: string; end_at: string; requester_first_name: string; requester_last_name: string; requester_email: string; requester_phone: string; ministry_name: string; purpose: string; estimated_attendance: number; approval_required_at_submission: boolean; approved_by: string; created_at: string; total_count: number }[];
+      };
+      admin_list_rooms: {
+        Args: never;
+        Returns: { id: string; name: string; slug: string; description: string; location: string; capacity: number; image_path: string; active: boolean; reservable: boolean; unavailable_message: string; approval_required: boolean; max_advance_value: number; max_advance_unit: Database["public"]["Enums"]["advance_unit"]; food_drinks_allowed: boolean; sort_order: number; amenity_ids: string[]; upcoming_count: number; updated_at: string }[];
+      };
+      admin_list_users: {
+        Args: never;
+        Returns: { id: string; email: string; full_name: string; role: Database["public"]["Enums"]["app_role"]; active: boolean; created_at: string; last_sign_in_at: string }[];
       };
       admin_reservation_emails: {
         Args: { p_id: string };
@@ -637,6 +657,10 @@ export type Database = {
         Args: { p_room_id: string; p_start_at: string; p_end_at: string; p_first_name: string; p_last_name: string; p_email: string; p_phone: string; p_purpose: string; p_estimated_attendance: number; p_token_hash: string; p_token_seed: string; p_ministry_id?: string; p_other_ministry_name?: string; p_setup_requirements?: string; p_requester_notes?: string };
         Returns: { id: string; reference_code: string; status: Database["public"]["Enums"]["reservation_status"] }[];
       };
+      create_staff_profile: {
+        Args: { p_user_id: string; p_full_name: string; p_role: Database["public"]["Enums"]["app_role"] };
+        Returns: undefined;
+      };
       create_staff_reservation: {
         Args: { p_room_id: string; p_start_at: string; p_end_at: string; p_first_name: string; p_last_name: string; p_email: string; p_phone: string; p_purpose: string; p_estimated_attendance: number; p_token_hash: string; p_token_seed: string; p_ministry_id?: string; p_other_ministry_name?: string; p_setup_requirements?: string; p_requester_notes?: string; p_admin_notes?: string; p_notify?: boolean };
         Returns: { id: string; reference_code: string }[];
@@ -665,8 +689,36 @@ export type Database = {
         Args: { p_bucket: string; p_key_hash: string; p_limit: number; p_window_seconds: number };
         Returns: boolean;
       };
+      save_amenity: {
+        Args: { p_name: string; p_icon: string; p_active?: boolean; p_id?: string };
+        Returns: string;
+      };
+      save_ministry: {
+        Args: { p_name: string; p_active: boolean; p_sort_order: number; p_id?: string };
+        Returns: string;
+      };
+      save_room: {
+        Args: { p_name: string; p_slug: string; p_capacity: number; p_approval_required: boolean; p_food_drinks_allowed: boolean; p_active: boolean; p_reservable: boolean; p_sort_order: number; p_amenity_ids: string[]; p_description?: string; p_location?: string; p_unavailable_message?: string; p_max_advance_value?: number; p_max_advance_unit?: Database["public"]["Enums"]["advance_unit"]; p_id?: string };
+        Returns: string;
+      };
+      set_room_image: {
+        Args: { p_id: string; p_image_path?: string };
+        Returns: undefined;
+      };
+      set_user_active: {
+        Args: { p_user_id: string; p_active: boolean };
+        Returns: undefined;
+      };
+      set_user_role: {
+        Args: { p_user_id: string; p_role: Database["public"]["Enums"]["app_role"] };
+        Returns: undefined;
+      };
       update_admin_notes: {
         Args: { p_id: string; p_admin_notes: string };
+        Returns: undefined;
+      };
+      update_app_settings: {
+        Args: { p_church_name: string; p_app_name: string; p_timezone: string; p_booking_interval_minutes: number; p_default_max_advance_value: number; p_default_max_advance_unit: Database["public"]["Enums"]["advance_unit"]; p_min_lead_time_minutes: number; p_bookable_day_start: string; p_bookable_day_end: string; p_allow_guest_cancellation: boolean; p_extra_admin_notification_emails: string[]; p_email_sender_name: string; p_contact_email?: string; p_contact_phone?: string };
         Returns: undefined;
       };
       update_reservation: {

@@ -108,6 +108,14 @@ Project: `atnwrwrehexnwgqqnyek` (region us-west-2).
 4. **Authentication → Emails → SMTP:** configure custom SMTP with Resend, so invitations
    and password resets are delivered reliably. Supabase's built-in email is heavily
    rate-limited.
+5. **Authentication → Emails → Templates:** change the link in two templates so it points
+   at the app's confirmation route:
+   - **Invite user:**
+     `{{ .SiteURL }}/admin/auth/confirm?token_hash={{ .TokenHash }}&type=invite&next=/admin/set-password`
+   - **Reset password:**
+     `{{ .SiteURL }}/admin/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/admin/set-password`
+
+   The route exchanges the one-time token for a session, then shows "Choose a password".
 
 ## Database migrations
 
@@ -162,7 +170,34 @@ The script refuses to create a second Super Admin. Add further administrators fr
 the first one expired.
 
 ## Resend setup _(pending — Phase 8)_
-## Room policy configuration _(pending — Phase 6)_
+## Room policy configuration
+
+Super Admins manage rooms under **Admin → Rooms**. Each room has:
+
+| Setting | Effect |
+| --- | --- |
+| Capacity | Guests see it on every room card; entering more attendees shows a warning (never a refusal). |
+| Approval Required / Instant Reservation | Approval rooms create **Pending** requests that staff approve or decline. Instant rooms are **Approved** immediately. |
+| Maximum advance reservation | A number of days, weeks or months, or the app default from Settings. Later dates can't be picked, and the database rejects them too. |
+| Food & drinks | Allowed or Not Allowed. Shown before booking, on the review step, the confirmation and in emails. |
+| Active | Inactive rooms are archived: hidden everywhere, history kept. Rooms are never deleted. |
+| Open for reservations | Turn off to mark a room temporarily unavailable, with an optional message. |
+
+The editor shows a plain-language summary before saving, for example: *"Guests may
+reserve this room up to 4 weeks in advance. Reservations require approval. Food and
+drinks are not allowed."*
+
+Changes apply to new reservations and to rescheduling. Existing reservations keep the
+policies they were booked with. A Pending request stays Pending if a room stops
+requiring approval, and an Admin decides it. Every change is recorded in the
+**Audit Log**.
+
+Other Super Admin areas:
+- **Ministries:** add, rename, reorder, deactivate.
+- **Users & Roles:** invite, set Admin or Super Admin, disable or re-enable. The last
+  active Super Admin can't be demoted or disabled.
+- **Settings:** timezone, bookable hours, time increments, minimum notice, default
+  advance limit, guest cancellation, and extra notification emails.
 ## PWA behavior _(pending — Phase 9)_
 ## Testing _(pending — Phase 11)_
 ## Production deployment & domain _(pending — Phase 12)_

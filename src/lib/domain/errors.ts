@@ -15,6 +15,8 @@ export type AppErrorKind =
   | "not_found"
   | "forbidden"
   | "validation"
+  | "duplicate"
+  | "in_use"
   | "unexpected";
 
 export class AppError extends Error {
@@ -39,6 +41,11 @@ const SQLSTATE_KIND: Record<string, AppErrorKind> = {
   RAR07: "rate_limited",
   RAR08: "not_found",
   RAR09: "forbidden",
+  RAR10: "validation",
+  "23505": "duplicate",
+  "23514": "validation",
+  "23001": "in_use",
+  "23503": "in_use",
   "42501": "forbidden",
   PGRST116: "not_found",
 };
@@ -74,6 +81,10 @@ export function friendlyMessage(kind: AppErrorKind, context: ErrorContext = {}):
       return "You don't have permission to do that.";
     case "validation":
       return "Please check the highlighted fields and try again.";
+    case "duplicate":
+      return "That name or web address is already in use. Please choose another.";
+    case "in_use":
+      return "This is still in use, so it can't be removed. Archive it instead.";
     case "unexpected":
       return "Something went wrong. Please try again. If the problem continues, contact the church office.";
   }
