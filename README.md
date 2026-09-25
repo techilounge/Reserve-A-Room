@@ -130,17 +130,10 @@ Project: `atnwrwrehexnwgqqnyek` (region us-west-2).
    - Site URL: `https://reservearoom.stonehillchurch.org`
    - Redirect URLs: add `https://reservearoom.stonehillchurch.org/**`, your Vercel URLs
      (e.g. `https://reserve-a-room.vercel.app/**`) and `http://localhost:3000/**`
-4. **Authentication → Emails → SMTP:** configure custom SMTP with Resend, so invitations
-   and password resets are delivered reliably. Supabase's built-in email is heavily
-   rate-limited.
-5. **Authentication → Emails → Templates:** change the link in two templates so it points
-   at the app's confirmation route:
-   - **Invite user:**
-     `{{ .SiteURL }}/admin/auth/confirm?token_hash={{ .TokenHash }}&type=invite&next=/admin/set-password`
-   - **Reset password:**
-     `{{ .SiteURL }}/admin/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/admin/set-password`
-
-   The route exchanges the one-time token for a session, then shows "Choose a password".
+4. **Authentication email:** no Supabase SMTP or template customization is required.
+   The app asks Supabase to generate/verify one-time invitation and recovery tokens, then
+   renders and sends the branded messages directly through Resend. Supabase does not send
+   those messages.
 
 ## Database migrations
 
@@ -188,7 +181,8 @@ once, from your computer:
    npm run bootstrap:super-admin
    ```
 
-3. Open the printed link to choose a password.
+3. The script sends a branded password-setup email through Resend. If Resend is not
+   configured locally, it prints the link instead.
 
 The script refuses to create a second Super Admin. Add further administrators from
 **Users & Roles** inside the app. Re-running it for the same email prints a fresh link if
@@ -209,9 +203,9 @@ Reservation emails are sent through [Resend](https://resend.com) from the verifi
 4. **Replies:** optionally set `RESEND_REPLY_TO` (e.g. the church office inbox). Without it,
    replies to requester emails go to the contact email from Settings. Staff notification
    emails always reply to the requester.
-5. **Staff sign-in emails:** in Supabase → Authentication → Emails → SMTP, enter Resend's
-   SMTP details: host `smtp.resend.com`, port `465`, user `resend`, password = a Resend API
-   key, sender = an address on the verified domain.
+5. **Staff account emails:** invitations and password resets use the same Resend key,
+   sender, React Email branding and app-owned confirmation route as the rest of the app.
+   Supabase SMTP is not used.
 6. **Cron:** set `CRON_SECRET` in Vercel (any long random string). `vercel.json` schedules a
    daily sweep of `/api/cron/email-outbox`, and Vercel sends the secret automatically.
 
@@ -234,6 +228,8 @@ Emails sent:
 | Reservation updated by staff (date, time or room of an approved reservation) | Requester |
 | Reservation cancelled (by the requester or by staff) | Requester |
 | Cancelled by requester | Staff |
+| Staff invitation | Invited administrator |
+| Password reset | Administrator |
 
 **Without a key.** In local development and previews without `RESEND_API_KEY`, emails are
 marked "Not sent" and their subject is logged (locally, the whole plain-text body
@@ -358,8 +354,7 @@ relevant dashboard.
 2. Complete [Supabase setup](#supabase-setup):
    - sign-ups off
    - Site URL and redirect URLs
-   - the two email templates
-   - custom SMTP through Resend
+   - no Supabase SMTP or auth-template setup is needed; the app sends through Resend
 3. In Supabase → Storage, confirm the `room-images` bucket exists. The migrations create
    it.
 
@@ -425,7 +420,7 @@ relevant dashboard.
 | Emails show "Not delivered: Email delivery is not configured" | `RESEND_API_KEY` or `RESEND_FROM_EMAIL` is missing in production. |
 | Emails show "Not sent: email delivery isn't configured" | Expected in local development and in previews without a Resend key. |
 | Email links point at the wrong site | Set `NEXT_PUBLIC_APP_URL` for Production and redeploy. Previews link to their own URL on purpose. |
-| Invitation or reset links open the home page, or say the link is invalid | Update the two Supabase email templates to use `/admin/auth/confirm?token_hash=…` (see Supabase setup), and add the site to the Redirect URLs. Links are single-use and expire; send a new one. |
+| Invitation or reset links say the link is invalid | Confirm `NEXT_PUBLIC_APP_URL`, the two Supabase public variables and the service-role key are valid in the active Vercel deployment. Links are single-use and expire; send a new one after fixing the variables. |
 | "This account doesn't have access" after signing in | The account has no active staff profile. A Super Admin can re-enable it in **Users & Roles**. |
 | A time slot can't be chosen although it looks free | It's too soon (minimum notice), outside bookable hours, or beyond the room's advance limit. Check Settings and the room's rules. |
 | "That room was just reserved…" | Someone else took the time a moment earlier. Pick another time. The database never allows two reservations to overlap. |

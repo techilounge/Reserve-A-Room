@@ -10,6 +10,8 @@
 // Safe to re-run: once a Super Admin exists it refuses to create another, but it will
 // print a fresh password-setup link for that same person (e.g. if the first expired).
 import { createClient } from "@supabase/supabase-js";
+import { createHash } from "node:crypto";
+import { Resend } from "resend";
 
 import type { Database } from "../src/lib/supabase/database.types.ts";
 
@@ -49,6 +51,46 @@ function setupLink(hashedToken: string, type: "invite" | "recovery"): string {
   return link.toString();
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]!);
+}
+
+async function sendSetupEmail(actionUrl: string): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.RESEND_FROM_EMAIL?.trim();
+  if (!apiKey || !from) return false;
+
+  const safeName = escapeHtml(fullName.split(/\s+/)[0] || email.split("@")[0]);
+  const safeUrl = escapeHtml(actionUrl);
+  const logoUrl = `${appUrl}/branding/stonehill-logo-dark.png`;
+  const subject = "Choose your Reserve-A-Room administrator password";
+  const text = `Hi ${fullName.split(/\s+/)[0] || email.split("@")[0]},\n\nChoose a password for your Reserve-A-Room Super Admin account:\n${actionUrl}\n\nThis secure link expires soon and can be used only once.`;
+  const html = `<!doctype html><html><body style="margin:0;background:#f5f6f8;font-family:Arial,sans-serif;color:#1b2433"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td style="padding:24px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;margin:auto"><tr><td style="background:#031e47;padding:24px 22px;border-radius:12px 12px 0 0"><img src="${escapeHtml(logoUrl)}" width="240" alt="Reserve-A-Room — Stonehill SDA Church" style="display:block;max-width:100%;height:auto"></td></tr><tr><td style="height:4px;background:#dea621"></td></tr><tr><td style="background:#fff;padding:28px 22px;border-radius:0 0 12px 12px"><h1 style="margin:0 0 16px;color:#031e47;font-size:22px">Choose your password</h1><p style="font-size:15px;line-height:24px">Hi ${safeName},</p><p style="font-size:15px;line-height:24px">Your Reserve-A-Room Super Admin account is ready. Choose a password to activate it.</p><p style="margin:22px 0"><a href="${safeUrl}" style="background:#031e47;color:#fff;border-radius:8px;padding:12px 22px;text-decoration:none;font-weight:600">Choose your password</a></p><p style="font-size:12px;line-height:18px;color:#566074">This secure link expires soon and can be used only once. Don’t forward this email.</p></td></tr></table></td></tr></table></body></html>`;
+  const idempotencyKey = `bootstrap-${createHash("sha256").update(actionUrl).digest("hex").slice(0, 32)}`;
+  const { error } = await new Resend(apiKey).emails.send(
+    {
+      from,
+      to: [email],
+      subject,
+      html,
+      text,
+      replyTo: process.env.RESEND_REPLY_TO?.trim() || undefined,
+    },
+    { idempotencyKey },
+  );
+  if (error) {
+    console.error(`✖ Resend could not deliver the password-setup email: ${error.message}`);
+    return false;
+  }
+  return true;
+}
+
 async function main() {
   const { data: existing, error: existingError } = await supabase
     .from("profiles")
@@ -81,8 +123,14 @@ async function main() {
     console.log(`✔ ${email} is already the Super Admin. Generated a new password-setup link.`);
   }
 
-  console.log("\nOpen this link to choose a password (it expires soon; re-run this script if it does):\n");
-  console.log(`  ${setupLink(link.properties.hashed_token, type)}\n`);
+  const actionUrl = setupLink(link.properties.hashed_token, type);
+  if (await sendSetupEmail(actionUrl)) {
+    console.log(`\n✔ Branded password-setup email sent to ${email} through Resend.`);
+    console.log("  It expires soon; re-run this script if it does.\n");
+  } else {
+    console.log("\nOpen this link to choose a password (it expires soon; re-run this script if it does):\n");
+    console.log(`  ${actionUrl}\n`);
+  }
 }
 
 main().catch((error: unknown) => {

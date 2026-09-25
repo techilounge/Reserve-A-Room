@@ -4,9 +4,12 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { safeNextPath } from "@/lib/auth/guards";
+import { authSetupUrl } from "@/lib/auth/setup-link";
 import { getAppUrl } from "@/lib/app-url";
+import { sendAuthEmail } from "@/lib/email/auth";
 import { hitRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
 import { clientIp } from "@/lib/security/request";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { emailField } from "@/lib/validation/text";
 
@@ -59,10 +62,28 @@ export async function requestPasswordReset(_prev: AuthFormState, form: FormData)
   };
   if (!(await hitRateLimit(RATE_LIMITS.passwordResetPerIp, await clientIp()))) return success;
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
   const redirectTo = new URL("/admin/auth/confirm?next=/admin/set-password", getAppUrl()).toString();
-  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data, { redirectTo });
-  if (error) console.error("[auth] password reset request failed", error.message);
+  const { data: link, error } = await supabase.auth.admin.generateLink({
+    type: "recovery",
+    email: parsed.data,
+    options: { redirectTo },
+  });
+  if (error) {
+    // Do not reveal whether an administrator account exists.
+    console.error("[auth] password reset link generation failed", error.message);
+    return success;
+  }
+
+  const profile = await supabase.from("profiles").select("full_name").eq("id", link.user.id).maybeSingle();
+  const delivered = await sendAuthEmail({
+    kind: "password_reset",
+    to: parsed.data,
+    fullName: profile.data?.full_name ?? link.user.user_metadata.full_name,
+    actionUrl: authSetupUrl(link.properties.hashed_token, "recovery"),
+    service: supabase,
+  });
+  if (!delivered.ok) console.error("[auth] password reset email failed", delivered.error);
   return success;
 }
 

@@ -440,16 +440,19 @@ Screen" sheet, and hidden in standalone mode.
 
 ### ADR-13 · Authentication & bootstrap
 Supabase Auth email + password for staff only. Public signup is disabled in the
-dashboard. Invitations use `auth.admin.inviteUserByEmail` (server, service role). Profile
-creation and the role are set in the same server action. Disabling a user sets
+dashboard. Invitations and resets use `auth.admin.generateLink` (server, service role)
+to create one-time tokens without asking Supabase to send mail. The app renders branded
+React Email templates and delivers them directly through Resend. Profile creation and the
+role are set in the same server action. Disabling a user sets
 `profiles.active = false` **and** bans the auth user so refresh tokens stop working.
 The last active Super Admin is protected by a trigger that takes an advisory lock and
 refuses any change that leaves zero, so two Super Admins demoting each other
 concurrently cannot both succeed.
 **Bootstrap:** `npm run bootstrap:super-admin` (run once by the owner with production
-env vars) reads `INITIAL_SUPER_ADMIN_EMAIL`, invites or locates that user, and creates a
-`super_admin` profile **only if no Super Admin exists yet**. Otherwise it refuses.
-There is no web route for this.
+env vars) reads `INITIAL_SUPER_ADMIN_EMAIL`, invites or locates that user, creates a
+`super_admin` profile **only if no Super Admin exists yet**, and sends the setup link
+through Resend (falling back to printing it only when email is not configured). Otherwise
+it refuses. There is no web route for this.
 
 ### ADR-14 · Abuse protection
 Honeypot field, a minimum fill time, Zod payload limits, a 16 KB action body cap, and a

@@ -17,12 +17,18 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get("type") as EmailOtpType | null;
   const code = searchParams.get("code");
 
-  const supabase = await createSupabaseServerClient();
   let ok = false;
-  if (tokenHash && type && OTP_TYPES.includes(type)) {
-    ok = !(await supabase.auth.verifyOtp({ token_hash: tokenHash, type })).error;
-  } else if (code) {
-    ok = !(await supabase.auth.exchangeCodeForSession(code)).error;
+  let configurationFailed = false;
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (tokenHash && type && OTP_TYPES.includes(type)) {
+      ok = !(await supabase.auth.verifyOtp({ token_hash: tokenHash, type })).error;
+    } else if (code) {
+      ok = !(await supabase.auth.exchangeCodeForSession(code)).error;
+    }
+  } catch (error) {
+    configurationFailed = true;
+    console.error("[auth] confirmation route could not reach Supabase", error);
   }
 
   const destination = request.nextUrl.clone();
@@ -33,7 +39,7 @@ export async function GET(request: NextRequest) {
     if (query) destination.search = `?${query}`;
   } else {
     destination.pathname = "/admin/login";
-    destination.searchParams.set("error", "link_expired");
+    destination.searchParams.set("error", configurationFailed ? "configuration" : "link_expired");
   }
   const response = NextResponse.redirect(destination);
   response.headers.set("Referrer-Policy", "no-referrer");

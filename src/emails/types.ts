@@ -15,17 +15,20 @@ export function isEmailEvent(value: string): value is EmailEvent {
   return (EMAIL_EVENTS as readonly string[]).includes(value);
 }
 
-/**
- * Everything a template renders, already formatted for display in the church timezone.
- * Built by src/lib/email/outbox.ts from `email_context`; templates never touch the DB.
- */
-export type EmailData = {
+/** Shared identity/contact fields used by every branded email. */
+export type EmailBrandData = {
   appUrl: string;
   appName: string;
   churchName: string;
   contactEmail: string | null;
   contactPhone: string | null;
+};
 
+/**
+ * Everything a template renders, already formatted for display in the church timezone.
+ * Built by src/lib/email/outbox.ts from `email_context`; templates never touch the DB.
+ */
+export type EmailData = EmailBrandData & {
   referenceCode: string;
   roomName: string;
   roomCapacity: number;

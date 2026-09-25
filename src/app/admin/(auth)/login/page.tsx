@@ -11,6 +11,7 @@ export const metadata: Metadata = {
 };
 
 const NOTICES: Record<string, string> = {
+  configuration: "Administrator sign-in is temporarily unavailable because the production connection is not configured.",
   no_access: "Your account doesn't have access to Reserve-A-Room administration. Contact a Super Admin.",
   link_expired: "That link has expired or was already used. Please request a new one.",
 };

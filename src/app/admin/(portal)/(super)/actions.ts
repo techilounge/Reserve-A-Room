@@ -4,8 +4,10 @@ import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { assertPermission } from "@/lib/auth/guards";
+import { authSetupUrl } from "@/lib/auth/setup-link";
 import { getAppUrl } from "@/lib/app-url";
 import { CATALOG_TAG } from "@/lib/data/catalog";
+import { sendAuthEmail } from "@/lib/email/auth";
 import { toAppError } from "@/lib/domain/errors";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -157,32 +159,46 @@ export async function inviteUserAction(input: unknown): Promise<SuperActionResul
   const service = createSupabaseServiceClient();
   const redirectTo = new URL("/admin/auth/confirm?next=/admin/set-password", getAppUrl()).toString();
   let userId: string | undefined;
-  const invited = await service.auth.admin.inviteUserByEmail(email, { redirectTo, data: { full_name: fullName } });
-  if (invited.data.user) {
-    userId = invited.data.user.id;
-  } else {
-    // Already registered (e.g. a former staff member): reuse that auth account.
-    for (let page = 1; !userId; page++) {
-      const { data, error } = await service.auth.admin.listUsers({ page, perPage: 1000 });
-      if (error) return fail(error);
-      userId = data.users.find((u) => u.email?.toLowerCase() === email)?.id;
-      if (data.users.length < 1000) break;
-    }
-    if (!userId) {
-      console.error("[super-admin] invite failed", invited.error);
-      return { ok: false, message: "The invitation couldn't be sent. Please check the email address and try again." };
-    }
-    const supabase = await createSupabaseServerClient();
-    await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  for (let page = 1; !userId; page++) {
+    const { data, error } = await service.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) return fail(error);
+    userId = data.users.find((u) => u.email?.toLowerCase() === email)?.id;
+    if (data.users.length < 1000) break;
   }
+
+  const linkType = userId ? "recovery" : "invite";
+  const { data: link, error: linkError } = await service.auth.admin.generateLink(
+    linkType === "invite"
+      ? { type: "invite", email, options: { redirectTo, data: { full_name: fullName } } }
+      : { type: "recovery", email, options: { redirectTo } },
+  );
+  if (linkError) {
+    console.error("[super-admin] invite link generation failed", linkError);
+    return { ok: false, message: "The invitation couldn't be created. Please check the email address and try again." };
+  }
+  userId = link.user.id;
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc("create_staff_profile", { p_user_id: userId, p_full_name: fullName, p_role: role });
   if (error) {
     return error.code === "RAR10" ? { ok: false, message: "That person already has an administrator account." } : fail(error);
   }
+  const delivered = await sendAuthEmail({
+    kind: "invitation",
+    to: email,
+    fullName,
+    actionUrl: authSetupUrl(link.properties.hashed_token, linkType),
+    service,
+  });
   revalidatePath("/admin/users");
-  return { ok: true, message: `Invitation sent to ${email}.` };
+  if (!delivered.ok) {
+    console.error("[super-admin] invitation email failed", delivered.error);
+    return {
+      ok: false,
+      message: `The administrator account was created, but its email couldn't be sent. Ask ${email} to use Forgot password after email delivery is configured.`,
+    };
+  }
+  return { ok: true, message: `Branded invitation sent to ${email} through Resend.` };
 }
 
 export async function setUserRoleAction(userId: string, role: "admin" | "super_admin"): Promise<SuperActionResult> {

@@ -14,7 +14,7 @@ import {
 } from "@react-email/components";
 import type { ReactNode } from "react";
 
-import type { EmailData } from "./types";
+import type { EmailBrandData } from "./types";
 
 // Email clients ignore CSS variables and most stylesheets, so the brand tokens are
 // repeated here as literal values (see globals.css for the app's equivalents).
@@ -39,7 +39,7 @@ export function EmailLayout({
   heading,
   children,
 }: {
-  data: EmailData;
+  data: EmailBrandData;
   preview: string;
   heading: string;
   children: ReactNode;
