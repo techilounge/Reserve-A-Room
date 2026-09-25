@@ -39,6 +39,32 @@ test("the sign-in page ignores off-site redirect targets", async ({ browser }) =
   await context.close();
 });
 
+test("password-setup links require a user action before consuming the token", async ({ browser }) => {
+  const context = await newVisitor(browser);
+  const page = await context.newPage();
+  await page.goto("/admin/auth/confirm?token_hash=e2e-password-setup-token&type=recovery&next=%2Fadmin%2Fset-password");
+
+  await expect(page.getByRole("heading", { name: "Continue to choose your password" })).toBeVisible();
+  await expect(page).toHaveURL(/token_hash=e2e-password-setup-token/);
+
+  await page.getByRole("button", { name: "Continue securely" }).click();
+  await expect(page).toHaveURL(/\/admin\/set-password$/);
+  await expect(page.getByRole("heading", { name: "Choose a password" })).toBeVisible();
+  await context.close();
+});
+
+test("an invalid password-setup link shows an error instead of the dashboard", async ({ browser }) => {
+  const context = await browser.newContext();
+  await signInAs(context, "superAdmin");
+  const page = await context.newPage();
+  await page.goto("/admin/auth/confirm?token_hash=invalid&type=recovery");
+  await page.getByRole("button", { name: "Continue securely" }).click();
+
+  await expect(page).toHaveURL(/\/admin\/auth\/confirm\?error=link_expired$/);
+  await expect(page.getByRole("heading", { name: "We couldn't confirm this link" })).toBeVisible();
+  await context.close();
+});
+
 test("Admins can't open Super Admin pages; Super Admins can", async ({ browser }) => {
   const adminContext = await browser.newContext();
   await signInAs(adminContext, "admin");

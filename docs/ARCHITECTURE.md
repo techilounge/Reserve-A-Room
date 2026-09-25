@@ -107,7 +107,7 @@ is enforced in Postgres, and mirrored in TypeScript only to give good feedback e
 │  │  │  ├─ reserve/               ← 3-step flow (room+schedule → details → review)
 │  │  │  └─ reservation/[reference]/  ← secure guest status / cancel page
 │  │  ├─ admin/
-│  │  │  ├─ login/  forgot-password/  reset-password/  auth/confirm/ (route)
+│  │  │  ├─ login/  forgot-password/  set-password/  auth/confirm/ (page + action)
 │  │  │  └─ (portal)/              ← authenticated layout, role guard, bell, nav
 │  │  │     ├─ page.tsx            ← dashboard
 │  │  │     ├─ reservations/  reservations/new/  reservations/[id]/

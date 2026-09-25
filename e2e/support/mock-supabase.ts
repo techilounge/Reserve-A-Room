@@ -136,6 +136,14 @@ const server = http.createServer(async (req, res) => {
       const user = refreshTokens.get(body.refresh_token);
       return user ? send(200, session(user)) : send(400, { error_code: "refresh_token_not_found", msg: "Invalid Refresh Token" });
     }
+    if (url.pathname === "/auth/v1/verify" && req.method === "POST") {
+      const body = await readBody(req);
+      const user = staff.get(TEST_ACCOUNTS.superAdmin.email);
+      if (!user || body.token_hash !== "e2e-password-setup-token" || !["invite", "recovery"].includes(body.type)) {
+        return send(403, { code: 403, error_code: "otp_expired", msg: "Token has expired or is invalid" });
+      }
+      return send(200, session(user));
+    }
     if (url.pathname === "/auth/v1/user") {
       const claims = verify((req.headers.authorization ?? "").replace(/^Bearer /, ""));
       if (!claims) return send(401, { code: 401, error_code: "bad_jwt", msg: "invalid JWT" });
