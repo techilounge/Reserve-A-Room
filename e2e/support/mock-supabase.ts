@@ -55,6 +55,10 @@ for (const { id, email, role, name } of Object.values(TEST_ACCOUNTS)) {
   await db.query("insert into public.profiles (id, email, full_name, role) values ($1, $2, $3, $4)", [u.id, email, name, role]);
   staff.set(email, { id: u.id, email });
 }
+await db.query("update public.profiles set invited_by = $1 where id = $2", [
+  TEST_ACCOUNTS.superAdmin.id,
+  TEST_ACCOUNTS.admin.id,
+]);
 await db.query(`insert into public.notifications (user_id, type, title, message, reservation_id, created_at)
   select p.id, 'reservation_pending', 'New request: ' || rm.name, r.requester_first_name || ' ' || r.requester_last_name || ' requested ' || rm.name || '.', r.id, now() - interval '25 minutes'
   from public.reservations r join public.rooms rm on rm.id = r.room_id cross join public.profiles p where r.status = 'pending'`);
@@ -125,6 +129,16 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(user ? 200 : 404, { "content-type": "text/plain", "access-control-allow-origin": "*" });
       return res.end(user ? `base64-${Buffer.from(JSON.stringify(session(user))).toString("base64url")}` : "");
     }
+    if (url.pathname === "/qa/system-emails") {
+      const entity = url.searchParams.get("entity");
+      return send(
+        200,
+        await json(
+          "select coalesce(jsonb_agg(to_jsonb(e) order by created_at), '[]') as j from public.system_email_logs e where entity_id = $1::uuid",
+          [entity],
+        ),
+      );
+    }
     // --- auth ---
     if (url.pathname === "/auth/v1/token" && req.method === "POST") {
       const body = await readBody(req);
@@ -138,7 +152,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === "/auth/v1/verify" && req.method === "POST") {
       const body = await readBody(req);
-      const user = staff.get(TEST_ACCOUNTS.superAdmin.email);
+      const user = staff.get(body.type === "invite" ? TEST_ACCOUNTS.admin.email : TEST_ACCOUNTS.superAdmin.email);
       if (!user || body.token_hash !== "e2e-password-setup-token" || !["invite", "recovery"].includes(body.type)) {
         return send(403, { code: 403, error_code: "otp_expired", msg: "Token has expired or is invalid" });
       }
@@ -191,6 +205,7 @@ const server = http.createServer(async (req, res) => {
       // PostgREST accepts bytea as "\x…" hex text; PGlite wants bytes.
       const values = names.map((n) => {
         const v = args[n];
+        if ((n === "p_occurrences" || n === "p_exceptions") && Array.isArray(v)) return JSON.stringify(v);
         if (Array.isArray(v)) return `{${v.map((x) => `"${String(x).replace(/"/g, '\\"')}"`).join(",")}}`;
         return typeof v === "string" && /^\\x[0-9a-f]*$/i.test(v) ? Buffer.from(v.slice(2), "hex") : v;
       });

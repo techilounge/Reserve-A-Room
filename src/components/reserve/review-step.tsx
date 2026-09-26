@@ -1,6 +1,7 @@
 "use client";
 
-import { Pencil } from "lucide-react";
+import { Pencil, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 import { useFormContext, useWatch } from "react-hook-form";
 
 import { CapacityWarning } from "@/components/reservations/capacity-warning";
@@ -23,7 +24,11 @@ export function ReviewStep({
   ministries: { id: string; name: string }[];
   onEdit: (step: "schedule" | "details") => void;
 }) {
-  const { control } = useFormContext<ReservationInput>();
+  const {
+    control,
+    register,
+    formState: { errors },
+  } = useFormContext<ReservationInput>();
   const v = useWatch({ control }) as Partial<Record<keyof ReservationInput, string>>;
   const ministry =
     v.ministryId === OTHER_MINISTRY ? v.otherMinistryName : ministries.find((m) => m.id === v.ministryId)?.name;
@@ -79,6 +84,61 @@ export function ReviewStep({
       </section>
 
       <CapacityWarning estimated={Number.isFinite(estimated) ? estimated : 0} capacity={room.capacity} />
+
+      <section
+        aria-labelledby="legal-consent-heading"
+        className="rounded-xl border border-brand-gold/55 bg-warning-soft/45 p-4 shadow-sm ring-1 ring-brand-gold/20 sm:p-5"
+      >
+        <div className="flex gap-3">
+          <ShieldCheck className="mt-0.5 size-5 shrink-0 text-gold-text" aria-hidden />
+          <div className="min-w-0 flex-1 space-y-3">
+            <div>
+              <h3 id="legal-consent-heading" className="font-semibold">
+                Privacy &amp; Terms
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Please review and accept both documents before submitting your reservation.
+              </p>
+            </div>
+            <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border bg-card p-3 has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring">
+              <input
+                id="legalAccepted"
+                type="checkbox"
+                className="mt-0.5 size-5 shrink-0 accent-primary"
+                aria-invalid={errors.legalAccepted ? "true" : undefined}
+                aria-describedby={errors.legalAccepted ? "legalAccepted-error" : undefined}
+                {...register("legalAccepted")}
+              />
+              <span className="text-sm leading-6">
+                I have read and accept the{" "}
+                <Link
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-primary underline decoration-brand-gold decoration-2 underline-offset-4 hover:text-gold-text"
+                >
+                  Privacy Policy
+                </Link>{" "}
+                and{" "}
+                <Link
+                  href="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-primary underline decoration-brand-gold decoration-2 underline-offset-4 hover:text-gold-text"
+                >
+                  Terms of Service
+                </Link>
+                .
+              </span>
+            </label>
+            {errors.legalAccepted?.message ? (
+              <p id="legalAccepted-error" role="alert" className="text-sm font-medium text-destructive">
+                {errors.legalAccepted.message}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

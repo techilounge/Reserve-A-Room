@@ -3,6 +3,7 @@ import "server-only";
 import { after } from "next/server";
 
 import { deliverQueuedEmails } from "./outbox";
+import { deliverQueuedSystemEmails } from "./system-outbox";
 
 /**
  * Sends a reservation's queued emails after the response has been sent, so the requester
@@ -15,6 +16,17 @@ export function scheduleEmailDelivery(reservationId?: string) {
       await deliverQueuedEmails({ reservationId });
     } catch (error) {
       console.error("[email] background delivery failed", reservationId, error);
+    }
+  });
+}
+
+/** Background delivery for entity-backed messages such as one recurring-series summary. */
+export function scheduleSystemEmailDelivery(entityId?: string) {
+  after(async () => {
+    try {
+      await deliverQueuedSystemEmails({ entityId });
+    } catch (error) {
+      console.error("[system-email] background delivery failed", entityId, error);
     }
   });
 }

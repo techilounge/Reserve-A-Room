@@ -1,4 +1,4 @@
-import { Ban, ChevronLeft, ChevronRight, CircleCheck, CircleX, Hourglass } from "lucide-react";
+import { Ban, ChevronLeft, ChevronRight, CircleCheck, CircleX, Hourglass, Repeat2 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -37,9 +37,16 @@ function EntryChip({ entry, compact = false }: { entry: Entry; compact?: boolean
         <span className="font-semibold">{formatTime(entry.start)}</span>{" "}
         <span className={compact ? "block truncate" : ""}>{entry.room_name}</span>
         {!compact ? (
-          <span className="block truncate opacity-90">
-            {entry.requester_first_name} {entry.requester_last_name} · {entry.ministry_name}
-          </span>
+          <>
+            <span className="block truncate opacity-90">
+              {entry.requester_first_name} {entry.requester_last_name} · {entry.ministry_name}
+            </span>
+            {entry.series_id ? (
+              <span className="mt-1 flex items-center gap-1 font-medium">
+                <Repeat2 className="size-3" aria-hidden /> Recurring
+              </span>
+            ) : null}
+          </>
         ) : null}
       </span>
     </Link>

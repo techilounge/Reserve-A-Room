@@ -53,9 +53,9 @@ export function ScheduleStep({
           {rooms.map((r) => (
             <label
               key={r.id}
+              data-selected={roomId === r.id}
               className={cn(
-                "relative flex cursor-pointer flex-col gap-2 rounded-xl border bg-card p-4 transition-colors hover:border-ring has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50",
-                roomId === r.id && "border-primary ring-1 ring-primary",
+                "relative flex cursor-pointer flex-col gap-2 rounded-xl border border-brand-gold/50 bg-card p-4 shadow-sm ring-1 ring-brand-gold/25 transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-brand-gold hover:shadow-md hover:ring-2 hover:ring-brand-gold/60 has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-3 has-[:focus-visible]:outline-ring data-[selected=true]:border-brand-gold data-[selected=true]:shadow-md data-[selected=true]:ring-2 data-[selected=true]:ring-brand-gold dark:ring-brand-gold/40 dark:hover:ring-brand-gold/80",
               )}
             >
               <input
@@ -70,7 +70,7 @@ export function ScheduleStep({
                 <span id={`room-${r.id}-name`} className="font-semibold">
                   {r.name}
                 </span>
-                {roomId === r.id ? <CircleCheck className="size-5 shrink-0 text-primary" aria-hidden /> : null}
+                {roomId === r.id ? <CircleCheck className="size-5 shrink-0 text-gold-text" aria-hidden /> : null}
               </span>
               <span id={`room-${r.id}-policies`} className="flex flex-wrap gap-1.5">
                 <CapacityBadge capacity={r.capacity} />

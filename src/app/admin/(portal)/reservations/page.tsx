@@ -1,52 +1,32 @@
-import { ChevronLeft, ChevronRight, Plus, SearchX, TriangleAlert } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Plus, SearchX, TriangleAlert } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
 import { PaginationLink } from "@/components/admin/pagination-link";
+import { RecurringBadge } from "@/components/admin/recurring-badge";
 import { ReservationFilters } from "@/components/admin/reservation-filters";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatusBadge } from "@/components/reservations/status-badge";
 import { Button } from "@/components/ui/button";
-import { formatShortDate, formatTimeRange, isLocalDate, toLocalParts, todayInZone } from "@/lib/datetime";
-import { listReservations, SORTS, type AdminReservationRow, type ReservationFilters as Filters } from "@/lib/data/admin";
+import { formatShortDate, formatTimeRange, toLocalParts } from "@/lib/datetime";
+import { listReservations, type AdminReservationRow } from "@/lib/data/admin";
 import { loadCatalog } from "@/lib/data/catalog";
 import { evaluateCapacity } from "@/lib/domain/rooms/capacity";
 import { approvalLabel } from "@/lib/reservations/labels";
-import type { Enums } from "@/lib/supabase/database.types";
+import { parseReservationListFilters } from "@/lib/reservations/filters";
 
 export const metadata: Metadata = {
   title: "Reservations",
 };
 
 const PAGE_SIZE = 25;
-const STATUSES = ["pending", "approved", "declined", "cancelled"] as const;
-const UUID = /^[0-9a-f-]{36}$/i;
-
 export default async function AdminReservationsPage({ searchParams }: PageProps<"/admin/reservations">) {
   const raw = await searchParams;
-  const one = (key: string) => (typeof raw[key] === "string" ? (raw[key] as string) : "");
 
   const catalog = await loadCatalog();
   const timeZone = catalog.ok ? catalog.catalog.settings.timeZone : "America/Chicago";
-  const status = one("status");
-  const filters: Filters = {
-    search: one("q").slice(0, 100),
-    statuses:
-      status === "upcoming"
-        ? ["pending", "approved"]
-        : (STATUSES as readonly string[]).includes(status)
-          ? [status as Enums<"reservation_status">]
-          : undefined,
-    roomId: UUID.test(one("room")) ? one("room") : undefined,
-    ministryId: UUID.test(one("ministry")) ? one("ministry") : undefined,
-    from: isLocalDate(one("from")) ? one("from") : status === "upcoming" ? todayInZone(timeZone) : undefined,
-    to: isLocalDate(one("to")) ? one("to") : undefined,
-    approval: one("approval") === "required" || one("approval") === "instant" ? (one("approval") as "required" | "instant") : undefined,
-    sort: (SORTS as readonly string[]).includes(one("sort")) ? (one("sort") as Filters["sort"]) : "start_asc",
-    page: Math.max(1, Number.parseInt(one("page"), 10) || 1),
-    pageSize: PAGE_SIZE,
-  };
+  const filters = parseReservationListFilters(raw, timeZone, PAGE_SIZE);
 
   const { rows, total } = await listReservations(filters);
   const page = filters.page ?? 1;
@@ -56,6 +36,11 @@ export default async function AdminReservationsPage({ searchParams }: PageProps<
     next.set("page", String(p));
     return `/admin/reservations?${next.toString()}`;
   };
+  const exportParams = new URLSearchParams(
+    Object.entries(raw).filter(([key, value]) => key !== "page" && typeof value === "string") as [string, string][],
+  );
+  const exportHref = (format: "csv" | "pdf") =>
+    `/admin/reservations/export/${format}${exportParams.size ? `?${exportParams.toString()}` : ""}`;
 
   return (
     <div className="flex flex-col gap-6">
@@ -63,14 +48,32 @@ export default async function AdminReservationsPage({ searchParams }: PageProps<
         title="Reservations"
         description="Search, review and manage every reservation."
         actions={
-          <Button asChild>
-            <Link href="/admin/reservations/new">
-              <Plus data-icon="inline-start" aria-hidden />
-              New reservation
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <a href={exportHref("csv")} download>
+                <FileSpreadsheet data-icon="inline-start" aria-hidden />
+                CSV / Excel
+              </a>
+            </Button>
+            <Button asChild variant="outline">
+              <a href={exportHref("pdf")} download>
+                <FileText data-icon="inline-start" aria-hidden />
+                PDF
+              </a>
+            </Button>
+            <Button asChild>
+              <Link href="/admin/reservations/new">
+                <Plus data-icon="inline-start" aria-hidden />
+                New reservation
+              </Link>
+            </Button>
+          </div>
         }
       />
+      <p className="-mt-4 text-xs text-muted-foreground">
+        Exports use the active filters, include up to 1,000 rows, and are limited to one calendar year. Without dates,
+        the current year is used.
+      </p>
       <ReservationFilters
         rooms={catalog.ok ? catalog.catalog.rooms.map(({ id, name }) => ({ id, name })) : []}
         ministries={catalog.ok ? catalog.catalog.ministries : []}
@@ -144,6 +147,7 @@ export default async function AdminReservationsPage({ searchParams }: PageProps<
                       </td>
                       <td className="px-4 py-3">
                         <StatusBadge status={row.status} />
+                        {row.series_id ? <div className="mt-1.5"><RecurringBadge seriesId={row.series_id} /></div> : null}
                         <div className="mt-1 text-xs text-muted-foreground">{approvalLabel(row)}</div>
                       </td>
                     </tr>
@@ -187,7 +191,10 @@ function ReservationCard({ row, timeZone }: { row: AdminReservationRow; timeZone
           </p>
           <p className="text-sm text-muted-foreground">{row.room_name}</p>
         </div>
-        <StatusBadge status={row.status} />
+        <div className="flex flex-col items-end gap-1.5">
+          <StatusBadge status={row.status} />
+          {row.series_id ? <RecurringBadge seriesId={row.series_id} linked={false} /> : null}
+        </div>
       </div>
       <p className="mt-2 text-sm">
         {row.requester_first_name} {row.requester_last_name} · {row.ministry_name}

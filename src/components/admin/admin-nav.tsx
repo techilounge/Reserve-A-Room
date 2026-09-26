@@ -1,11 +1,10 @@
 "use client";
 
-import { Menu } from "lucide-react";
+import type { ReactElement } from "react";
 import { useState } from "react";
 
 import { BrandLockup } from "@/components/brand/brand";
 import { NavLink } from "@/components/layout/nav-link";
-import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
@@ -31,10 +30,14 @@ function visibleGroups(allowedHrefs: readonly string[]): NavGroup[] {
 function NavGroups({
   allowedHrefs,
   onNavigate,
+  excludedHrefs = [],
 }: {
   allowedHrefs: readonly string[];
   onNavigate?: () => void;
+  excludedHrefs?: readonly string[];
 }) {
+  const excluded = new Set(excludedHrefs);
+
   return (
     <nav aria-label="Admin" className="flex flex-col gap-6">
       {visibleGroups(allowedHrefs).map((group) => (
@@ -42,7 +45,7 @@ function NavGroups({
           <p className="px-3 pb-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
             {group.label}
           </p>
-          {group.items.map(({ href, label, icon: Icon }) => (
+          {group.items.filter(({ href }) => !excluded.has(href)).map(({ href, label, icon: Icon }) => (
             <NavLink
               key={href}
               href={href}
@@ -63,24 +66,32 @@ export function AdminSidebarNav({ allowedHrefs }: { allowedHrefs: readonly strin
   return <NavGroups allowedHrefs={allowedHrefs} />;
 }
 
-export function AdminMobileNav({ allowedHrefs }: { allowedHrefs: readonly string[] }) {
+const PRIMARY_MOBILE_HREFS = ["/admin", "/admin/reservations", "/admin/calendar"] as const;
+
+export function AdminMoreNav({
+  allowedHrefs,
+  trigger,
+}: {
+  allowedHrefs: readonly string[];
+  trigger: ReactElement;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Open admin menu">
-          <Menu className="size-5" aria-hidden />
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="left" className="w-[min(18rem,85vw)] gap-0 bg-sidebar p-0">
+      <SheetTrigger asChild>{trigger}</SheetTrigger>
+      <SheetContent side="right" className="w-[min(20rem,88vw)] gap-0 bg-sidebar p-0">
         <SheetHeader className="border-b p-4">
           <SheetTitle className="sr-only">Admin menu</SheetTitle>
           <SheetDescription className="sr-only">Administrative navigation</SheetDescription>
-          <BrandLockup href="/admin" subtitle="Administration" className="pr-10" />
+          <BrandLockup href="/" subtitle="Administration" className="pr-10" />
         </SheetHeader>
         <div className="overflow-y-auto p-3">
-          <NavGroups allowedHrefs={allowedHrefs} onNavigate={() => setOpen(false)} />
+          <NavGroups
+            allowedHrefs={allowedHrefs}
+            excludedHrefs={PRIMARY_MOBILE_HREFS}
+            onNavigate={() => setOpen(false)}
+          />
         </div>
       </SheetContent>
     </Sheet>

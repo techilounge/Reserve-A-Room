@@ -284,6 +284,8 @@ export type Database = {
           invited_by: string | null;
           created_at: string;
           updated_at: string;
+          invitation_accepted_at: string | null;
+          first_login_at: string | null;
         };
         Insert: {
           id: string;
@@ -295,6 +297,8 @@ export type Database = {
           invited_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          invitation_accepted_at?: string | null;
+          first_login_at?: string | null;
         };
         Update: {
           id?: string;
@@ -306,6 +310,8 @@ export type Database = {
           invited_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          invitation_accepted_at?: string | null;
+          first_login_at?: string | null;
         };
         Relationships: [
           {
@@ -337,6 +343,186 @@ export type Database = {
           created_at?: string;
         };
         Relationships: [
+        ];
+      };
+      reservation_series: {
+        Row: {
+          id: string;
+          status: string;
+          room_id: string;
+          created_by_user_id: string;
+          frequency: string;
+          interval_count: number;
+          weekdays: number[];
+          weekday: number | null;
+          month_ordinals: number[];
+          month_ordinal: number | null;
+          day_of_month: number | null;
+          month_of_year: number | null;
+          instance_limit: number;
+          start_date: string;
+          end_date: string | null;
+          local_start_time: string;
+          local_end_time: string;
+          timezone: string;
+          requester_first_name: string;
+          requester_last_name: string;
+          requester_email: string;
+          requester_phone: string;
+          ministry_id: string | null;
+          other_ministry_name: string | null;
+          purpose: string;
+          estimated_attendance: number;
+          setup_requirements: string | null;
+          requester_notes: string | null;
+          admin_notes: string | null;
+          notify_requester: boolean;
+          materialized_through: string | null;
+          paused_reason: string | null;
+          materialization_claim_id: string | null;
+          materialization_claimed_at: string | null;
+          ended_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          status?: string;
+          room_id: string;
+          created_by_user_id: string;
+          frequency: string;
+          interval_count?: number;
+          weekdays?: number[];
+          weekday?: number | null;
+          month_ordinals?: number[];
+          month_ordinal?: number | null;
+          day_of_month?: number | null;
+          month_of_year?: number | null;
+          instance_limit?: number;
+          start_date: string;
+          end_date?: string | null;
+          local_start_time: string;
+          local_end_time: string;
+          timezone: string;
+          requester_first_name: string;
+          requester_last_name: string;
+          requester_email: string;
+          requester_phone: string;
+          ministry_id?: string | null;
+          other_ministry_name?: string | null;
+          purpose: string;
+          estimated_attendance: number;
+          setup_requirements?: string | null;
+          requester_notes?: string | null;
+          admin_notes?: string | null;
+          notify_requester?: boolean;
+          materialized_through?: string | null;
+          paused_reason?: string | null;
+          materialization_claim_id?: string | null;
+          materialization_claimed_at?: string | null;
+          ended_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          status?: string;
+          room_id?: string;
+          created_by_user_id?: string;
+          frequency?: string;
+          interval_count?: number;
+          weekdays?: number[];
+          weekday?: number | null;
+          month_ordinals?: number[];
+          month_ordinal?: number | null;
+          day_of_month?: number | null;
+          month_of_year?: number | null;
+          instance_limit?: number;
+          start_date?: string;
+          end_date?: string | null;
+          local_start_time?: string;
+          local_end_time?: string;
+          timezone?: string;
+          requester_first_name?: string;
+          requester_last_name?: string;
+          requester_email?: string;
+          requester_phone?: string;
+          ministry_id?: string | null;
+          other_ministry_name?: string | null;
+          purpose?: string;
+          estimated_attendance?: number;
+          setup_requirements?: string | null;
+          requester_notes?: string | null;
+          admin_notes?: string | null;
+          notify_requester?: boolean;
+          materialized_through?: string | null;
+          paused_reason?: string | null;
+          materialization_claim_id?: string | null;
+          materialization_claimed_at?: string | null;
+          ended_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reservation_series_created_by_user_id_fkey";
+            columns: ["created_by_user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reservation_series_ministry_id_fkey";
+            columns: ["ministry_id"];
+            isOneToOne: false;
+            referencedRelation: "ministries";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reservation_series_room_id_fkey";
+            columns: ["room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      reservation_series_exceptions: {
+        Row: {
+          id: string;
+          series_id: string;
+          occurrence_date: string;
+          reason: string;
+          message: string;
+          resolved_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          series_id: string;
+          occurrence_date: string;
+          reason: string;
+          message: string;
+          resolved_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          series_id?: string;
+          occurrence_date?: string;
+          reason?: string;
+          message?: string;
+          resolved_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reservation_series_exceptions_series_id_fkey";
+            columns: ["series_id"];
+            isOneToOne: false;
+            referencedRelation: "reservation_series";
+            referencedColumns: ["id"];
+          },
         ];
       };
       reservations: {
@@ -377,6 +563,12 @@ export type Database = {
           search_text: string | null;
           created_at: string;
           updated_at: string;
+          series_id: string | null;
+          occurrence_date: string | null;
+          privacy_accepted_at: string | null;
+          privacy_version: string | null;
+          terms_accepted_at: string | null;
+          terms_version: string | null;
         };
         Insert: {
           id?: string;
@@ -415,6 +607,12 @@ export type Database = {
           search_text?: never;
           created_at?: string;
           updated_at?: string;
+          series_id?: string | null;
+          occurrence_date?: string | null;
+          privacy_accepted_at?: string | null;
+          privacy_version?: string | null;
+          terms_accepted_at?: string | null;
+          terms_version?: string | null;
         };
         Update: {
           id?: string;
@@ -453,6 +651,12 @@ export type Database = {
           search_text?: never;
           created_at?: string;
           updated_at?: string;
+          series_id?: string | null;
+          occurrence_date?: string | null;
+          privacy_accepted_at?: string | null;
+          privacy_version?: string | null;
+          terms_accepted_at?: string | null;
+          terms_version?: string | null;
         };
         Relationships: [
           {
@@ -495,6 +699,13 @@ export type Database = {
             columns: ["room_id"];
             isOneToOne: false;
             referencedRelation: "rooms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reservations_series_id_fkey";
+            columns: ["series_id"];
+            isOneToOne: false;
+            referencedRelation: "reservation_series";
             referencedColumns: ["id"];
           },
         ];
@@ -590,6 +801,55 @@ export type Database = {
         Relationships: [
         ];
       };
+      system_email_logs: {
+        Row: {
+          id: string;
+          recipient: string;
+          event_type: string;
+          entity_type: string;
+          entity_id: string;
+          payload: Json;
+          status: Database["public"]["Enums"]["email_status"];
+          provider_message_id: string | null;
+          error_message: string | null;
+          attempt_count: number;
+          last_attempt_at: string | null;
+          sent_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          recipient: string;
+          event_type: string;
+          entity_type: string;
+          entity_id: string;
+          payload?: Json;
+          status?: Database["public"]["Enums"]["email_status"];
+          provider_message_id?: string | null;
+          error_message?: string | null;
+          attempt_count?: number;
+          last_attempt_at?: string | null;
+          sent_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          recipient?: string;
+          event_type?: string;
+          entity_type?: string;
+          entity_id?: string;
+          payload?: Json;
+          status?: Database["public"]["Enums"]["email_status"];
+          provider_message_id?: string | null;
+          error_message?: string | null;
+          attempt_count?: number;
+          last_attempt_at?: string | null;
+          sent_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+        ];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -605,9 +865,21 @@ export type Database = {
         Args: never;
         Returns: { pending_count: number; approved_today_count: number; upcoming_count: number; week_count: number }[];
       };
+      admin_end_reservation_series: {
+        Args: { p_id: string };
+        Returns: boolean;
+      };
+      admin_export_reservations: {
+        Args: { p_from: string; p_to: string; p_search?: string; p_statuses?: Database["public"]["Enums"]["reservation_status"][]; p_room_id?: string; p_ministry_id?: string; p_approval?: string; p_sort?: string; p_limit?: number };
+        Returns: { id: string; reference_code: string; status: Database["public"]["Enums"]["reservation_status"]; source: Database["public"]["Enums"]["reservation_source"]; room_name: string; start_at: string; end_at: string; requester_first_name: string; requester_last_name: string; requester_email: string; requester_phone: string; ministry_name: string; purpose: string; estimated_attendance: number; approval_required_at_submission: boolean; created_at: string }[];
+      };
       admin_get_reservation: {
         Args: { p_id: string };
         Returns: { id: string; reference_code: string; status: Database["public"]["Enums"]["reservation_status"]; source: Database["public"]["Enums"]["reservation_source"]; room_id: string; room_name: string; room_slug: string; room_capacity: number; room_food_drinks_allowed: boolean; room_approval_required: boolean; start_at: string; end_at: string; requester_first_name: string; requester_last_name: string; requester_email: string; requester_phone: string; ministry_id: string; ministry_name: string; other_ministry_name: string; purpose: string; estimated_attendance: number; setup_requirements: string; requester_notes: string; admin_notes: string; requester_message: string; approval_required_at_submission: boolean; food_drinks_allowed_at_submission: boolean; room_capacity_at_submission: number; created_by_name: string; approved_by_name: string; approved_at: string; declined_by_name: string; declined_at: string; cancelled_by_name: string; cancelled_at: string; cancelled_by_requester: boolean; created_at: string; updated_at: string }[];
+      };
+      admin_get_reservation_series: {
+        Args: { p_id: string };
+        Returns: Json;
       };
       admin_list_amenities: {
         Args: never;
@@ -633,6 +905,10 @@ export type Database = {
         Args: { p_id: string };
         Returns: { id: string; recipient: string; event_type: string; status: Database["public"]["Enums"]["email_status"]; error_message: string; attempt_count: number; sent_at: string; created_at: string }[];
       };
+      admin_reservation_series_links: {
+        Args: { p_ids: string[] };
+        Returns: { reservation_id: string; series_id: string; occurrence_date: string }[];
+      };
       approve_reservation: {
         Args: { p_id: string; p_message?: string };
         Returns: Database["public"]["Enums"]["reservation_status"];
@@ -657,13 +933,33 @@ export type Database = {
         Args: { p_limit?: number; p_reservation_id?: string };
         Returns: string[];
       };
+      claim_series_to_materialize: {
+        Args: { p_limit?: number };
+        Returns: { id: string; claim_id: string; room_id: string; frequency: string; interval_count: number; weekdays: number[]; weekday: number; month_ordinals: number[]; month_ordinal: number; day_of_month: number; month_of_year: number; instance_limit: number; start_date: string; end_date: string; local_start_time: string; local_end_time: string; timezone: string; materialized_through: string; target_through: string; occurrence_count: number }[];
+      };
+      claim_system_emails: {
+        Args: { p_limit?: number; p_entity_id?: string };
+        Returns: string[];
+      };
       complete_email: {
         Args: { p_id: string; p_status: Database["public"]["Enums"]["email_status"]; p_provider_message_id?: string; p_error?: string };
         Returns: undefined;
       };
+      complete_staff_password_setup: {
+        Args: never;
+        Returns: boolean;
+      };
+      complete_system_email: {
+        Args: { p_id: string; p_status: Database["public"]["Enums"]["email_status"]; p_provider_message_id?: string; p_error?: string };
+        Returns: undefined;
+      };
       create_guest_reservation: {
-        Args: { p_room_id: string; p_start_at: string; p_end_at: string; p_first_name: string; p_last_name: string; p_email: string; p_phone: string; p_purpose: string; p_estimated_attendance: number; p_token_hash: string; p_token_seed: string; p_ministry_id?: string; p_other_ministry_name?: string; p_setup_requirements?: string; p_requester_notes?: string };
+        Args: { p_room_id: string; p_start_at: string; p_end_at: string; p_first_name: string; p_last_name: string; p_email: string; p_phone: string; p_purpose: string; p_estimated_attendance: number; p_token_hash: string; p_token_seed: string; p_privacy_accepted: boolean; p_terms_accepted: boolean; p_privacy_version: string; p_terms_version: string; p_ministry_id?: string; p_other_ministry_name?: string; p_setup_requirements?: string; p_requester_notes?: string };
         Returns: { id: string; reference_code: string; status: Database["public"]["Enums"]["reservation_status"] }[];
+      };
+      create_recurring_reservation_series: {
+        Args: { p_room_id: string; p_frequency: string; p_interval_count: number; p_weekdays: number[]; p_weekday: number; p_month_ordinals: number[]; p_month_ordinal: number; p_day_of_month: number; p_month_of_year: number; p_instance_limit: number; p_start_date: string; p_end_date: string; p_local_start_time: string; p_local_end_time: string; p_timezone: string; p_first_name: string; p_last_name: string; p_email: string; p_phone: string; p_purpose: string; p_estimated_attendance: number; p_occurrences: Json; p_materialized_through: string; p_ministry_id?: string; p_other_ministry_name?: string; p_setup_requirements?: string; p_requester_notes?: string; p_admin_notes?: string; p_notify?: boolean };
+        Returns: { series_id: string; occurrence_count: number }[];
       };
       create_staff_profile: {
         Args: { p_user_id: string; p_full_name: string; p_role: Database["public"]["Enums"]["app_role"] };
@@ -705,9 +1001,17 @@ export type Database = {
         Args: { p_ids?: string[] };
         Returns: number;
       };
+      materialize_series_occurrences: {
+        Args: { p_series_id: string; p_claim_id: string; p_occurrences: Json; p_materialized_through: string; p_exceptions?: Json };
+        Returns: { created_count: number; exception_count: number; series_status: string }[];
+      };
       my_notifications: {
         Args: { p_unread_only?: boolean; p_limit?: number; p_offset?: number };
         Returns: { id: string; type: string; title: string; message: string; reservation_id: string; read_at: string; created_at: string; total_count: number }[];
+      };
+      record_staff_login: {
+        Args: { p_method?: string };
+        Returns: undefined;
       };
       retry_email: {
         Args: { p_id: string };
@@ -736,6 +1040,10 @@ export type Database = {
       set_user_role: {
         Args: { p_user_id: string; p_role: Database["public"]["Enums"]["app_role"] };
         Returns: undefined;
+      };
+      system_email_context: {
+        Args: { p_email_id: string };
+        Returns: Json;
       };
       unread_notification_count: {
         Args: never;

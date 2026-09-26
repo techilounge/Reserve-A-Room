@@ -1,8 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 
-import { isPasswordSetupOtpType } from "@/lib/auth/setup-link";
+import { isPasswordSetupOtpType, PASSWORD_SETUP_KIND_COOKIE } from "@/lib/auth/setup-link";
+import { isProductionDeployment } from "@/lib/env/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
@@ -29,6 +31,15 @@ export async function confirmPasswordSetup(formData: FormData): Promise<void> {
     console.error("[auth] password-setup confirmation could not reach Supabase", error);
   }
 
-  if (verified) redirect("/admin/set-password");
+  if (verified) {
+    (await cookies()).set(PASSWORD_SETUP_KIND_COOKIE, type, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: isProductionDeployment() || process.env.NODE_ENV === "production",
+      path: "/admin",
+      maxAge: 15 * 60,
+    });
+    redirect("/admin/set-password");
+  }
   redirect(`/admin/auth/confirm?error=${errorCode}`);
 }

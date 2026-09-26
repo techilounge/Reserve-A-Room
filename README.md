@@ -5,8 +5,9 @@ Room reservations for **Stonehill Seventh-day Adventist Church**
 
 Production: https://reservearoom.stonehillchurch.org
 
-> **Status:** feature-complete (build phases 0–12). See
-> [Production deployment & domain](#production-deployment--domain) for the go-live checklist.
+> **Status:** the production baseline is live from `main`. Recurrence, lifecycle,
+> navigation, legal-consent, and export enhancements are implemented locally and remain
+> pending the migration/deployment checklist below.
 
 ## What it does
 
@@ -18,6 +19,13 @@ Production: https://reservearoom.stonehillchurch.org
   - food and drinks policy
 - Admins review, approve, decline, edit and cancel reservations. Super Admins also
   manage rooms, ministries, users, settings and the audit log.
+- Admins can create bounded daily, weekday, weekly, monthly, and yearly recurring
+  schedules—including combinations such as the second and fourth Saturday—and download
+  the filtered reservation list as Excel-compatible CSV or PDF.
+- Guests explicitly accept the published Privacy Policy and Terms of Service; the
+  accepted document versions and timestamps are retained with the reservation.
+- Mobile users receive context-aware floating navigation without changing the desktop
+  header or admin sidebar.
 - Double-bookings are prevented by the database itself.
 - Installable as a Progressive Web App, with light and dark mode.
 
@@ -93,7 +101,7 @@ the same variables in Vercel → Settings → Environment Variables for **Produc
 | `RESEND_API_KEY` | Yes | Sending email |
 | `RESEND_FROM_EMAIL` | Yes, e.g. `reservations@reservearoom.stonehillchurch.org` | Sender address (the display name comes from Settings) |
 | `RESEND_REPLY_TO` | Optional | Reply-to for requester emails (defaults to the Settings contact email) |
-| `CRON_SECRET` | Recommended | Enables the daily sweep for unsent emails |
+| `CRON_SECRET` | Recommended | Protects the scheduled recurrence materializer and email-outbox sweep |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Optional (both or neither) | Cloudflare Turnstile on the guest form |
 | `INITIAL_SUPER_ADMIN_EMAIL` / `INITIAL_SUPER_ADMIN_NAME` | Only in `.env.local`, for the one-time bootstrap | `npm run bootstrap:super-admin` |
 
@@ -105,13 +113,11 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 
 ## Deployments
 
-- **Production:** `main` is meant to be the Vercel production branch, served at
+- **Production:** `main` is the Vercel production branch, served at
   `https://reservearoom.stonehillchurch.org`.
-- **Development:** `claude/reserve-a-room-build` is the development branch. Each push
-  creates a Vercel deployment for testing.
-- **Merging:** nothing is merged to `main` without the owner's approval. See
-  [Production deployment & domain](#production-deployment--domain) for the one-time
-  switch-over.
+- **Development:** use review branches or managed worktrees; preview deployments are
+  validated before merging to `main`.
+- **Merging:** nothing is merged to `main` without the owner's approval.
 
 ## Supabase setup
 
@@ -158,6 +164,14 @@ the hosted project.
 The migrations create the initial reference data: the **Conference Room** (capacity 15,
 confirmed instantly, bookable up to 4 weeks ahead, no food or drinks), 11 ministries, a
 starter amenity list, and the default settings.
+
+The enhancement rollout adds these append-only migrations, in order:
+
+- `20260925100000_recurring_reservations.sql`
+- `20260925110000_staff_account_lifecycle.sql`
+- `20260925120000_super_admin_disable_protection.sql`
+- `20260925130000_reservation_legal_consent.sql`
+- `20260925140000_reservation_exports.sql`
 
 After changing a migration, regenerate the TypeScript types:
 
@@ -206,8 +220,9 @@ Reservation emails are sent through [Resend](https://resend.com) from the verifi
 5. **Staff account emails:** invitations and password resets use the same Resend key,
    sender, React Email branding and app-owned confirmation route as the rest of the app.
    Supabase SMTP is not used.
-6. **Cron:** set `CRON_SECRET` in Vercel (any long random string). `vercel.json` schedules a
-   daily sweep of `/api/cron/email-outbox`, and Vercel sends the secret automatically.
+6. **Cron:** set `CRON_SECRET` in Vercel (any long random string). `vercel.json` schedules
+   `/api/cron/email-outbox`; each authenticated run first materializes due recurring
+   occurrences, then drains both reservation and system-email outboxes.
 
 **How sending works.** A reservation change queues its emails in `email_logs` in the same
 database transaction. Right after the response is sent, the server renders the React Email
@@ -230,6 +245,7 @@ Emails sent:
 | Cancelled by requester | Staff |
 | Staff invitation | Invited administrator |
 | Password reset | Administrator |
+| Invited administrator accepts and enters the portal for the first time | Active Super Admins |
 
 **Without a key.** In local development and previews without `RESEND_API_KEY`, emails are
 marked "Not sent" and their subject is logged (locally, the whole plain-text body
@@ -361,15 +377,9 @@ relevant dashboard.
 **2. Vercel project**
 1. **Environment variables:** set every variable in the table above for Production (and
    Preview, if previews should work fully).
-2. **Branches:** when you're happy with the preview, create `main` from the reviewed
-   commit of `claude/reserve-a-room-build`, for example with a pull request on GitHub.
-   Then:
-   - make `main` the GitHub default branch (GitHub → Settings → General);
-   - make `main` the production branch (Vercel → Settings → Git → Production Branch).
-
-   The project currently deploys `claude/reserve-a-room-build` as production, so this
-   switch must happen before the custom domain is attached.
-3. **Deploy:** redeploy `main` so the new variables take effect.
+2. **Branch:** confirm the reviewed commit is merged to `main`; Vercel already tracks
+   `main` as the production branch.
+3. **Deploy:** confirm the `main` deployment succeeds after the database migration step.
 
 **3. Custom domain**
 1. In Vercel → Settings → Domains, add `reservearoom.stonehillchurch.org`.

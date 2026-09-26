@@ -67,9 +67,11 @@ export function ReservationWizard({
       estimatedAttendance: "",
       setupRequirements: "",
       requesterNotes: "",
+      legalAccepted: false,
     },
   });
   const { setValue, setError, clearErrors, trigger, getValues } = form;
+  const legalAcceptanceInvalid = Boolean(form.formState.errors.legalAccepted);
 
   const [step, setStep] = useState<Step>("schedule");
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -139,6 +141,14 @@ export function ReservationWizard({
     headingRef.current?.focus();
   }, [step]);
 
+  // Validation errors render after the submit event. Focus after that commit so
+  // keyboard and screen-reader users land on the control that needs attention.
+  useEffect(() => {
+    if (step === "review" && legalAcceptanceInvalid) {
+      document.getElementById("legalAccepted")?.focus();
+    }
+  }, [legalAcceptanceInvalid, step]);
+
   // The date picker and time selects are controlled (not registered), so react-hook-form
   // can't focus them itself; move focus to the first invalid one in visual order.
   function focusFirstScheduleError() {
@@ -184,8 +194,11 @@ export function ReservationWizard({
     setStep(step === "review" ? "details" : "schedule");
   }
 
-  function submit() {
+  async function submit() {
     if (!online || pending) return;
+    if (!(await trigger([...STEP_FIELDS.review], { shouldFocus: true }))) {
+      return;
+    }
     if (needsVerification) {
       setSubmitError("Please complete the verification check above the button.");
       return;
@@ -226,7 +239,7 @@ export function ReservationWizard({
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          if (step === "review") submit();
+          if (step === "review") void submit();
           else void next();
         }}
         className="flex flex-col gap-6"

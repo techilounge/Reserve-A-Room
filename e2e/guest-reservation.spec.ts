@@ -4,6 +4,46 @@ import { ROOMS } from "./support/accounts";
 import { daysFromToday, goToReview, guest, newVisitor, REFERENCE, referenceOnPage } from "./support/helpers";
 
 test.describe("guest reservation (instant room)", () => {
+  test("requires explicit Privacy Policy and Terms acceptance before submission", async ({ browser }) => {
+    const context = await newVisitor(browser);
+    const page = await context.newPage();
+    await goToReview(page, {
+      room: ROOMS.conference.slug,
+      date: daysFromToday(27),
+      start: "19:00",
+      end: "20:00",
+      guest: guest(),
+    });
+
+    const consent = page.getByRole("checkbox", { name: /I have read and accept/ });
+    await consent.uncheck();
+    await page.getByRole("button", { name: "Reserve Room" }).click();
+    await expect(page.getByText("Please accept the Privacy Policy and Terms of Service to continue.")).toBeVisible();
+    await expect(consent).toBeFocused();
+    await expect(page).toHaveURL(/\/reserve/);
+
+    const reservationForm = page.locator("#main");
+    await expect(reservationForm.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("target", "_blank");
+    await expect(reservationForm.getByRole("link", { name: "Terms of Service" })).toHaveAttribute("target", "_blank");
+    await consent.check();
+    await page.getByRole("button", { name: "Reserve Room" }).click();
+    await expect(page.getByRole("heading", { name: "Room Reserved" })).toBeVisible();
+    await context.close();
+  });
+
+  test("room cards expose distinct selected and keyboard-focus states", async ({ page }) => {
+    await page.goto("/reserve");
+    const room = page.getByRole("radio", { name: ROOMS.conference.name });
+    const card = room.locator("xpath=..");
+
+    await expect(card).toHaveAttribute("data-selected", "false");
+    await card.click();
+    await expect(room).toBeChecked();
+    await expect(card).toHaveAttribute("data-selected", "true");
+    await room.focus();
+    await expect(room).toBeFocused();
+  });
+
   test("reserves, manages with the private link cookie, and cancels", async ({ browser }) => {
     const context = await newVisitor(browser);
     const page = await context.newPage();

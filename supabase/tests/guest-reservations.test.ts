@@ -51,6 +51,10 @@ async function createGuest(room: string, day: number, from: string, to: string, 
     p_requester_notes: null,
     p_token_hash: hash,
     p_token_seed: randomBytes(16),
+    p_privacy_accepted: true,
+    p_terms_accepted: true,
+    p_privacy_version: "2026-09-25",
+    p_terms_version: "2026-09-25",
     ...overrides,
   };
   const names = Object.keys(args);
@@ -88,6 +92,32 @@ describe("create_guest_reservation", () => {
 
     const notes = await db.query("select 1 from public.notifications where reservation_id = $1", [r.id]);
     expect(notes.rows).toHaveLength(0);
+  });
+
+  it("requires and records versioned Privacy Policy and Terms acceptance", async () => {
+    await expect(
+      createGuest(instantRoom, 2, "12:00", "13:00", { p_privacy_accepted: false }),
+    ).rejects.toMatchObject({ code: "RAR12" });
+
+    const r = await createGuest(instantRoom, 2, "14:00", "15:00");
+    const { rows } = await db.query<{
+      privacy_accepted: boolean;
+      terms_accepted: boolean;
+      privacy_version: string;
+      terms_version: string;
+    }>(
+      `select privacy_accepted_at is not null as privacy_accepted,
+              terms_accepted_at is not null as terms_accepted,
+              privacy_version, terms_version
+       from public.reservations where id = $1`,
+      [r.id],
+    );
+    expect(rows[0]).toEqual({
+      privacy_accepted: true,
+      terms_accepted: true,
+      privacy_version: "2026-09-25",
+      terms_version: "2026-09-25",
+    });
   });
 
   it("creates a pending request, emails staff and notifies them when approval is required", async () => {

@@ -56,7 +56,16 @@ describe("guests (anon)", () => {
   });
 
   it("cannot read staff profiles, audit logs, email logs or notifications", async () => {
-    for (const table of ["profiles", "audit_logs", "email_logs", "notifications", "rate_limit_events"]) {
+    for (const table of [
+      "profiles",
+      "audit_logs",
+      "email_logs",
+      "notifications",
+      "rate_limit_events",
+      "reservation_series",
+      "reservation_series_exceptions",
+      "system_email_logs",
+    ]) {
       await expect(asRole(db, "anon", (tx) => tx.query(`select 1 from public.${table}`))).rejects.toMatchObject(
         PERMISSION_DENIED,
       );
@@ -373,16 +382,22 @@ describe("function privileges (catalog-wide allowlist)", () => {
       "public.admin_audit_log",
       "public.admin_calendar",
       "public.admin_dashboard",
+      "public.admin_end_reservation_series",
+      "public.admin_export_reservations",
       "public.admin_get_reservation",
+      "public.admin_get_reservation_series",
       "public.admin_list_amenities",
       "public.admin_list_ministries",
       "public.admin_list_reservations",
       "public.admin_list_rooms",
       "public.admin_list_users",
       "public.admin_reservation_emails",
+      "public.admin_reservation_series_links",
       "public.approve_reservation",
       "public.booking_horizon_date",
       "public.cancel_reservation",
+      "public.complete_staff_password_setup",
+      "public.create_recurring_reservation_series",
       "public.create_staff_profile",
       "public.create_staff_reservation",
       "public.current_staff_profile",
@@ -391,6 +406,7 @@ describe("function privileges (catalog-wide allowlist)", () => {
       "public.get_public_busy_blocks",
       "public.mark_notifications_read",
       "public.my_notifications",
+      "public.record_staff_login",
       "public.retry_email",
       "public.save_amenity",
       "public.save_ministry",

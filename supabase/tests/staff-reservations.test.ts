@@ -82,6 +82,25 @@ describe("dashboard", () => {
   });
 });
 
+describe("admin_export_reservations", () => {
+  it("requires active staff and a bounded date range", async () => {
+    const year = (await db.query<{ y: string }>("select extract(year from now())::int::text as y")).rows[0].y;
+    const from = `${year}-01-01`;
+    const to = `${year}-12-31`;
+    const rows = await asAdmin(async (tx) =>
+      (await tx.query<Record<string, unknown>>("select * from public.admin_export_reservations($1, $2)", [from, to])).rows,
+    );
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]).not.toHaveProperty("guest_token_hash");
+    await expect(
+      asRole(db, "anon", (tx) => tx.query("select * from public.admin_export_reservations($1, $2)", [from, to])),
+    ).rejects.toMatchObject({ code: "42501" });
+    await expect(
+      asAdmin((tx) => tx.query("select * from public.admin_export_reservations('2026-01-01', '2027-12-31')")),
+    ).rejects.toMatchObject({ code: "RAR10" });
+  });
+});
+
 describe("approve / decline / cancel", () => {
   it("approves a pending request, recording who and emailing the requester", async () => {
     const r = await reservation(hall, 6, "09:00", "10:00");

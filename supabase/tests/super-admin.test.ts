@@ -122,11 +122,12 @@ describe("users & roles", () => {
     await expect(as(superAdmin, (tx) => tx.query("select public.create_staff_profile($1, 'Again', 'admin')", [rows[0].id]))).rejects.toMatchObject({ code: "RAR10" });
   });
 
-  it("lets Super Admins promote, demote, disable and re-enable", async () => {
+  it("requires deliberate demotion before a Super Admin can be disabled", async () => {
     await as(superAdmin, (tx) => tx.query("select public.set_user_role($1, 'super_admin')", [admin]));
+    await expect(as(superAdmin, (tx) => tx.query("select public.set_user_active($1, false)", [admin]))).rejects.toMatchObject({ code: "RAR11" });
+    await as(superAdmin, (tx) => tx.query("select public.set_user_role($1, 'admin')", [admin]));
     await as(superAdmin, (tx) => tx.query("select public.set_user_active($1, false)", [admin]));
     await as(superAdmin, (tx) => tx.query("select public.set_user_active($1, true)", [admin]));
-    await as(superAdmin, (tx) => tx.query("select public.set_user_role($1, 'admin')", [admin]));
     const audit = await db.query<{ action: string }>("select action from public.audit_logs where entity_type = 'user' and entity_id = $1", [admin]);
     expect(audit.rows.length).toBeGreaterThanOrEqual(4);
   });
@@ -139,7 +140,7 @@ describe("users & roles", () => {
 
   it("refuses to demote or disable the last active Super Admin", async () => {
     await expect(as(superAdmin, (tx) => tx.query("select public.set_user_role($1, 'admin')", [superAdmin]))).rejects.toMatchObject({ code: "RAR06" });
-    await expect(as(superAdmin, (tx) => tx.query("select public.set_user_active($1, false)", [superAdmin]))).rejects.toMatchObject({ code: "RAR06" });
+    await expect(as(superAdmin, (tx) => tx.query("select public.set_user_active($1, false)", [superAdmin]))).rejects.toMatchObject({ code: "RAR11" });
   });
 
   it("lists users with their last sign-in", async () => {

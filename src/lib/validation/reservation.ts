@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { isLocalDate, isLocalTime, minutesOfDay } from "@/lib/datetime";
+import { LEGAL_ACCEPTANCE_MESSAGE } from "@/lib/legal";
 
 import { emailField, multiLine, phoneField, singleLine } from "./text";
 
@@ -47,6 +48,7 @@ export const reservationSchema = z
     ),
     setupRequirements: multiLine("setup requirements", LIMITS.notes, { required: false }).optional(),
     requesterNotes: multiLine("notes", LIMITS.notes, { required: false }).optional(),
+    legalAccepted: z.boolean().refine((accepted) => accepted, LEGAL_ACCEPTANCE_MESSAGE),
   })
   .superRefine((value, ctx) => {
     if (isLocalTime(value.start) && isLocalTime(value.end) && minutesOfDay(value.end) <= minutesOfDay(value.start)) {
@@ -91,6 +93,7 @@ export const STEP_FIELDS = {
     "setupRequirements",
     "requesterNotes",
   ],
+  review: ["legalAccepted"],
 } as const satisfies Record<string, readonly (keyof ReservationInput)[]>;
 
 /** Flattens Zod issues to { field: firstMessage } for the form. */

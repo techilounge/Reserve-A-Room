@@ -29,7 +29,26 @@ export function SiteFooter() {
           >
             Staff sign in
           </Link>
+          <div className="flex flex-wrap gap-x-4 gap-y-2 text-muted-foreground sm:justify-end">
+            <Link href="/privacy" className="min-h-6 underline-offset-4 hover:text-foreground hover:underline">
+              Privacy
+            </Link>
+            <Link href="/terms" className="min-h-6 underline-offset-4 hover:text-foreground hover:underline">
+              Terms of Service
+            </Link>
+          </div>
           <InstallFooterButton />
+          <p className="text-muted-foreground">
+            Developed By{" "}
+            <a
+              href="https://techilounge.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-foreground underline-offset-4 hover:text-gold-text hover:underline"
+            >
+              TechiLounge
+            </a>
+          </p>
           <p className="text-muted-foreground">
             © {new Date().getFullYear()} {site.churchShortName}
           </p>

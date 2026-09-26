@@ -1,12 +1,14 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { z } from "zod";
 
 import { safeNextPath } from "@/lib/auth/guards";
-import { authSetupUrl } from "@/lib/auth/setup-link";
+import { authSetupUrl, PASSWORD_SETUP_KIND_COOKIE } from "@/lib/auth/setup-link";
 import { getAppUrl } from "@/lib/app-url";
 import { sendAuthEmail } from "@/lib/email/auth";
+import { scheduleSystemEmailDelivery } from "@/lib/email/schedule";
 import { hitRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
 import { clientIp } from "@/lib/security/request";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -45,6 +47,10 @@ export async function signIn(_prev: AuthFormState, form: FormData): Promise<Auth
     await supabase.auth.signOut();
     return { status: "error", message: "This account doesn't have access to Reserve-A-Room administration.", email };
   }
+
+  const { error: auditError } = await supabase.rpc("record_staff_login", { p_method: "password" });
+  if (auditError) console.error("[auth] successful login could not be audited", auditError.message);
+  scheduleSystemEmailDelivery(profile.id);
 
   redirect(safeNextPath(String(form.get("next") ?? "")));
 }
@@ -116,6 +122,14 @@ export async function setPassword(_prev: AuthFormState, form: FormData): Promise
       status: "error",
       message: error.code === "same_password" ? "Please choose a password you haven't used before." : "We couldn't update your password. Please try again.",
     };
+  }
+  const cookieStore = await cookies();
+  const setupKind = cookieStore.get(PASSWORD_SETUP_KIND_COOKIE)?.value;
+  cookieStore.delete(PASSWORD_SETUP_KIND_COOKIE);
+  if (setupKind === "invite") {
+    const { data: accepted, error: lifecycleError } = await supabase.rpc("complete_staff_password_setup");
+    if (lifecycleError) console.error("[auth] invitation acceptance could not be recorded", lifecycleError.message);
+    if (accepted) scheduleSystemEmailDelivery(user.id);
   }
   redirect("/admin");
 }

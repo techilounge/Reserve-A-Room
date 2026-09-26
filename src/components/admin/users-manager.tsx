@@ -111,6 +111,8 @@ function InviteDialog() {
 
 function UserRow({ user, isSelf }: { user: ManagedUser; isSelf: boolean }) {
   const [pending, startTransition] = useTransition();
+  const disableProtected = user.active && user.role === "super_admin";
+  const guidanceId = `disable-guidance-${user.id}`;
   const run = (fn: () => Promise<{ ok: boolean; message: string }>) =>
     startTransition(async () => {
       const result = await fn();
@@ -154,19 +156,27 @@ function UserRow({ user, isSelf }: { user: ManagedUser; isSelf: boolean }) {
           <option value="admin">Admin</option>
           <option value="super_admin">Super Admin</option>
         </NativeSelect>
-        <Button
-          size="sm"
-          variant={user.active ? "outline" : "secondary"}
-          disabled={pending}
-          onClick={() => {
-            if (user.active && !window.confirm(`Disable ${user.fullName}? They will be signed out and can't sign in until re-enabled.`)) return;
-            run(() => setUserActiveAction(user.id, !user.active));
-          }}
-        >
-          {pending ? <LoaderCircle className="animate-spin" aria-hidden /> : null}
-          {user.active ? "Disable" : "Re-enable"}
-          <span className="sr-only"> {user.fullName}</span>
-        </Button>
+        <div className="flex flex-col items-start gap-1">
+          <Button
+            size="sm"
+            variant={user.active ? "outline" : "secondary"}
+            disabled={pending || disableProtected}
+            aria-describedby={disableProtected ? guidanceId : undefined}
+            onClick={() => {
+              if (user.active && !window.confirm(`Disable ${user.fullName}? They will be signed out and can't sign in until re-enabled.`)) return;
+              run(() => setUserActiveAction(user.id, !user.active));
+            }}
+          >
+            {pending ? <LoaderCircle className="animate-spin" aria-hidden /> : null}
+            {user.active ? "Disable" : "Re-enable"}
+            <span className="sr-only"> {user.fullName}</span>
+          </Button>
+          {disableProtected ? (
+            <p id={guidanceId} className="max-w-48 text-xs text-muted-foreground">
+              Demote to Admin before disabling this account.
+            </p>
+          ) : null}
+        </div>
       </div>
     </li>
   );
@@ -177,7 +187,7 @@ export function UsersManager({ users, currentUserId }: { users: ManagedUser[]; c
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          At least one active Super Admin is always required, so the last one can&apos;t be demoted or disabled.
+          Super Admins must be demoted to Admin before they can be disabled. At least one active Super Admin is always required.
         </p>
         <InviteDialog />
       </div>

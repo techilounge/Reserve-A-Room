@@ -5,6 +5,8 @@ import { actionLabel, auditChanges, auditSubject } from "./audit-format";
 describe("audit formatting", () => {
   it("labels actions", () => {
     expect(actionLabel("reservation.approved")).toBe("Reservation approved");
+    expect(actionLabel("user.logged_in")).toBe("Administrator signed in");
+    expect(actionLabel("user.invitation_accepted")).toBe("Administrator invitation accepted");
     expect(actionLabel("something.new")).toBe("something new");
   });
 
@@ -27,6 +29,7 @@ describe("audit formatting", () => {
 
   it("finds a subject", () => {
     expect(auditSubject({ reference_code: "RAR-20261001-A7F4" })).toBe("RAR-20261001-A7F4");
+    expect(auditSubject({ full_name: "Ada Lovelace", email: "ada@example.org" })).toBe("Ada Lovelace");
     expect(auditSubject({ changes: { name: { from: "Hall", to: "Fellowship Hall" } } })).toBe("Fellowship Hall");
     expect(auditSubject(null)).toBeNull();
   });

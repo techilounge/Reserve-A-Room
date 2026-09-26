@@ -42,6 +42,7 @@ export default async function NewReservationPage() {
           estimatedAttendance: "",
           setupRequirements: "",
           requesterNotes: "",
+          legalAccepted: true,
         }}
       />
     </div>

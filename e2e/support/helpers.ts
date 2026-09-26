@@ -75,6 +75,7 @@ export async function goToReview(page: Page, opts: { room: string; date: LocalDa
   await page.locator("#estimatedAttendance").fill(String(g.attendance));
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { name: "Review & submit" })).toBeVisible();
+  await page.getByRole("checkbox", { name: /I have read and accept/ }).check();
 
   // The server rejects forms completed faster than a person could (bot defense).
   const wait = 3200 - (Date.now() - startedAt);

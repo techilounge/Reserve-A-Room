@@ -3,6 +3,7 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 import { getAppUrl } from "@/lib/app-url";
 
 export type PasswordSetupOtpType = Extract<EmailOtpType, "invite" | "recovery">;
+export const PASSWORD_SETUP_KIND_COOKIE = "rar-password-setup-kind";
 
 export function isPasswordSetupOtpType(value: unknown): value is PasswordSetupOtpType {
   return value === "invite" || value === "recovery";

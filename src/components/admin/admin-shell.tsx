@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 
-import { AdminMobileNav, AdminSidebarNav } from "@/components/admin/admin-nav";
+import { AdminSidebarNav } from "@/components/admin/admin-nav";
 import { BrandLockup } from "@/components/brand/brand";
+import { AdminMobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 /**
@@ -18,7 +19,7 @@ export function AdminShell({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex min-h-dvh flex-col pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-0">
       <a
         href="#admin-main"
         className="sr-only z-50 rounded-md bg-primary px-4 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
@@ -27,8 +28,7 @@ export function AdminShell({
       </a>
       <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
         <div className="flex h-16 items-center gap-2 px-4 sm:px-6">
-          <AdminMobileNav allowedHrefs={allowedHrefs} />
-          <BrandLockup href="/admin" subtitle="Administration" compactOnMobile />
+          <BrandLockup href="/" subtitle="Administration" compactOnMobile />
           <div className="ml-auto flex items-center gap-1">
             {headerActions}
             <ThemeToggle />
@@ -43,6 +43,7 @@ export function AdminShell({
           <div className="mx-auto w-full max-w-6xl">{children}</div>
         </main>
       </div>
+      <AdminMobileBottomNav allowedHrefs={allowedHrefs} />
     </div>
   );
 }

@@ -55,6 +55,7 @@ Browser (guest / admin)
    │
    ├── Server Components ── read-only queries (rooms, availability, admin lists)
    ├── Server Actions ───── all mutations (reserve, approve, edit, settings …)
+   ├── Route Handlers ───── authenticated CSV/PDF exports + protected cron worker
    │        │
    │        ├─ Zod validation → permission check → domain service
    │        ├─ Supabase client:
@@ -104,13 +105,14 @@ is enforced in Postgres, and mirrored in TypeScript only to give good feedback e
 │  │  │  ├─ page.tsx               ← home
 │  │  │  ├─ rooms/  rooms/[slug]/
 │  │  │  ├─ availability/
-│  │  │  ├─ reserve/               ← 3-step flow (room+schedule → details → review)
+│  │  │  ├─ reserve/               ← 3-step flow + required legal acceptance
+│  │  │  ├─ privacy/  terms/       ← repository-controlled legal copy
 │  │  │  └─ reservation/[reference]/  ← secure guest status / cancel page
 │  │  ├─ admin/
 │  │  │  ├─ login/  forgot-password/  set-password/  auth/confirm/ (page + action)
 │  │  │  └─ (portal)/              ← authenticated layout, role guard, bell, nav
 │  │  │     ├─ page.tsx            ← dashboard
-│  │  │     ├─ reservations/  reservations/new/  reservations/[id]/
+│  │  │     ├─ reservations/  reservations/new/  reservations/[id]/  reservation-series/[id]/
 │  │  │     ├─ calendar/  notifications/
 │  │  │     └─ (super)/            ← Super Admin guard
 │  │  │        ├─ rooms/  rooms/new/  rooms/[id]/
@@ -205,7 +207,8 @@ Not Listed" is **not** a row; it is represented by `ministry_id IS NULL` +
 
 ### 6.3 `profiles` (admins only)
 `id (PK → auth.users), full_name, email (lowercase text, unique), role app_role, active,
-email_notifications bool default true, invited_by, created_at, updated_at`.
+email_notifications bool default true, invited_by, invitation_accepted_at,
+first_login_at, created_at, updated_at`.
 Last sign-in is read from `auth.users.last_sign_in_at` through a Super-Admin-only function.
 
 ### 6.4 `reservations`
@@ -239,6 +242,9 @@ Last sign-in is read from `auth.users.last_sign_in_at` through a Super-Admin-onl
 | declined_by / declined_at | | |
 | cancelled_by_user_id / cancelled_at / cancelled_by_requester | | |
 | guest_token_hash | bytea | SHA-256 of the management token; never selected by app queries |
+| series_id / occurrence_date | uuid / date, null | Idempotent link to a generated recurring occurrence |
+| privacy_accepted_at / privacy_version | timestamptz / text, null | Versioned guest acceptance; null for legacy/staff-created rows |
+| terms_accepted_at / terms_version | timestamptz / text, null | Versioned guest acceptance; null for legacy/staff-created rows |
 | created_at / updated_at | timestamptz | |
 
 Constraint (the critical one):
@@ -288,6 +294,25 @@ Status-consistency CHECKs (e.g. `status = 'declined' ⇒ declined_at IS NOT NULL
 - `audit_logs`: `SELECT` for `is_super_admin()` only.
 - `profiles`: role/active changes only via `set_user_role()` / `set_user_active()`.
 - Storage bucket `room-images`: public read, write restricted to Super Admins.
+
+### 6.8 Recurring staff reservations
+
+`reservation_series` stores a typed daily, weekday, interval-weekly, monthly, or yearly rule, local wall-clock
+schedule, timezone, requester template, lifecycle status, rolling materialization
+boundary, and a short-lived worker claim lease. Monthly ordinal-weekday rules store one
+or more unique values in `month_ordinals` (for example second and fourth Saturday), while
+the single `month_ordinal` column is reserved for yearly ordinal rules. `reservations.series_id` plus
+`occurrence_date` links each generated occurrence; a partial unique index makes creation
+idempotent. `reservation_series_exceptions` records conflicts, invalid local times,
+room unavailability, and rule failures without deleting history.
+
+Active staff can read series and exceptions through RLS. Staff mutations use audited
+SECURITY DEFINER create/read/end RPCs. Only the service role can claim due series and call
+the materialization RPC. Initial creation is one transaction and rolls back completely on
+any conflict. Later rolling materialization catches per-date conflicts, records an
+exception, and continues; room unavailability pauses the series. Every occurrence remains
+an ordinary approved reservation, so the existing policy trigger and GiST exclusion
+constraint remain the final authority.
 
 ---
 
@@ -709,3 +734,52 @@ browser is redirected to `/reservation/<REF>?submitted=1`.
   - The cron endpoint returns 401 without the secret.
   - The guest cookie is HttpOnly, path-scoped, SameSite=Lax and Secure on HTTPS, and is
     set on a `no-referrer` redirect.
+
+---
+
+## 12. Enhancement decisions
+
+### ADR-30 · Recurrence uses local dates and bounded expansion
+
+- Rules support every-X-days, weekdays, every-X-weeks on multiple weekdays, monthly
+  day-of-month, one or more monthly ordinal weekdays, yearly fixed date, and yearly ordinal weekday.
+  Start and optional end dates are inclusive.
+- `src/lib/recurrence/` owns the pure rule types, local-date expansion, validation,
+  human-readable labels, preview conversion, and conflict grouping. The expander returns
+  local `YYYY-MM-DD` dates and always requires an inclusive `throughDate`, so an ongoing
+  series can never expand without a finite rolling horizon.
+- Local start/end times are preserved on every occurrence. Each date is converted to UTC
+  independently in the configured church timezone; a spring-forward time that does not
+  exist is surfaced as a date-level error rather than shifted silently.
+- Expansion is capped at the earlier of one year or 50 occurrences. Impossible calendar
+  dates are skipped; last-weekday rules always select the final match, and overlapping
+  selections such as fourth plus last are de-duplicated when they land on the same date.
+- Persistence is added by `20260925100000_recurring_reservations.sql`. PostgreSQL
+  remains the final authority for room policy and overlap rules: initial batches are
+  atomic, while service-role rolling materialization uses claim leases, idempotent
+  occurrence keys, and per-date exceptions. The protected cron route materializes due
+  occurrences before processing email queues.
+
+### ADR-31 · Staff lifecycle and Super Admin invariants
+
+Successful application logins write immutable `user.logged_in` entries. Invitation
+acceptance is recorded exactly once and queues one idempotent branded notification per
+active Super Admin. Every current Super Admin must be demoted before disabling; both the
+UI and `set_user_active` enforce this, while the last-active-Super-Admin trigger remains
+defense in depth.
+
+### ADR-32 · Legal copy and auditable guest consent
+
+`/privacy` and `/terms` render trusted repository Markdown without accepting raw HTML.
+The guest review step requires one unchecked acceptance control linked to both documents.
+The shared Zod schema, Server Action, and consent-only guest RPC all require acceptance.
+`20260925130000_reservation_legal_consent.sql` stores both timestamps and version ids;
+legacy and staff-created reservations retain null consent fields.
+
+### ADR-33 · Bounded reservation exports
+
+CSV and PDF downloads are server-generated after a fresh staff-session and database
+authorization check. Shared parsing applies the visible filters, a one-year range, and a
+1,000-row cap. CSV includes a UTF-8 BOM and neutralizes formula-like cells. The PDF is a
+landscape, paginated brand report with repeated headers and contains no tokens or private
+admin notes.

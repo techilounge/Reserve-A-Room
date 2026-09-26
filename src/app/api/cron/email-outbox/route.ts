@@ -1,7 +1,9 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
 import { deliverQueuedEmails } from "@/lib/email/outbox";
+import { deliverQueuedSystemEmails } from "@/lib/email/system-outbox";
 import { getServerEnv } from "@/lib/env/server";
+import { materializeDueReservationSeries } from "@/lib/recurrence/materialize";
 
 /**
  * Safety-net sweep for the email outbox. Emails are normally sent right after the action
@@ -21,8 +23,12 @@ export async function GET(request: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const result = await deliverQueuedEmails({ limit: 50 });
-    return Response.json({ ok: true, ...result });
+    const series = await materializeDueReservationSeries(20);
+    const [reservations, system] = await Promise.all([
+      deliverQueuedEmails({ limit: 50 }),
+      deliverQueuedSystemEmails({ limit: 50 }),
+    ]);
+    return Response.json({ ok: true, series, reservations, system });
   } catch (error) {
     console.error("[cron] email outbox sweep failed", error);
     return Response.json({ ok: false }, { status: 500 });

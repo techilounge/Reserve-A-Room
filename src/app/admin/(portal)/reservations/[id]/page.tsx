@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AdminNotesForm } from "@/components/admin/admin-notes-form";
+import { RecurringBadge } from "@/components/admin/recurring-badge";
 import { ReservationActions } from "@/components/admin/reservation-actions";
 import { RetryEmailButton } from "@/components/admin/retry-email-button";
 import { ApprovalBadge, FoodPolicyBadge } from "@/components/rooms/policy-badges";
@@ -66,6 +67,7 @@ export default async function AdminReservationPage({ params, searchParams }: Pag
           <p className="text-lg text-muted-foreground">{formatTimeRange(start.time, end.time)}</p>
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={r.status} />
+            {r.series_id ? <RecurringBadge seriesId={r.series_id} /> : null}
             <span className="text-sm text-muted-foreground">{approvalLabel(r)}</span>
           </div>
         </div>

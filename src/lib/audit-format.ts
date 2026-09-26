@@ -21,6 +21,8 @@ const ACTION_LABELS: Record<string, string> = {
   "user.updated": "Administrator changed",
   "user.deleted": "Administrator removed",
   "user.bootstrapped": "First Super Admin created",
+  "user.invitation_accepted": "Administrator invitation accepted",
+  "user.logged_in": "Administrator signed in",
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -93,6 +95,8 @@ export function auditSubject(metadata: unknown): string | null {
   if (!metadata || typeof metadata !== "object") return null;
   const m = metadata as Record<string, unknown>;
   if (typeof m.reference_code === "string") return m.reference_code;
+  if (typeof m.full_name === "string") return m.full_name;
+  if (typeof m.email === "string") return m.email;
   const changes = m.changes as Record<string, { to?: unknown; from?: unknown }> | undefined;
   const name = changes?.name?.to ?? changes?.name?.from ?? changes?.full_name?.to ?? changes?.email?.to;
   return typeof name === "string" ? name : null;

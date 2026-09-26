@@ -18,6 +18,7 @@ const valid = {
   estimatedAttendance: "12",
   setupRequirements: "",
   requesterNotes: "",
+  legalAccepted: true,
 };
 
 const errorsFor = (input: Record<string, unknown>) => {
@@ -53,6 +54,13 @@ describe("reservationSchema", () => {
       ["email", "estimatedAttendance", "firstName", "lastName", "ministryId", "phone", "purpose"].sort(),
     );
     expect(errors.firstName).toBe("Please enter your first name.");
+  });
+
+  it("requires explicit Privacy Policy and Terms acceptance", () => {
+    expect(errorsFor({ ...valid, legalAccepted: false }).legalAccepted).toBe(
+      "Please accept the Privacy Policy and Terms of Service to continue.",
+    );
+    expect(errorsFor({ ...valid, legalAccepted: undefined }).legalAccepted).toBeDefined();
   });
 
   it("validates email and phone formats with friendly messages", () => {

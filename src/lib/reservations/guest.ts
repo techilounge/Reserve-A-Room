@@ -6,6 +6,7 @@ import { loadCatalog } from "@/lib/data/catalog";
 import { isRangeAvailable, type BusyBlock, type DayWindow } from "@/lib/domain/availability";
 import { friendlyMessage, toAppError, type AppErrorKind } from "@/lib/domain/errors";
 import { newGuestToken } from "@/lib/domain/guest-token";
+import { LEGAL_DOCUMENT_VERSIONS } from "@/lib/legal";
 import { advanceLabel, advanceLimitMessage, isWithinHorizon } from "@/lib/domain/rooms/advance-booking";
 import { hitRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
 import { clientIp } from "@/lib/security/request";
@@ -76,7 +77,8 @@ export async function createGuestReservation(raw: unknown, meta: SubmissionMeta)
   if (!parsed.success) {
     const errors = fieldErrors(parsed.error);
     const scheduleError = ["roomId", "date", "start", "end"].some((f) => f in errors);
-    return fail("validation", friendlyMessage("validation"), scheduleError ? "schedule" : "details", errors);
+    const step = "legalAccepted" in errors ? "review" : scheduleError ? "schedule" : "details";
+    return fail("validation", friendlyMessage("validation"), step, errors);
   }
   const input = parsed.data;
 
@@ -151,6 +153,10 @@ export async function createGuestReservation(raw: unknown, meta: SubmissionMeta)
       p_requester_notes: input.requesterNotes,
       p_token_hash: link.hash,
       p_token_seed: link.seed,
+      p_privacy_accepted: input.legalAccepted,
+      p_terms_accepted: input.legalAccepted,
+      p_privacy_version: LEGAL_DOCUMENT_VERSIONS.privacy,
+      p_terms_version: LEGAL_DOCUMENT_VERSIONS.terms,
     })
     .single();
 

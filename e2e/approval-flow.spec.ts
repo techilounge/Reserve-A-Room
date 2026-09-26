@@ -5,7 +5,9 @@ import { daysFromToday, goToReview, guest, newVisitor, referenceOnPage, signInAs
 
 /** Opens the single reservation left after searching by reference. */
 async function openOnlyResult(page: Page) {
-  const links = page.locator('main a[href^="/admin/reservations/"]:not([href$="/new"])').filter({ visible: true });
+  const links = page
+    .locator('main a[href^="/admin/reservations/"]:not([href$="/new"]):not([href*="/export/"])')
+    .filter({ visible: true });
   await expect(links).toHaveCount(1);
   await links.click();
   await expect(page).toHaveURL(/\/admin\/reservations\/[0-9a-f-]{36}$/);

@@ -65,6 +65,39 @@ test("an invalid password-setup link shows an error instead of the dashboard", a
   await context.close();
 });
 
+test("an invited Admin's first portal entry is audited and notifies Super Admins exactly once", async ({ browser }) => {
+  const context = await newVisitor(browser);
+  const page = await context.newPage();
+  await page.goto("/admin/auth/confirm?token_hash=e2e-password-setup-token&type=invite");
+  await page.getByRole("button", { name: "Continue securely" }).click();
+  await page.getByLabel("New password").fill(TEST_PASSWORD);
+  await page.getByLabel("Confirm password").fill(TEST_PASSWORD);
+  await page.getByRole("button", { name: "Save password" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+
+  const mockUrl = `http://127.0.0.1:${process.env.MOCK_SUPABASE_PORT ?? 54400}`;
+  const queued = await fetch(`${mockUrl}/qa/system-emails?entity=${TEST_ACCOUNTS.admin.id}`);
+  expect(await queued.json()).toHaveLength(1);
+
+  await page.getByRole("button", { name: `Account menu for ${TEST_ACCOUNTS.admin.name}` }).click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
+  await page.getByLabel("Email").fill(TEST_ACCOUNTS.admin.email);
+  await page.getByLabel("Password").fill(TEST_PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+  expect(await (await fetch(`${mockUrl}/qa/system-emails?entity=${TEST_ACCOUNTS.admin.id}`)).json()).toHaveLength(1);
+
+  const superContext = await browser.newContext();
+  await signInAs(superContext, "superAdmin");
+  const audit = await superContext.newPage();
+  await audit.goto("/admin/audit?entity=user");
+  const acceptance = audit.getByRole("listitem").filter({ hasText: "Administrator invitation accepted" }).first();
+  await expect(acceptance).toContainText(TEST_ACCOUNTS.admin.name);
+
+  await superContext.close();
+  await context.close();
+});
+
 test("Admins can't open Super Admin pages; Super Admins can", async ({ browser }) => {
   const adminContext = await browser.newContext();
   await signInAs(adminContext, "admin");
@@ -89,10 +122,26 @@ test("Admins can't open Super Admin pages; Super Admins can", async ({ browser }
   await superContext.close();
 });
 
+test("Super Admin accounts must be demoted before the Disable control is available", async ({ browser }) => {
+  const context = await browser.newContext();
+  await signInAs(context, "superAdmin");
+  const page = await context.newPage();
+  await page.goto("/admin/users");
+
+  await expect(page.getByRole("button", { name: `Disable ${TEST_ACCOUNTS.superAdmin.name}` })).toBeDisabled();
+  await expect(page.getByText("Demote to Admin before disabling this account.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: `Disable ${TEST_ACCOUNTS.admin.name}` })).toBeEnabled();
+
+  await context.close();
+});
+
 test("the email cron endpoint requires its secret", async ({ request }) => {
   expect((await request.get("/api/cron/email-outbox")).status()).toBe(401);
   expect((await request.get("/api/cron/email-outbox", { headers: { authorization: "Bearer wrong" } })).status()).toBe(401);
   const ok = await request.get("/api/cron/email-outbox", { headers: { authorization: "Bearer e2e-cron-secret" } });
   expect(ok.status()).toBe(200);
-  expect(await ok.json()).toMatchObject({ ok: true });
+  expect(await ok.json()).toMatchObject({
+    ok: true,
+    series: { claimed: expect.any(Number), created: expect.any(Number), exceptions: expect.any(Number), failed: 0 },
+  });
 });

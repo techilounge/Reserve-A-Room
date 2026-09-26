@@ -23,7 +23,7 @@ const ENTITIES = [
   ["room_amenity", "Room amenities"],
   ["ministry", "Ministries"],
   ["amenity", "Amenities"],
-  ["user", "Users"],
+  ["user", "Users & authentication"],
   ["settings", "Settings"],
 ] as const;
 const PAGE_SIZE = 50;

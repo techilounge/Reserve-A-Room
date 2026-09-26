@@ -77,6 +77,7 @@ export default async function EditReservationPage({ params }: PageProps<"/admin/
           estimatedAttendance: String(r.estimated_attendance),
           setupRequirements: r.setup_requirements ?? "",
           requesterNotes: r.requester_notes ?? "",
+          legalAccepted: true,
         }}
       />
     </div>

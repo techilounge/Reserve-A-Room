@@ -50,7 +50,7 @@ export function InstallBanner() {
       {ready && !dismissed && !quiet && mode !== "none" ? (
         <section
           aria-label="Install app"
-          className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 mx-auto flex max-w-md items-center gap-3 rounded-xl border bg-card p-3 pr-2 text-card-foreground shadow-lg"
+          className="fixed inset-x-3 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-40 mx-auto flex max-w-md items-center gap-3 rounded-xl border bg-card p-3 pr-2 text-card-foreground shadow-lg md:bottom-[max(0.75rem,env(safe-area-inset-bottom))]"
         >
           <Image src={site.logo.mark} alt="" width={40} height={40} className="size-10 shrink-0" />
           <div className="min-w-0 flex-1">

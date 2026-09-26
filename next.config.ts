@@ -55,6 +55,10 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // The E2E suite builds into its own folder (it bakes in the mock Supabase URL).
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  outputFileTracingIncludes: {
+    "/privacy": ["./privacy.md"],
+    "/terms": ["./terms-of-service.md"],
+  },
   env: {
     // Versions the service worker URL (/sw.js?v=…) so each deployment installs a fresh one.
     NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? Date.now().toString(36),

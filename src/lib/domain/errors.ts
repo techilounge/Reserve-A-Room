@@ -11,12 +11,14 @@ export type AppErrorKind =
   | "invalid_time"
   | "invalid_transition"
   | "last_super_admin"
+  | "protected_super_admin"
   | "rate_limited"
   | "not_found"
   | "forbidden"
   | "validation"
   | "duplicate"
   | "in_use"
+  | "database_update_required"
   | "unexpected";
 
 export class AppError extends Error {
@@ -42,12 +44,15 @@ const SQLSTATE_KIND: Record<string, AppErrorKind> = {
   RAR08: "not_found",
   RAR09: "forbidden",
   RAR10: "validation",
+  RAR11: "protected_super_admin",
+  RAR12: "validation",
   "23505": "duplicate",
   "23514": "validation",
   "23001": "in_use",
   "23503": "in_use",
   "42501": "forbidden",
   PGRST116: "not_found",
+  PGRST202: "database_update_required",
 };
 
 export type ErrorContext = {
@@ -73,6 +78,8 @@ export function friendlyMessage(kind: AppErrorKind, context: ErrorContext = {}):
       return "This reservation can no longer be changed that way. Please refresh and try again.";
     case "last_super_admin":
       return "At least one active Super Admin is required. Add another Super Admin first.";
+    case "protected_super_admin":
+      return "Demote to Admin before disabling this account.";
     case "rate_limited":
       return "Too many attempts. Please wait a few minutes and try again.";
     case "not_found":
@@ -85,6 +92,8 @@ export function friendlyMessage(kind: AppErrorKind, context: ErrorContext = {}):
       return "That name or web address is already in use. Please choose another.";
     case "in_use":
       return "This is still in use, so it can't be removed. Archive it instead.";
+    case "database_update_required":
+      return "This feature needs the latest database update before it can be used. Please contact the site administrator.";
     case "unexpected":
       return "Something went wrong. Please try again. If the problem continues, contact the church office.";
   }

@@ -27,7 +27,9 @@ describe("toAppError", () => {
     ["RAR07", "rate_limited"],
     ["RAR08", "not_found"],
     ["RAR09", "forbidden"],
+    ["RAR11", "protected_super_admin"],
     ["42501", "forbidden"],
+    ["PGRST202", "database_update_required"],
   ])("maps %s to %s", (code, kind) => {
     expect(toAppError({ code }).kind).toBe(kind);
   });

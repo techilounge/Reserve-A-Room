@@ -13,6 +13,8 @@ const PUBLIC_PAGES = [
   `/rooms/${ROOMS.hall.slug}`,
   "/availability",
   "/reserve",
+  "/privacy",
+  "/terms",
   `/reserve?room=${ROOMS.hall.slug}&date=${daysFromToday(20)}&start=10:00&end=11:00`,
   "/offline",
   "/admin/login",
