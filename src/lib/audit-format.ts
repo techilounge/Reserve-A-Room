@@ -7,6 +7,7 @@ const ACTION_LABELS: Record<string, string> = {
   "reservation.cancelled": "Reservation cancelled",
   "reservation.updated": "Reservation edited",
   "reservation.notes_updated": "Private notes updated",
+  "recurring_request.created": "Recurring request submitted",
   "room.created": "Room created",
   "room.updated": "Room updated",
   "room.deleted": "Room deleted",
@@ -53,6 +54,7 @@ const FIELD_LABELS: Record<string, string> = {
   slug: "Web address",
   sort_order: "Display order",
   image_path: "Photo",
+  image_paths: "Room images",
   purpose: "Purpose",
   estimated_attendance: "Estimated attendance",
 };
@@ -100,4 +102,24 @@ export function auditSubject(metadata: unknown): string | null {
   const changes = m.changes as Record<string, { to?: unknown; from?: unknown }> | undefined;
   const name = changes?.name?.to ?? changes?.name?.from ?? changes?.full_name?.to ?? changes?.email?.to;
   return typeof name === "string" ? name : null;
+}
+
+function normalizedSearchText(value: string): string {
+  return value.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+/** Mirrors the database search semantics for the temporary pre-migration fallback. */
+export function auditEntryMatchesSearch(
+  entry: { action: string; entity_type: string; entity_id: string | null; actor_name: string | null; metadata: unknown },
+  search: string,
+): boolean {
+  const terms = normalizedSearchText(search).split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return true;
+  const subject = auditSubject(entry.metadata);
+  const haystack = normalizedSearchText(
+    [actionLabel(entry.action), entry.action, entry.entity_type, entry.entity_id, entry.actor_name, subject, JSON.stringify(entry.metadata)]
+      .filter(Boolean)
+      .join(" "),
+  );
+  return terms.every((term) => haystack.includes(term));
 }

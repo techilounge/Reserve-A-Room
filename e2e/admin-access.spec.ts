@@ -132,6 +132,34 @@ test("Super Admin accounts must be demoted before the Disable control is availab
   await expect(page.getByText("Demote to Admin before disabling this account.", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: `Disable ${TEST_ACCOUNTS.admin.name}` })).toBeEnabled();
 
+  await page.getByRole("button", { name: `Disable ${TEST_ACCOUNTS.admin.name}` }).click();
+  await expect(page.getByRole("alertdialog")).toBeVisible();
+  await expect(page.getByRole("heading", { name: `Disable ${TEST_ACCOUNTS.admin.name}?` })).toBeVisible();
+  await expect(page.getByText("They will be signed out and won't be able to sign in until a Super Admin re-enables their account.")).toBeVisible();
+  await page.getByRole("button", { name: "Keep enabled" }).click();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+
+  await context.close();
+});
+
+test("Audit Log search and date filters update live and reset pagination", async ({ browser }) => {
+  const context = await browser.newContext();
+  await signInAs(context, "superAdmin");
+  const page = await context.newPage();
+  await page.goto("/admin/audit?page=2");
+  await page.getByLabel("Search").fill("Amenity created · Chairs");
+  await expect(page).toHaveURL(/q=Amenity/);
+  await expect(page).not.toHaveURL(/page=2/);
+  await expect(page.getByRole("listitem").filter({ hasText: "Amenity created · Chairs" })).toBeVisible();
+  await page.getByLabel("Type").selectOption("user");
+  await expect(page).toHaveURL(/entity=user/);
+  await page.getByLabel("Date").selectOption("custom");
+  await page.getByLabel("From").fill("2026-09-01");
+  await page.getByLabel("Through").fill("2026-09-30");
+  await expect(page).toHaveURL(/date=custom/);
+  await expect(page).toHaveURL(/from=2026-09-01/);
+  await expect(page).toHaveURL(/to=2026-09-30/);
+  await expect(page.getByText(/entire audit history/i)).toBeVisible();
   await context.close();
 });
 

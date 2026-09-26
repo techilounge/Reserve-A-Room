@@ -99,6 +99,16 @@ describe("room management", () => {
     await expect(as(superAdmin, (tx) => tx.query("select public.set_room_image($1, $2)", [roomId, "rooms/other/x.jpg"]))).rejects.toMatchObject({ code: "RAR10" });
     await as(superAdmin, (tx) => tx.query("select public.set_room_image($1, $2)", [roomId, `rooms/${roomId}/photo-1.webp`]));
   });
+
+  it("stores at most four ordered room images and keeps the first as the legacy primary", async () => {
+    const paths = [1, 2, 3, 4].map((index) => `rooms/${roomId}/photo-${index}.webp`);
+    await as(superAdmin, (tx) => tx.query("select public.set_room_images($1, $2::text[])", [roomId, `{${paths.join(",")}}`]));
+    const { rows } = await db.query<{ image_path: string; image_paths: string[] }>("select image_path, image_paths from public.rooms where id = $1", [roomId]);
+    expect(rows[0]).toEqual({ image_path: paths[0], image_paths: paths });
+    await expect(
+      as(superAdmin, (tx) => tx.query("select public.set_room_images($1, $2::text[])", [roomId, `{${[...paths, `rooms/${roomId}/photo-5.webp`].join(",")}}`])),
+    ).rejects.toMatchObject({ code: "RAR10" });
+  });
 });
 
 describe("ministries", () => {
@@ -192,6 +202,49 @@ describe("audit log", () => {
     const rows = await as(superAdmin, async (tx) => (await tx.query<{ action: string }>("select * from public.admin_audit_log('room')")).rows);
     expect(rows.length).toBeGreaterThan(0);
     await expect(as(admin, (tx) => tx.query("select * from public.admin_audit_log()"))).rejects.toMatchObject({ code: "RAR09" });
+  });
+
+  it("matches copied display titles across action and metadata fields", async () => {
+    const rows = await as(superAdmin, async (tx) =>
+      (await tx.query<{ action: string; metadata: { changes?: { name?: { to?: string } } } }>(
+        "select action, metadata from public.admin_audit_log(p_search => $1)",
+        ["Amenity created · Chairs"],
+      )).rows,
+    );
+    expect(rows.some((row) => row.action === "amenity.created" && row.metadata.changes?.name?.to === "Chairs")).toBe(true);
+  });
+
+  it("applies date bounds before pagination", async () => {
+    const rows = await as(superAdmin, async (tx) =>
+      (await tx.query("select * from public.admin_audit_log(p_search => 'room', p_from => '2100-01-01'::timestamptz, p_limit => 1, p_offset => 0)")).rows,
+    );
+    expect(rows).toEqual([]);
+  });
+});
+
+describe("recurring reservation requests", () => {
+  it("creates a request atomically, notifies staff, and keeps it private from guests", async () => {
+    const room = (await db.query<{ id: string }>("select id from public.rooms where active order by sort_order limit 1")).rows[0];
+    const result = await asRole(db, "service_role", async (tx) =>
+      (await tx.query<{ id: string; reference_code: string }>(
+        `select * from public.create_recurring_reservation_request(
+          p_room_id => $1, p_preferred_start_date => current_date + 30,
+          p_local_start_time => '14:00', p_local_end_time => '16:00',
+          p_recurrence_description => 'Second and fourth Saturday of every month',
+          p_first_name => 'Jamie', p_last_name => 'Guest', p_email => 'jamie@example.org',
+          p_phone => '+15125550123', p_purpose => 'Monthly ministry meeting',
+          p_estimated_attendance => 20, p_privacy_accepted => true, p_terms_accepted => true,
+          p_privacy_version => '2026-09-25', p_terms_version => '2026-09-25'
+        )`,
+        [room.id],
+      )).rows[0],
+    );
+    expect(result.reference_code).toMatch(/^RRR-/);
+    const notices = await db.query<{ n: number }>("select count(*)::int as n from public.notifications where recurring_request_id = $1", [result.id]);
+    expect(notices.rows[0].n).toBeGreaterThanOrEqual(2);
+    const staffRows = await as(admin, async (tx) => (await tx.query("select reference_code from public.recurring_reservation_requests where id = $1", [result.id])).rows);
+    expect(staffRows).toHaveLength(1);
+    await expect(asRole(db, "anon", (tx) => tx.query("select id from public.recurring_reservation_requests"))).rejects.toMatchObject({ code: "42501" });
   });
 });
 

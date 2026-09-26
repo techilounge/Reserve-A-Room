@@ -22,7 +22,7 @@ import { renderEmail } from "./render";
 type Outcome = "sent" | "failed" | "skipped";
 type Service = ReturnType<typeof createSupabaseServiceClient>;
 
-const STAFF_EVENTS = new Set(["admin_new_request", "admin_reservation_cancelled"]);
+const STAFF_EVENTS = new Set(["admin_new_request", "admin_reservation_created", "admin_reservation_cancelled"]);
 
 export async function deliverQueuedEmails(options: { reservationId?: string; limit?: number } = {}) {
   const supabase = createSupabaseServiceClient();

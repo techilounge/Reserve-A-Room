@@ -16,10 +16,11 @@ export default async function NewRoomPage() {
 
   return (
     <div className="flex max-w-3xl flex-col gap-6">
-      <PageHeader title="Add room" description="You can add a photo after the room is created." />
+      <PageHeader title="Add room" description="Add the room details, reservation rules, and up to four images." />
       <RoomEditor
         defaultAdvance={defaultAdvance}
         amenities={amenities}
+        initialImages={[]}
         room={{
           id: null,
           name: "",

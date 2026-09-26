@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
-import { notificationIcon, timeAgo } from "./notification-meta";
+import { notificationHref, notificationIcon, timeAgo } from "./notification-meta";
 
 const POLL_MS = 60_000;
 
@@ -94,7 +94,7 @@ export function NotificationBell({ initialUnread }: { initialUnread: number }) {
                 return (
                   <li key={n.id}>
                     <Link
-                      href={n.reservation_id ? `/admin/reservations/${n.reservation_id}` : "/admin/notifications"}
+                      href={notificationHref(n)}
                       onClick={() => {
                         setOpen(false);
                         if (!n.read_at) {

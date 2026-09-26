@@ -1,8 +1,8 @@
 # Reserve-A-Room enhancements implementation plan
 
-Last updated: 2026-09-25  
-Plan status: **implementation and integrated local QA complete; production rollout pending authorization**  
-Implementation status: **Phases 0–13 are complete locally; all enhancement changes remain uncommitted and undeployed**
+Last updated: 2026-09-26
+Plan status: **Phase 14 local implementation and integrated QA complete**
+Implementation status: **Phases 0–13 are deployed; Phase 14 is local-only, uncommitted, and awaiting rollout authorization**
 
 This is the execution and handoff document for the enhancements requested after the initial production launch. It is intentionally specific enough for a new agent to continue without reconstructing the architecture or making silent product decisions.
 
@@ -35,6 +35,13 @@ Before implementing any phase:
 9. Public Privacy and Terms of Service pages render the approved copy in `privacy.md` and `terms-of-service.md`.
 10. The public reservation flow requires explicit acceptance of the Privacy Policy and Terms of Service before submission, with a premium, accessible presentation and server/database enforcement.
 11. Admins and Super Admins can export the reservations they are authorized to view as CSV (Excel-compatible) and PDF files.
+12. Reservation dates consistently include the year in previews and reservation listings.
+13. The Audit Log supports live server-side search, preset/custom date filtering, and pagination across the complete result set.
+14. Super Admins can upload, automatically compress, order, and remove up to four room images; only supported image types up to 2 MB each are accepted.
+15. Guests can submit a focused recurring-reservation request without complicating the ordinary reservation wizard, and staff can review those requests.
+16. The `/reserve` introduction links directly to the public Availability page.
+17. Turnstile failures expose a useful retry/error state while verification remains mandatory; the production hostname and network prerequisites are documented for operators.
+18. Opted-in Admins and Super Admins receive branded email notifications for every new reservation and every requester- or staff-initiated cancellation.
 
 ## 3. Product decisions and acceptance rules
 
@@ -94,6 +101,33 @@ These decisions remove ambiguity for implementation. Change them only if the use
 - CSV is UTF-8 with a BOM for Excel compatibility and protects formula-like cell values from spreadsheet injection.
 - PDF uses a readable branded tabular layout, repeats headers across pages, shows active filters/generated time, and avoids exposing private tokens or internal-only secrets.
 - Export generation occurs server-side after fresh staff authorization. Use route handlers for downloadable responses and never trust client-supplied rows.
+
+### 3.11 Date clarity and Audit Log discovery
+
+- Reservation preview, occurrence, and reservation-list dates include a four-digit year. Compact calendar range labels may remain yearless only when the surrounding view already establishes the year unambiguously.
+- Audit search and filters execute in PostgreSQL before pagination so they cover the entire immutable log, not merely the visible page.
+- Search updates after a short debounce; entity/date changes update immediately. Any filter change resets to page 1.
+- Date presets include all time, today, last 7 days, last 30 days, this month, and a custom inclusive local-date range interpreted in the configured application timezone.
+
+### 3.12 Room image galleries
+
+- A room may have zero to four ordered images. The first image is the primary card image and existing single-image data is preserved during migration.
+- Accepted source formats are JPEG, PNG, and WebP. Each selected source file must be no larger than 2 MB, and the Storage bucket independently enforces the same limit.
+- Browser-side compression resizes oversized dimensions and encodes an efficient WebP when that produces a smaller file. Validation and the four-image cap are enforced again at the database boundary.
+- Creating a room and managing an existing room both support the gallery. Public room details display all available images while selection cards retain a single primary image.
+
+### 3.13 Guest recurring-reservation requests
+
+- The ordinary `/reserve` wizard remains unchanged except for a compact link to a separate recurring-request page.
+- The request captures contact details, preferred room/date/time, recurrence description, purpose, and attendance. It does not create or promise a reservation.
+- Submission is protected with server validation, a honeypot/minimum-fill-time check, and database-backed rate limiting. Guests receive a reference code and staff receive an in-app notification.
+- Authenticated staff can view submitted requests; only staff authorization policies/RPCs expose request details.
+
+### 3.14 Turnstile recovery
+
+- CAPTCHA verification remains fail-closed whenever Turnstile is configured.
+- The client captures Cloudflare error codes, explains likely configuration/network failures without exposing secrets, and provides a retry control.
+- Production configuration must authorize the exact public hostname and allow Cloudflare challenge hosts through network/content filters.
 
 ### 3.2 Mobile bottom navigation
 
@@ -549,6 +583,33 @@ Change `src/components/reserve/schedule-step.tsx` using token-based classes. Add
 - [x] Map a missing PostgREST RPC to a clear database-update-required message instead of the generic error.
 - [x] Run all quality gates and update the live checkpoints.
 
+### Phase 14 — Reservation clarity, audit discovery, room galleries, and guest recurring requests
+
+- [x] Include years in recurrence previews and reservation list dates, with regression coverage.
+- [x] Add live, server-side Audit Log search, preset/custom date filtering, and result-set-wide pagination.
+- [x] Add a four-image room gallery schema/RPC/storage policy with 2 MB/type limits and legacy-image backfill.
+- [x] Add client-side room image validation/compression and create/edit gallery management.
+- [x] Add the focused guest recurring-request page, protected persistence, staff notifications, and staff review page.
+- [x] Add the `/reserve` Availability and recurring-request links without expanding the wizard.
+- [x] Improve Turnstile failure diagnostics/retry behavior and document the verified production prerequisites.
+- [x] Run all quality gates, inspect migration/security diffs, and update the live checkpoints.
+
+### Phase 15 — Complete staff reservation lifecycle emails
+
+- [x] Preserve existing staff email alerts for approval-required requests and requester cancellations.
+- [x] Queue a branded staff email for every newly confirmed reservation, including instant, staff-created, and recurring occurrences.
+- [x] Queue the staff cancellation alert for staff-initiated cancellations without duplicating requester-cancellation alerts.
+- [x] Keep recipients preference-aware, links staff-only, replies addressed to the requester, and delivery idempotent.
+- [x] Add template, database, recurring-series, and focused browser regression coverage.
+
+### Phase 16 — Confirmation, Audit Log search, and room-editor reliability
+
+- [x] Replace the remaining native browser confirmation with the branded, keyboard-accessible confirmation dialog pattern.
+- [x] Make Audit Log search normalize punctuation and match every typed term across the combined display label, action, actor, entity, id, and metadata fields before pagination, with a global pre-migration compatibility path.
+- [x] Add regression coverage for the copied display title `Amenity created · Chairs` and confirmation-dialog cancellation.
+- [x] Keep room details editable during a pre-migration rollout by falling back to the legacy primary image only when the gallery RPC is specifically unavailable.
+- [x] Run the complete local quality gates and record the final totals.
+
 ## 7. Test matrix and acceptance criteria
 
 ### Unit tests
@@ -637,7 +698,7 @@ Rollout order:
 2. Merge feature code and new migrations only after local quality gates pass.
 3. Take a Supabase database backup/checkpoint per the operator’s normal process.
 4. Schedule a brief guest-reservation maintenance window: the consent migration intentionally replaces the old guest RPC signature, so migration and application deployment must happen back-to-back.
-5. Run `npx supabase db push`, verify the exact five new migration names before confirming, and immediately deploy `main` on Vercel.
+5. For the already-completed Phase 1–13 rollout, verify the five `20260925` migrations remain aligned. For Phases 14–15, run `npx supabase db push`, verify the exact four `20260926` migration names before confirming, and immediately deploy the matching application revision on Vercel.
 6. Confirm the production build is serving `/privacy`, `/terms`, the consent-aware reservation form, and the staff export endpoints before reopening guest submissions.
 7. Confirm cron configuration and run each worker once with authenticated tooling or wait for the scheduled run.
 8. Execute the manual smoke checklist using test accounts/rooms and non-sensitive addresses.
@@ -654,9 +715,9 @@ Rollback principles:
 
 ## 10. Live implementation checkpoint
 
-Current phase: **Phase 13 and the authorized production rollout are complete.**
-Last completed task: **Committed and deployed the complete enhancement set, applied all five append-only migrations, and completed non-mutating production smoke checks.**
-Next exact task: **Monitor Vercel/Supabase/Resend during normal use and, when a staff test login is available, complete the remaining authenticated recurrence-create/export and first-login-email smoke checks without changing the deployed schema.**
+Current phase: **Phase 16 local implementation and complete regression verification are complete; production rollout still awaits explicit authorization.**
+Last completed task: **Replaced the final native confirmation prompt, made copied Audit Log titles searchable across their underlying fields, and restored room editing against a pre-gallery-migration database.**
+Next exact task: **After explicit rollout authorization, take the operator's normal database checkpoint, commit the reviewed changes, apply the four `20260926` migrations, push `main`, deploy the matching revision, and run the production smoke checklist.**
 
 Current worktree:
 
@@ -669,7 +730,18 @@ Current worktree:
 - A headless, non-submitting production browser flow reached `Review & submit`, displayed the required Privacy & Terms checkbox, and verified that both legal links open in a new tab. No test reservation or email was created.
 - Latest verification: `npm run check` passed (typecheck, lint, 26 unit-test files / 176 tests, and 11 database-test files / 137 tests); `npm run build` passed; `npm run test:e2e` passed 85/85; `git diff --check` passed; and a changed-file secret-pattern scan passed after excluding the documented public E2E mock key.
 - Rendered PDF QA covered a three-page landscape export with repeated headers, pagination, and edge-clipping inspection; temporary QA artifacts were removed afterward.
-- No implementation blockers remain. Authenticated production recurrence-create/export and first-login-email delivery were not exercised because no production staff credentials were used during this rollout.
+- Phase 14 adds `20260926100000_audit_log_date_filters.sql`, `20260926110000_room_image_gallery.sql`, and `20260926120000_recurring_reservation_requests.sql`. They are append-only and remain unapplied to the hosted project.
+- Phase 15 adds append-only migration `20260926130000_staff_reservation_email_notifications.sql`; it remains unapplied to the hosted project.
+- Phase 14 adds year-inclusive reservation dates; result-set-wide Audit Log discovery; ordered four-image room galleries with browser compression and storage/database enforcement; a focused, legally consented guest recurring-request workflow with staff notifications/review; `/reserve` discovery links; and actionable Turnstile failure/retry states.
+- The Turnstile script and iframe load under the production CSP, while the challenge request fails downstream at Cloudflare. The application now exposes the callback code; production operations still need to confirm the exact hostname is authorized and that all documented Cloudflare challenge hostnames are allowed by network controls.
+- A narrow public-catalog compatibility fallback retries the room query without `image_paths` only for PostgreSQL missing-column error `42703`. This restored the local homepage against the intentionally pre-migration database while preserving all other failures.
+- Latest Phase 14 verification: `npm run check` passed (typecheck, lint, 28 unit-test files / 182 tests, and 11 database-test files / 140 tests); `npm run build` passed; `npm run test:e2e` passed 92/92, including the expanded 27-route-state accessibility/responsive matrix; `git diff --check` passed; and the secret-pattern scan found no matches. The build logged the expected linked-database warning that `rooms.image_paths` does not exist because the Phase 14 migration intentionally remains unapplied.
+- After the compatibility fix, `npm run typecheck` and `npm run lint` passed, and a live request to `http://localhost:3000` returned HTTP 200 with the room catalog rendered.
+- Final Phase 15 verification: typecheck and lint passed; 28 unit-test files / 184 tests passed; 11 database-test files / 140 tests passed; `npm run db:types` regenerated 15 tables / 55 functions / 6 enums; the production build passed; 14 focused Playwright reservation/approval/recurrence tests passed; the complete Playwright suite passed 92/92; and `git diff --check` passed.
+- Phase 16 adds a shared branded `ConfirmationDialog`, tokenized Audit Log search across display-title source fields, and a narrow `admin_room_image_paths` missing-RPC fallback to the room's legacy `image_path` during rolling/pre-migration operation.
+- Phase 16 focused verification: typecheck and lint passed; the focused Super Admin database file passed 21/21; confirmation and exact copied-title Playwright checks passed 2/2; and the room-detail light/dark accessibility checks passed 2/2.
+- Final Phase 16 verification: typecheck and lint passed; 28 unit-test files / 185 tests passed; 11 database-test files / 141 tests passed; the production build passed; the complete Playwright suite passed 92/92; and `git diff --check` passed (with pre-existing line-ending notices only).
+- Phase 14–15 changes are local-only; no new migration has been applied and no commit, push, or deployment is authorized yet. Authenticated production recurrence-create/export and first-login-email delivery were not exercised because no production staff credentials were used during the previous rollout.
 
 When handing off, replace this checkpoint with:
 

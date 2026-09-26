@@ -4,10 +4,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { RoomEditor } from "@/components/admin/room-editor";
-import { RoomPhoto } from "@/components/admin/room-photo";
 import { PageHeader } from "@/components/layout/page-header";
 import { loadCatalog } from "@/lib/data/catalog";
-import { listAmenities, listRooms } from "@/lib/data/super";
+import { getRoomImagePaths, listAmenities, listRooms } from "@/lib/data/super";
 import { isSupabaseConfigured } from "@/lib/env/public";
 import { roomImageUrl } from "@/lib/supabase/public";
 
@@ -21,6 +20,7 @@ export default async function EditRoomPage({ params, searchParams }: PageProps<"
   const [rooms, amenities, catalog] = await Promise.all([listRooms(), listAmenities(), loadCatalog()]);
   const room = rooms.find((r) => r.id === id);
   if (!room) notFound();
+  const imagePaths = await getRoomImagePaths(id, room.image_path);
   const defaultAdvance = catalog.ok ? catalog.catalog.settings.defaultAdvance : { value: 8, unit: "week" as const };
 
   return (
@@ -32,7 +32,7 @@ export default async function EditRoomPage({ params, searchParams }: PageProps<"
       {created === "1" ? (
         <p role="status" className="flex items-center gap-2 rounded-lg border border-success-border bg-success-soft p-3 text-sm text-success-soft-foreground">
           <CircleCheck className="size-4 shrink-0" aria-hidden />
-          Room created. Add a photo below if you have one.
+          Room created successfully.
         </p>
       ) : null}
       <PageHeader
@@ -46,11 +46,11 @@ export default async function EditRoomPage({ params, searchParams }: PageProps<"
           </>
         }
       />
-      <RoomPhoto roomId={room.id} roomName={room.name} imageUrl={isSupabaseConfigured() ? roomImageUrl(room.image_path) : null} />
       <RoomEditor
         key={room.updated_at}
         defaultAdvance={defaultAdvance}
         amenities={amenities}
+        initialImages={imagePaths.map((path) => ({ path, url: isSupabaseConfigured() ? roomImageUrl(path) ?? "" : "" })).filter((image) => image.url)}
         room={{
           id: room.id,
           name: room.name,

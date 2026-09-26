@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/feedback/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatusBadge } from "@/components/reservations/status-badge";
 import { Button } from "@/components/ui/button";
-import { formatShortDate, formatTimeRange, toLocalParts } from "@/lib/datetime";
+import { formatCompactDate, formatTimeRange, toLocalParts } from "@/lib/datetime";
 import { listReservations, type AdminReservationRow } from "@/lib/data/admin";
 import { loadCatalog } from "@/lib/data/catalog";
 import { evaluateCapacity } from "@/lib/domain/rooms/capacity";
@@ -120,7 +120,7 @@ export default async function AdminReservationsPage({ searchParams }: PageProps<
                     <tr key={row.id} className="align-top hover:bg-accent/50">
                       <td className="px-4 py-3 whitespace-nowrap">
                         <Link href={`/admin/reservations/${row.id}`} className="font-medium underline-offset-4 hover:underline">
-                          {formatShortDate(start.date)}
+                          {formatCompactDate(start.date)}
                         </Link>
                         <div className="text-muted-foreground">{formatTimeRange(start.time, end.time)}</div>
                         <div className="font-mono text-xs text-muted-foreground">{row.reference_code}</div>
@@ -187,7 +187,7 @@ function ReservationCard({ row, timeZone }: { row: AdminReservationRow; timeZone
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-semibold">
-            {formatShortDate(start.date)} · {formatTimeRange(start.time, end.time)}
+            {formatCompactDate(start.date)} · {formatTimeRange(start.time, end.time)}
           </p>
           <p className="text-sm text-muted-foreground">{row.room_name}</p>
         </div>

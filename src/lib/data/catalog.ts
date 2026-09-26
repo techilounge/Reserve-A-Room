@@ -21,6 +21,7 @@ export type PublicRoom = {
   location: string | null;
   capacity: number;
   imageUrl: string | null;
+  imageUrls: string[];
   reservable: boolean;
   unavailableMessage: string | null;
   approvalRequired: boolean;
@@ -58,26 +59,48 @@ export type CatalogResult =
 async function fetchCatalog(): Promise<Catalog> {
   const supabase = createSupabasePublicClient();
 
-  const [settingsResult, roomsResult, ministriesResult] = await Promise.all([
-    supabase
-      .from("app_settings")
+  // Keep the public catalog available during a coordinated rollout where the app can
+  // briefly reach a database that does not have the additive room-gallery column yet.
+  // Once the migration is present, the first query is the only one executed.
+  const roomsPromise = (async () => {
+    const galleryResult = await supabase
+      .from("rooms")
       .select(
-        "church_name, app_name, timezone, contact_email, contact_phone, booking_interval_minutes, min_lead_time_minutes, bookable_day_start, bookable_day_end, allow_guest_cancellation, default_max_advance_value, default_max_advance_unit",
+        "id, name, slug, description, location, capacity, image_path, image_paths, reservable, unavailable_message, approval_required, food_drinks_allowed, max_advance_value, max_advance_unit, sort_order, room_amenities(amenities(id, name, icon, sort_order, active))",
       )
-      .single(),
-    supabase
+      .eq("active", true)
+      .order("sort_order")
+      .order("name");
+
+    if (!galleryResult.error) return galleryResult.data;
+    if (galleryResult.error.code !== "42703" || !galleryResult.error.message.includes("image_paths")) {
+      throw galleryResult.error;
+    }
+
+    const legacyResult = await supabase
       .from("rooms")
       .select(
         "id, name, slug, description, location, capacity, image_path, reservable, unavailable_message, approval_required, food_drinks_allowed, max_advance_value, max_advance_unit, sort_order, room_amenities(amenities(id, name, icon, sort_order, active))",
       )
       .eq("active", true)
       .order("sort_order")
-      .order("name"),
+      .order("name");
+    if (legacyResult.error) throw legacyResult.error;
+    return legacyResult.data.map((room) => ({ ...room, image_paths: [] as string[] }));
+  })();
+
+  const [settingsResult, rooms, ministriesResult] = await Promise.all([
+    supabase
+      .from("app_settings")
+      .select(
+        "church_name, app_name, timezone, contact_email, contact_phone, booking_interval_minutes, min_lead_time_minutes, bookable_day_start, bookable_day_end, allow_guest_cancellation, default_max_advance_value, default_max_advance_unit",
+      )
+      .single(),
+    roomsPromise,
     supabase.from("ministries").select("id, name").eq("active", true).order("sort_order").order("name"),
   ]);
 
   if (settingsResult.error) throw settingsResult.error;
-  if (roomsResult.error) throw roomsResult.error;
   if (ministriesResult.error) throw ministriesResult.error;
 
   const s = settingsResult.data;
@@ -95,7 +118,7 @@ async function fetchCatalog(): Promise<Catalog> {
     defaultAdvance: { value: s.default_max_advance_value, unit: s.default_max_advance_unit },
   };
 
-  const rooms: PublicRoom[] = roomsResult.data.map((room) => ({
+  const publicRooms: PublicRoom[] = rooms.map((room) => ({
     id: room.id,
     name: room.name,
     slug: room.slug,
@@ -103,6 +126,9 @@ async function fetchCatalog(): Promise<Catalog> {
     location: room.location,
     capacity: room.capacity,
     imageUrl: roomImageUrl(room.image_path),
+    imageUrls: (room.image_paths?.length ? room.image_paths : room.image_path ? [room.image_path] : [])
+      .map(roomImageUrl)
+      .filter((url): url is string => Boolean(url)),
     reservable: room.reservable,
     unavailableMessage: room.unavailable_message,
     approvalRequired: room.approval_required,
@@ -115,7 +141,7 @@ async function fetchCatalog(): Promise<Catalog> {
       .map(({ id, name, icon }) => ({ id, name, icon })),
   }));
 
-  return { settings, rooms, ministries: ministriesResult.data };
+  return { settings, rooms: publicRooms, ministries: ministriesResult.data };
 }
 
 const getCachedCatalog = unstable_cache(fetchCatalog, ["public-catalog-v1"], {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { actionLabel, auditChanges, auditSubject } from "./audit-format";
+import { actionLabel, auditChanges, auditEntryMatchesSearch, auditSubject } from "./audit-format";
 
 describe("audit formatting", () => {
   it("labels actions", () => {
@@ -32,5 +32,17 @@ describe("audit formatting", () => {
     expect(auditSubject({ full_name: "Ada Lovelace", email: "ada@example.org" })).toBe("Ada Lovelace");
     expect(auditSubject({ changes: { name: { from: "Hall", to: "Fellowship Hall" } } })).toBe("Fellowship Hall");
     expect(auditSubject(null)).toBeNull();
+  });
+
+  it("matches copied display titles across action and metadata", () => {
+    const entry = {
+      action: "amenity.created",
+      entity_type: "amenity",
+      entity_id: "amenity-id",
+      actor_name: null,
+      metadata: { changes: { name: { from: null, to: "Chairs" } } },
+    };
+    expect(auditEntryMatchesSearch(entry, "Amenity created · Chairs")).toBe(true);
+    expect(auditEntryMatchesSearch(entry, "Administrator added · Chairs")).toBe(false);
   });
 });

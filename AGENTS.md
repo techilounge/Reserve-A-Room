@@ -39,7 +39,7 @@ If `docs/ENHANCEMENTS_IMPLEMENTATION_PLAN.md` is missing, recreate it from the s
 
 ## Requested enhancement scope
 
-The user requested the original seven items plus six follow-up expansions below. Treat `docs/ENHANCEMENTS_IMPLEMENTATION_PLAN.md` as the detailed specification and source of implementation status.
+The user requested the original seven items plus sixteen follow-up expansions below. Treat `docs/ENHANCEMENTS_IMPLEMENTATION_PLAN.md` as the detailed specification and source of implementation status.
 
 1. Admins and Super Admins can create recurring room reservations: weekly (for example every Saturday), monthly by ordinal weekday (for example first or second Saturday), and an optional end date.
 2. Add a premium floating bottom navigation bar on mobile, with agent-selected high-value menu items and no regression to desktop navigation.
@@ -54,6 +54,16 @@ The user requested the original seven items plus six follow-up expansions below.
 11. Require auditable Privacy Policy and Terms acceptance in the public reservation flow.
 12. Allow Admins and Super Admins to export filtered reservations as Excel-compatible CSV and branded PDF.
 13. Support complex monthly schedules such as second and fourth Saturday through an `Add week of month` control, show series start/end dates in the preview, and surface unapplied database migrations clearly.
+14. Show the year on reservation preview and reservation-list dates.
+15. Add live Audit Log search, preset/custom date filtering, and pagination across the complete result set.
+16. Allow Super Admins to upload and automatically compress up to four supported room images, with a 2 MB per-image limit.
+17. Add a focused public recurring-reservation request flow and staff review experience without expanding the standard reservation wizard.
+18. Add a clickable Availability link to the `/reserve` introduction.
+19. Diagnose the production Turnstile connection error and provide actionable failure/retry feedback without weakening verification.
+20. Email opted-in Admins and Super Admins for every new reservation and every requester- or staff-initiated cancellation.
+21. Use a branded, accessible confirmation dialog instead of native browser confirmation prompts across the app.
+22. Make Audit Log search match copied human-readable entry titles such as `Amenity created · Chairs` across the full result set.
+23. Restore the room edit page when the application runs briefly against a database where the gallery migration is not yet available.
 
 ## Live checkpoint — 2026-09-26
 
@@ -98,6 +108,21 @@ Verification completed for that fix before commit:
 - Production smoke checks passed for the public/legal pages, the non-submitting consent flow, unauthenticated admin/export redirects, cron authorization rejection, and the presence of the new database tables/RPCs. No production test reservation or email was created.
 - Latest verification: `npm run check` passed (typecheck, lint, 26 unit-test files / 176 tests, and 11 database-test files / 137 tests); `npm run build` passed; `npm run test:e2e` passed 85/85; `git diff --check` passed; the changed-file secret-pattern scan passed; and rendered multi-page PDF inspection passed.
 - Remaining operational follow-up: monitor Vercel/Supabase/Resend during normal use and complete authenticated production recurrence-create/export and first-login-email delivery checks when a staff test login is available.
+
+### Phase 14 local follow-up status
+
+- The six follow-up requirements are implemented locally and remain uncommitted, unapplied, unpushed, and undeployed pending explicit rollout authorization.
+- New append-only migrations are `20260926100000_audit_log_date_filters.sql`, `20260926110000_room_image_gallery.sql`, and `20260926120000_recurring_reservation_requests.sql`; `database.types.ts` was regenerated.
+- Phase 15 adds append-only migration `20260926130000_staff_reservation_email_notifications.sql`, which completes branded staff emails for confirmed reservations and staff cancellations without duplicating the existing pending-request and requester-cancellation alerts.
+- The application now uses year-inclusive compact dates in recurrence previews and reservation lists; server-side Audit Log search/date filters/pagination; ordered four-image room galleries with JPEG/PNG/WebP validation, a 2 MB limit, and browser compression; a focused public recurring-request flow with legal consent, rate limiting, staff notifications, and staff read-only review; and clean Availability/recurring-request discovery from `/reserve`.
+- Production inspection confirmed the Turnstile script and iframe are allowed and load under the application CSP, but the challenge fails downstream at Cloudflare. The UI now exposes Cloudflare callback codes and retry behavior; operators must still verify exact-hostname authorization and network access to the documented challenge hostnames.
+- A narrow public-catalog compatibility fallback retries without `image_paths` only for PostgreSQL missing-column error `42703`, so the local/pre-migration homepage remains available while unrelated database failures still surface.
+- Latest verification: `npm run check` passed (typecheck, lint, 28 unit-test files / 182 tests, and 11 database-test files / 140 tests); `npm run build` passed; `npm run test:e2e` passed 92/92, including the expanded 27-route-state accessibility/responsive matrix; `git diff --check` passed; and the secret-pattern scan found no matches. The build logged the expected linked-database warning that `rooms.image_paths` does not exist because the Phase 14 migration intentionally remains unapplied.
+- After the compatibility fix, `npm run typecheck` and `npm run lint` passed, and `http://localhost:3000` returned HTTP 200 with the room catalog rendered against the pre-migration database.
+- Final Phase 15 verification: typecheck and lint passed; 28 unit-test files / 184 tests passed; 11 database-test files / 140 tests passed; `npm run db:types` regenerated 15 tables / 55 functions / 6 enums; the production build passed; 14 focused Playwright reservation/approval/recurrence tests passed; the complete Playwright suite passed 92/92; and `git diff --check` passed.
+- Phase 16 adds a reusable branded confirmation dialog and removes the final `window.confirm`; normalizes Audit Log punctuation and requires every search term to match the combined action/actor/entity/id/metadata text before pagination; and falls back to the legacy room image only for missing gallery-RPC errors during a rolling or pre-migration deployment.
+- Phase 16 verification: typecheck and lint passed; 28 unit-test files / 185 tests passed; 11 database-test files / 141 tests passed; the production build passed; the custom-confirmation and exact-title Audit Log focused checks passed 2/2; room-detail light/dark accessibility checks passed 2/2; the complete Playwright suite passed 92/92; and `git diff --check` passed (with pre-existing line-ending notices only).
+- Next task after explicit authorization: take the normal database checkpoint, commit the reviewed changes, apply the four `20260926` migrations, push/deploy the matching revision, and complete production smoke checks.
 
 ## Required quality gates
 

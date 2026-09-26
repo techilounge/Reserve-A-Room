@@ -1,13 +1,13 @@
-import { ChevronLeft, ChevronRight, ScrollText, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { AuditLogFilters } from "@/components/admin/audit-log-filters";
 import { PaginationLink } from "@/components/admin/pagination-link";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { actionLabel, auditChanges, auditSubject } from "@/lib/audit-format";
+import { normalizeAuditDatePreset, resolveAuditDateRange } from "@/lib/audit-filters";
 import { formatInstant } from "@/lib/datetime";
 import { loadCatalog } from "@/lib/data/catalog";
 import { getAuditLog } from "@/lib/data/super";
@@ -19,6 +19,7 @@ export const metadata: Metadata = {
 const ENTITIES = [
   ["", "Everything"],
   ["reservation", "Reservations"],
+  ["recurring_request", "Recurring requests"],
   ["room", "Rooms"],
   ["room_amenity", "Room amenities"],
   ["ministry", "Ministries"],
@@ -26,51 +27,69 @@ const ENTITIES = [
   ["user", "Users & authentication"],
   ["settings", "Settings"],
 ] as const;
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
 
 export default async function AdminAuditPage({ searchParams }: PageProps<"/admin/audit">) {
   const raw = await searchParams;
   const search = typeof raw.q === "string" ? raw.q.slice(0, 100) : "";
   const entity = typeof raw.entity === "string" && ENTITIES.some(([k]) => k === raw.entity) ? raw.entity : "";
-  const page = Math.max(1, Number.parseInt(String(raw.page ?? "1"), 10) || 1);
-  const [{ rows, total }, catalog] = await Promise.all([
-    getAuditLog({ search, entityType: entity, page, pageSize: PAGE_SIZE }),
-    loadCatalog(),
-  ]);
+  const requestedPage = Math.max(1, Number.parseInt(String(raw.page ?? "1"), 10) || 1);
+  const preset = normalizeAuditDatePreset(raw.date);
+  const customFrom = typeof raw.from === "string" ? raw.from : "";
+  const customTo = typeof raw.to === "string" ? raw.to : "";
+  const catalog = await loadCatalog();
   const tz = catalog.ok ? catalog.catalog.settings.timeZone : "America/Chicago";
+  const dateRange = resolveAuditDateRange({ preset, from: customFrom, to: customTo, timeZone: tz });
+  let page = requestedPage;
+  let result = await getAuditLog({
+    search,
+    entityType: entity,
+    from: dateRange.error ? undefined : dateRange.fromInstant,
+    to: dateRange.error ? undefined : dateRange.toExclusiveInstant,
+    page,
+    pageSize: PAGE_SIZE,
+  });
+  if (page > 1 && result.rows.length === 0) {
+    page = 1;
+    result = await getAuditLog({
+      search,
+      entityType: entity,
+      from: dateRange.error ? undefined : dateRange.fromInstant,
+      to: dateRange.error ? undefined : dateRange.toExclusiveInstant,
+      page,
+      pageSize: PAGE_SIZE,
+    });
+  }
+  const { rows, total } = result;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const href = (p: number) => `/admin/audit?${new URLSearchParams({ q: search, entity, page: String(p) }).toString()}`;
+  const href = (p: number) => {
+    const params = new URLSearchParams();
+    if (search) params.set("q", search);
+    if (entity) params.set("entity", entity);
+    if (preset !== "all") params.set("date", preset);
+    if (preset === "custom" && customFrom) params.set("from", customFrom);
+    if (preset === "custom" && customTo) params.set("to", customTo);
+    params.set("page", String(p));
+    return `/admin/audit?${params.toString()}`;
+  };
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Audit Log" description="A permanent record of important changes. Entries can't be edited or deleted." />
 
-      <form action="/admin/audit" className="flex flex-col gap-2 rounded-xl border bg-card p-4 sm:flex-row sm:items-end">
-        <div className="relative flex-1">
-          <label htmlFor="audit-search" className="sr-only">
-            Search the audit log
-          </label>
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-          <Input id="audit-search" name="q" type="search" defaultValue={search} placeholder="Search actions, people, references…" className="pl-9" />
-        </div>
-        <label htmlFor="audit-entity" className="sr-only">
-          Type
-        </label>
-        <select id="audit-entity" name="entity" defaultValue={entity} className="h-10 rounded-lg border border-input bg-background px-3 text-sm sm:w-48">
-          {ENTITIES.map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-        <Button type="submit" variant="secondary">
-          Search
-        </Button>
-      </form>
+      <AuditLogFilters
+        initialSearch={search}
+        initialEntity={entity}
+        initialPreset={preset}
+        initialFrom={customFrom}
+        initialTo={customTo}
+        entities={ENTITIES}
+        error={dateRange.error}
+      />
 
       {rows.length === 0 ? (
         <EmptyState icon={ScrollText} title="No entries found">
-          Try a different search.
+          Try different search or date filters.
         </EmptyState>
       ) : (
         <ol className="divide-y rounded-xl border bg-card">

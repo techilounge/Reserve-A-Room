@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { addMonthsToLocalDate, formatShortDate, localDateToUtcMidnight } from "@/lib/datetime";
+import { addDaysToLocalDate, addMonthsToLocalDate, formatCompactDate, localDateToUtcMidnight } from "@/lib/datetime";
+import { weekdayOnOrAfter } from "@/lib/recurrence/dates";
 
 import { ROOMS } from "./support/accounts";
 import { daysFromToday, goToReview, guest, signInAs } from "./support/helpers";
@@ -9,8 +10,12 @@ async function chooseDate(page: Page, trigger: string, value: string) {
   const date = localDateToUtcMidnight(value);
   const selector = `${date.getUTCMonth() + 1}/${date.getUTCDate()}/${date.getUTCFullYear()}`;
   await page.locator(trigger).click();
-  await page.locator(`[data-slot="calendar"] button[data-day="${selector}"]`).click();
+  const day = page.locator(`[data-slot="calendar"] button[data-day="${selector}"]`);
+  if ((await day.count()) === 0) await page.locator('[data-slot="calendar"] .rdp-button_next').click();
+  await day.click();
 }
+
+const nextSaturday = () => weekdayOnOrAfter(daysFromToday(7), 6);
 
 async function fillStaffReservation(
   page: Page,
@@ -36,8 +41,7 @@ test("staff creates and ends a weekly recurring reservation series", async ({ br
   const context = await browser.newContext();
   await signInAs(context, "admin");
   const page = await context.newPage();
-  const startDate = daysFromToday(8);
-
+  const startDate = nextSaturday();
   await fillStaffReservation(page, {
     roomId: ROOMS.conference.id,
     date: startDate,
@@ -48,7 +52,7 @@ test("staff creates and ends a weekly recurring reservation series", async ({ br
   await page.getByRole("button", { name: "Preview schedule" }).click();
 
   await expect(page.getByText(/Every week on Saturday, 2:00 PM/)).toBeVisible();
-  await expect(page.getByText(`${formatShortDate(startDate)} · Available`, { exact: true })).toBeVisible();
+  await expect(page.getByText(`${formatCompactDate(startDate)} · Available`, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Create recurring series" }).click();
 
   await expect(page).toHaveURL(/\/admin\/reservation-series\/[0-9a-f-]+\?created=1$/);
@@ -67,10 +71,11 @@ test("staff creates a second-and-fourth-Saturday monthly series and sees its bou
   const context = await browser.newContext();
   await signInAs(context, "superAdmin");
   const page = await context.newPage();
+  const startDate = nextSaturday();
 
   await fillStaffReservation(page, {
     roomId: ROOMS.hall.id,
-    date: daysFromToday(8),
+    date: startDate,
     start: "14:00",
     end: "15:00",
   });
@@ -81,9 +86,9 @@ test("staff creates a second-and-fourth-Saturday monthly series and sees its bou
   await page.getByRole("button", { name: "Preview schedule" }).click();
   await expect(page.getByText(/The second and fourth Saturdays of every month, 2:00 PM/)).toBeVisible();
   const seriesBoundaries = page.locator("dl");
-  await expect(seriesBoundaries.getByText("Start date").locator("..")).toContainText(formatShortDate(daysFromToday(8)));
+  await expect(seriesBoundaries.getByText("Start date").locator("..")).toContainText(formatCompactDate(startDate));
   await expect(seriesBoundaries.getByText("End date").locator("..")).toContainText(
-    `${formatShortDate(addMonthsToLocalDate(daysFromToday(8), 12))} (automatic limit)`,
+    `${formatCompactDate(addMonthsToLocalDate(startDate, 12))} (automatic limit)`,
   );
 
   await page.getByRole("button", { name: "Create recurring series" }).click();
@@ -97,7 +102,7 @@ test("staff previews the expanded daily, weekday, interval, monthly, and yearly 
   const context = await browser.newContext();
   await signInAs(context, "admin");
   const page = await context.newPage();
-  const startDate = daysFromToday(8);
+  const startDate = nextSaturday();
   const start = localDateToUtcMidnight(startDate);
   const month = start.getUTCMonth() + 1;
   const day = start.getUTCDate();
@@ -158,8 +163,8 @@ test("a conflict found after preview prevents the entire series", async ({ brows
   const adminContext = await browser.newContext();
   await signInAs(adminContext, "admin");
   const admin = await adminContext.newPage();
-  const firstDate = daysFromToday(8);
-  const conflictDate = daysFromToday(15);
+  const firstDate = nextSaturday();
+  const conflictDate = addDaysToLocalDate(firstDate, 7);
 
   await fillStaffReservation(admin, {
     roomId: ROOMS.conference.id,

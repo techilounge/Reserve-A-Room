@@ -1,4 +1,4 @@
-import { Ban, Hourglass, MailWarning, Pencil, type LucideIcon } from "lucide-react";
+import { Ban, CalendarClock, Hourglass, MailWarning, Pencil, type LucideIcon } from "lucide-react";
 
 /** Icon per notification type (text always accompanies it). */
 export const NOTIFICATION_ICONS: Record<string, LucideIcon> = {
@@ -6,7 +6,14 @@ export const NOTIFICATION_ICONS: Record<string, LucideIcon> = {
   reservation_cancelled_by_requester: Ban,
   reservation_modified: Pencil,
   email_failed: MailWarning,
+  recurring_request_received: CalendarClock,
 };
+
+export function notificationHref(notification: { reservation_id: string | null; recurring_request_id: string | null }): string {
+  if (notification.reservation_id) return `/admin/reservations/${notification.reservation_id}`;
+  if (notification.recurring_request_id) return "/admin/recurring-requests";
+  return "/admin/notifications";
+}
 
 export function notificationIcon(type: string): LucideIcon {
   return NOTIFICATION_ICONS[type] ?? Hourglass;

@@ -32,10 +32,11 @@ export function approvalLabel(row: Row): string {
 export const EMAIL_EVENT_LABELS: Record<string, string> = {
   request_submitted: "Request received (requester)",
   admin_new_request: "New request (staff)",
+  admin_reservation_created: "New reservation (staff)",
   reservation_confirmed: "Reservation confirmed (requester)",
   reservation_approved: "Approved (requester)",
   reservation_declined: "Declined (requester)",
   reservation_modified: "Changed (requester)",
   reservation_cancelled: "Cancelled (requester)",
-  admin_reservation_cancelled: "Cancelled by requester (staff)",
+  admin_reservation_cancelled: "Cancellation alert (staff)",
 };

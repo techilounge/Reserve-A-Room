@@ -88,6 +88,20 @@ const templates: Record<EmailEvent, (d: EmailData) => Built> = {
     ),
   }),
 
+  admin_reservation_created: (d) => ({
+    subject: `New reservation: ${d.roomName} on ${d.date} (${d.referenceCode})`,
+    element: (
+      <EmailLayout data={d} preview={`${d.requesterName} reserved ${d.roomName} for ${d.date}.`} heading="A room was reserved">
+        <Paragraph>
+          {d.requesterName} completed a confirmed reservation for {d.roomName}.
+        </Paragraph>
+        <CapacityWarning d={d} />
+        <DetailsTable rows={staffRows(d)} />
+        <PrimaryButton href={d.adminUrl}>Open reservation</PrimaryButton>
+      </EmailLayout>
+    ),
+  }),
+
   reservation_confirmed: (d) => ({
     subject: `Reservation confirmed: ${d.roomName} on ${d.date} (${d.referenceCode})`,
     element: (
@@ -164,11 +178,17 @@ const templates: Record<EmailEvent, (d: EmailData) => Built> = {
   }),
 
   admin_reservation_cancelled: (d) => ({
-    subject: `Cancelled by requester: ${d.roomName} on ${d.date} (${d.referenceCode})`,
+    subject: `Reservation cancelled: ${d.roomName} on ${d.date} (${d.referenceCode})`,
     element: (
-      <EmailLayout data={d} preview={`${d.requesterName} cancelled ${d.referenceCode}.`} heading="A reservation was cancelled">
+      <EmailLayout
+        data={d}
+        preview={d.cancelledByRequester ? `${d.requesterName} cancelled ${d.referenceCode}.` : `${d.referenceCode} was cancelled by the church office.`}
+        heading="A reservation was cancelled"
+      >
         <Paragraph>
-          {d.requesterName} cancelled their reservation. {d.roomName} is available again for this time.
+          {d.cancelledByRequester
+            ? `${d.requesterName} cancelled their reservation.`
+            : `The church office cancelled ${d.requesterName}'s reservation.`} {d.roomName} is available again for this time.
         </Paragraph>
         <DetailsTable rows={staffRows(d)} />
         <PrimaryButton href={d.adminUrl}>Open reservation</PrimaryButton>

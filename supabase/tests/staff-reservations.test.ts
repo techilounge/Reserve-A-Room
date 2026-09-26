@@ -130,7 +130,13 @@ describe("approve / decline / cancel", () => {
     await asAdmin((tx) => tx.query("select public.cancel_reservation($1, 'Building closed')", [r.id]));
     const { rows } = await db.query("select status, cancelled_by_user_id, cancelled_by_requester from public.reservations where id = $1", [r.id]);
     expect(rows[0]).toEqual({ status: "cancelled", cancelled_by_user_id: admin, cancelled_by_requester: false });
-    expect(await emailsFor(r.id)).toContain("reservation_cancelled");
+    expect(await emailsFor(r.id)).toEqual([
+      "admin_reservation_created",
+      "admin_reservation_created",
+      "admin_reservation_cancelled",
+      "admin_reservation_cancelled",
+      "reservation_cancelled",
+    ]);
   });
 });
 
@@ -168,14 +174,21 @@ describe("update_reservation", () => {
     expect(await update(r.id, { p_start_at: await localTime(db, 9, "10:00"), p_end_at: await localTime(db, 9, "11:00") })).toBe(true);
     const { rows } = await db.query("select status from public.reservations where id = $1", [r.id]);
     expect(rows[0]).toEqual({ status: "approved" });
-    expect(await emailsFor(r.id)).toEqual(["reservation_modified"]);
+    expect(await emailsFor(r.id)).toEqual([
+      "admin_reservation_created",
+      "admin_reservation_created",
+      "reservation_modified",
+    ]);
   });
 
   it("does not email for non-material edits and reports no-ops", async () => {
     const r = await reservation(hall, 10, "09:00", "10:00", "approved");
     expect(await update(r.id, { p_purpose: "Updated purpose" })).toBe(true);
     expect(await update(r.id, { p_purpose: "Updated purpose" })).toBe(false);
-    expect(await emailsFor(r.id)).toEqual([]);
+    expect(await emailsFor(r.id)).toEqual([
+      "admin_reservation_created",
+      "admin_reservation_created",
+    ]);
   });
 
   it("re-applies conflict and destination-room rules when rescheduling", async () => {
@@ -223,7 +236,11 @@ describe("create_staff_reservation", () => {
     );
     const { rows } = await db.query("select status, source, approved_by, created_by_user_id from public.reservations where id = $1", [row.id]);
     expect(rows[0]).toEqual({ status: "approved", source: "admin", approved_by: admin, created_by_user_id: admin });
-    expect(await emailsFor(row.id)).toEqual(["reservation_confirmed"]);
+    expect(await emailsFor(row.id)).toEqual([
+      "admin_reservation_created",
+      "admin_reservation_created",
+      "reservation_confirmed",
+    ]);
   });
 });
 

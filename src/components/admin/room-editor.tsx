@@ -2,11 +2,13 @@
 
 import { Info, LoaderCircle, Plus } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { createAmenityAction, saveRoomAction } from "@/app/admin/(portal)/(super)/actions";
+import { createAmenityAction, saveRoomAction, setRoomImagesAction } from "@/app/admin/(portal)/(super)/actions";
 import { Field } from "@/components/forms/field";
+import { RoomImagePicker, type EditableRoomImage } from "@/components/admin/room-image-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +17,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { AMENITY_ICONS, amenityIcon } from "@/lib/amenity-icons";
 import { ADVANCE_MAX, advanceLabel, type AdvanceRule, type AdvanceUnit } from "@/lib/domain/rooms/advance-booking";
 import { roomPolicySummary } from "@/lib/domain/rooms/policy";
+import { roomImageExtension } from "@/lib/images/room-image";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { cn } from "@/lib/utils";
 import { slugify, type RoomInput } from "@/lib/validation/super";
 
@@ -94,12 +98,16 @@ export function RoomEditor({
   room,
   amenities: initialAmenities,
   defaultAdvance,
+  initialImages,
 }: {
   room: EditableRoom;
   amenities: Amenity[];
   defaultAdvance: AdvanceRule;
+  initialImages: { path: string; url: string }[];
 }) {
-  const creating = room.id === null;
+  const router = useRouter();
+  const [roomId, setRoomId] = useState(room.id);
+  const creating = roomId === null;
   const [form, setForm] = useState({
     ...room,
     capacity: String(room.capacity),
@@ -111,6 +119,10 @@ export function RoomEditor({
   const [slugTouched, setSlugTouched] = useState(!creating);
   const [amenities, setAmenities] = useState(initialAmenities);
   const [newAmenity, setNewAmenity] = useState({ name: "", icon: "" });
+  const [images, setImages] = useState<EditableRoomImage[]>(
+    initialImages.map((image) => ({ id: image.path, path: image.path, url: image.url, file: null })),
+  );
+  const [persistedImagePaths, setPersistedImagePaths] = useState(initialImages.map((image) => image.path));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -131,7 +143,7 @@ export function RoomEditor({
     setFormError(null);
     setErrors({});
     const payload: RoomInput = {
-      id: form.id,
+      id: roomId,
       name: form.name,
       slug: form.slug,
       description: form.description,
@@ -156,7 +168,60 @@ export function RoomEditor({
         setErrors(result.fieldErrors ?? {});
         return;
       }
-      toast.success(result.message);
+      const savedId = result.id ?? roomId;
+      if (!savedId) {
+        setFormError("The room was saved, but its identifier was not returned. Please reload and try again.");
+        return;
+      }
+      setRoomId(savedId);
+
+      const storage = getSupabaseBrowserClient().storage.from("room-images");
+      const uploadedPaths: string[] = [];
+      const nextPaths: string[] = [];
+      const nextImages: EditableRoomImage[] = [];
+      for (const image of images) {
+        if (!image.file && image.path) {
+          nextPaths.push(image.path);
+          nextImages.push(image);
+          continue;
+        }
+        if (!image.file) continue;
+        const extension = roomImageExtension(image.file.type);
+        if (!extension) continue;
+        const path = `rooms/${savedId}/${crypto.randomUUID()}.${extension}`;
+        const { error } = await storage.upload(path, image.file, {
+          contentType: image.file.type,
+          cacheControl: "31536000",
+          upsert: false,
+        });
+        if (error) {
+          console.error("[room-images] upload failed", error.message);
+          if (uploadedPaths.length) await storage.remove(uploadedPaths);
+          setFormError("The room was saved, but one or more images could not be uploaded. Please try saving the images again.");
+          return;
+        }
+        uploadedPaths.push(path);
+        nextPaths.push(path);
+        const { data } = storage.getPublicUrl(path);
+        nextImages.push({ id: path, path, url: data.publicUrl, file: null });
+      }
+
+      const imageResult = await setRoomImagesAction(savedId, nextPaths);
+      if (!imageResult.ok) {
+        if (uploadedPaths.length) await storage.remove(uploadedPaths);
+        setFormError(imageResult.message);
+        return;
+      }
+      const removedPaths = persistedImagePaths.filter((path) => !nextPaths.includes(path));
+      if (removedPaths.length) {
+        const { error } = await storage.remove(removedPaths);
+        if (error) console.error("[room-images] old file cleanup failed", error.message);
+      }
+      setPersistedImagePaths(nextPaths);
+      setImages(nextImages);
+      toast.success(creating ? "Room created." : "Room saved.");
+      if (creating) router.replace(`/admin/rooms/${savedId}?created=1`);
+      else router.refresh();
     });
   }
 
@@ -233,6 +298,8 @@ export function RoomEditor({
           </Field>
         </div>
       </section>
+
+      <RoomImagePicker images={images} onChange={setImages} disabled={pending} />
 
       <section aria-labelledby="amenities-heading" className="space-y-4 rounded-xl border bg-card p-4 sm:p-6">
         <h2 id="amenities-heading" className="text-lg font-semibold">

@@ -153,8 +153,13 @@ describe("atomic recurring-series creation", () => {
       ),
     ).toBe(true);
 
-    const emails = await db.query("select id from public.email_logs where reservation_id in (select id from public.reservations where series_id = $1)", [seriesId]);
-    expect(emails.rows).toHaveLength(0);
+    const emails = await db.query<{ event_type: string; recipient: string }>(
+      "select event_type, recipient from public.email_logs where reservation_id in (select id from public.reservations where series_id = $1) order by recipient, reservation_id",
+      [seriesId],
+    );
+    expect(emails.rows).toHaveLength(6);
+    expect(emails.rows.every((email) => email.event_type === "admin_reservation_created")).toBe(true);
+    expect([...new Set(emails.rows.map((email) => email.recipient))]).toEqual(["series-admin@example.org", "series-super@example.org"]);
     const systemEmails = await db.query<{ event_type: string; recipient: string; status: string }>(
       "select event_type, recipient, status from public.system_email_logs where entity_id = $1",
       [seriesId],

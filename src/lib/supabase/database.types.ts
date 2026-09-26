@@ -235,6 +235,7 @@ export type Database = {
           reservation_id: string | null;
           read_at: string | null;
           created_at: string;
+          recurring_request_id: string | null;
         };
         Insert: {
           id?: string;
@@ -245,6 +246,7 @@ export type Database = {
           reservation_id?: string | null;
           read_at?: string | null;
           created_at?: string;
+          recurring_request_id?: string | null;
         };
         Update: {
           id?: string;
@@ -255,8 +257,16 @@ export type Database = {
           reservation_id?: string | null;
           read_at?: string | null;
           created_at?: string;
+          recurring_request_id?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "notifications_recurring_request_id_fkey";
+            columns: ["recurring_request_id"];
+            isOneToOne: false;
+            referencedRelation: "recurring_reservation_requests";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "notifications_reservation_id_fkey";
             columns: ["reservation_id"];
@@ -343,6 +353,86 @@ export type Database = {
           created_at?: string;
         };
         Relationships: [
+        ];
+      };
+      recurring_reservation_requests: {
+        Row: {
+          id: string;
+          reference_code: string;
+          status: string;
+          room_id: string;
+          preferred_start_date: string;
+          local_start_time: string;
+          local_end_time: string;
+          recurrence_description: string;
+          requester_first_name: string;
+          requester_last_name: string;
+          requester_email: string;
+          requester_phone: string;
+          purpose: string;
+          estimated_attendance: number;
+          requester_notes: string | null;
+          privacy_accepted_at: string;
+          terms_accepted_at: string;
+          privacy_version: string;
+          terms_version: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          reference_code: string;
+          status?: string;
+          room_id: string;
+          preferred_start_date: string;
+          local_start_time: string;
+          local_end_time: string;
+          recurrence_description: string;
+          requester_first_name: string;
+          requester_last_name: string;
+          requester_email: string;
+          requester_phone: string;
+          purpose: string;
+          estimated_attendance: number;
+          requester_notes?: string | null;
+          privacy_accepted_at: string;
+          terms_accepted_at: string;
+          privacy_version: string;
+          terms_version: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          reference_code?: string;
+          status?: string;
+          room_id?: string;
+          preferred_start_date?: string;
+          local_start_time?: string;
+          local_end_time?: string;
+          recurrence_description?: string;
+          requester_first_name?: string;
+          requester_last_name?: string;
+          requester_email?: string;
+          requester_phone?: string;
+          purpose?: string;
+          estimated_attendance?: number;
+          requester_notes?: string | null;
+          privacy_accepted_at?: string;
+          terms_accepted_at?: string;
+          privacy_version?: string;
+          terms_version?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "recurring_reservation_requests_room_id_fkey";
+            columns: ["room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
+            referencedColumns: ["id"];
+          },
         ];
       };
       reservation_series: {
@@ -759,6 +849,7 @@ export type Database = {
           sort_order: number;
           created_at: string;
           updated_at: string;
+          image_paths: string[];
         };
         Insert: {
           id?: string;
@@ -778,6 +869,7 @@ export type Database = {
           sort_order?: number;
           created_at?: string;
           updated_at?: string;
+          image_paths?: string[];
         };
         Update: {
           id?: string;
@@ -797,6 +889,7 @@ export type Database = {
           sort_order?: number;
           created_at?: string;
           updated_at?: string;
+          image_paths?: string[];
         };
         Relationships: [
         ];
@@ -854,7 +947,7 @@ export type Database = {
     Views: { [_ in never]: never };
     Functions: {
       admin_audit_log: {
-        Args: { p_search?: string; p_entity_type?: string; p_limit?: number; p_offset?: number };
+        Args: { p_search?: string; p_entity_type?: string; p_from?: string; p_to?: string; p_limit?: number; p_offset?: number };
         Returns: { id: number; created_at: string; actor_kind: Database["public"]["Enums"]["actor_kind"]; actor_name: string; action: string; entity_type: string; entity_id: string; metadata: Json; total_count: number }[];
       };
       admin_calendar: {
@@ -909,6 +1002,10 @@ export type Database = {
         Args: { p_ids: string[] };
         Returns: { reservation_id: string; series_id: string; occurrence_date: string }[];
       };
+      admin_room_image_paths: {
+        Args: { p_room_id: string };
+        Returns: string[];
+      };
       approve_reservation: {
         Args: { p_id: string; p_message?: string };
         Returns: Database["public"]["Enums"]["reservation_status"];
@@ -956,6 +1053,10 @@ export type Database = {
       create_guest_reservation: {
         Args: { p_room_id: string; p_start_at: string; p_end_at: string; p_first_name: string; p_last_name: string; p_email: string; p_phone: string; p_purpose: string; p_estimated_attendance: number; p_token_hash: string; p_token_seed: string; p_privacy_accepted: boolean; p_terms_accepted: boolean; p_privacy_version: string; p_terms_version: string; p_ministry_id?: string; p_other_ministry_name?: string; p_setup_requirements?: string; p_requester_notes?: string };
         Returns: { id: string; reference_code: string; status: Database["public"]["Enums"]["reservation_status"] }[];
+      };
+      create_recurring_reservation_request: {
+        Args: { p_room_id: string; p_preferred_start_date: string; p_local_start_time: string; p_local_end_time: string; p_recurrence_description: string; p_first_name: string; p_last_name: string; p_email: string; p_phone: string; p_purpose: string; p_estimated_attendance: number; p_privacy_accepted: boolean; p_terms_accepted: boolean; p_privacy_version: string; p_terms_version: string; p_requester_notes?: string };
+        Returns: { id: string; reference_code: string }[];
       };
       create_recurring_reservation_series: {
         Args: { p_room_id: string; p_frequency: string; p_interval_count: number; p_weekdays: number[]; p_weekday: number; p_month_ordinals: number[]; p_month_ordinal: number; p_day_of_month: number; p_month_of_year: number; p_instance_limit: number; p_start_date: string; p_end_date: string; p_local_start_time: string; p_local_end_time: string; p_timezone: string; p_first_name: string; p_last_name: string; p_email: string; p_phone: string; p_purpose: string; p_estimated_attendance: number; p_occurrences: Json; p_materialized_through: string; p_ministry_id?: string; p_other_ministry_name?: string; p_setup_requirements?: string; p_requester_notes?: string; p_admin_notes?: string; p_notify?: boolean };
@@ -1007,7 +1108,7 @@ export type Database = {
       };
       my_notifications: {
         Args: { p_unread_only?: boolean; p_limit?: number; p_offset?: number };
-        Returns: { id: string; type: string; title: string; message: string; reservation_id: string; read_at: string; created_at: string; total_count: number }[];
+        Returns: { id: string; type: string; title: string; message: string; reservation_id: string; recurring_request_id: string; read_at: string; created_at: string; total_count: number }[];
       };
       record_staff_login: {
         Args: { p_method?: string };
@@ -1031,6 +1132,10 @@ export type Database = {
       };
       set_room_image: {
         Args: { p_id: string; p_image_path?: string };
+        Returns: undefined;
+      };
+      set_room_images: {
+        Args: { p_id: string; p_image_paths?: string[] };
         Returns: undefined;
       };
       set_user_active: {

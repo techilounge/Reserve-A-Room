@@ -88,7 +88,12 @@ describe("create_guest_reservation", () => {
       [r.id],
     );
     expect(rows[0]).toEqual({ requester_first_name: "Grace", requester_email: "grace@example.org", approved: true, approved_by: null, source: "guest" });
-    expect(await emails(r.id)).toEqual([{ recipient: "grace@example.org", event_type: "reservation_confirmed", status: "queued" }]);
+    expect(await emails(r.id)).toEqual([
+      { recipient: "frontdesk@example.org", event_type: "admin_reservation_created", status: "queued" },
+      { recipient: "office@example.org", event_type: "admin_reservation_created", status: "queued" },
+      { recipient: "pastor@example.org", event_type: "admin_reservation_created", status: "queued" },
+      { recipient: "grace@example.org", event_type: "reservation_confirmed", status: "queued" },
+    ]);
 
     const notes = await db.query("select 1 from public.notifications where reservation_id = $1", [r.id]);
     expect(notes.rows).toHaveLength(0);

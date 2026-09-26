@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { inviteUserAction, setUserActiveAction, setUserRoleAction } from "@/app/admin/(portal)/(super)/actions";
 import { PolicyPill } from "@/components/rooms/policy-badges";
 import { Button } from "@/components/ui/button";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import {
   Dialog,
   DialogClose,
@@ -157,20 +158,34 @@ function UserRow({ user, isSelf }: { user: ManagedUser; isSelf: boolean }) {
           <option value="super_admin">Super Admin</option>
         </NativeSelect>
         <div className="flex flex-col items-start gap-1">
-          <Button
-            size="sm"
-            variant={user.active ? "outline" : "secondary"}
-            disabled={pending || disableProtected}
-            aria-describedby={disableProtected ? guidanceId : undefined}
-            onClick={() => {
-              if (user.active && !window.confirm(`Disable ${user.fullName}? They will be signed out and can't sign in until re-enabled.`)) return;
-              run(() => setUserActiveAction(user.id, !user.active));
-            }}
-          >
-            {pending ? <LoaderCircle className="animate-spin" aria-hidden /> : null}
-            {user.active ? "Disable" : "Re-enable"}
-            <span className="sr-only"> {user.fullName}</span>
-          </Button>
+          {user.active ? (
+            <ConfirmationDialog
+              trigger={
+                <Button size="sm" variant="outline" disabled={pending || disableProtected} aria-describedby={disableProtected ? guidanceId : undefined}>
+                  Disable
+                  <span className="sr-only"> {user.fullName}</span>
+                </Button>
+              }
+              title={`Disable ${user.fullName}?`}
+              description="They will be signed out and won't be able to sign in until a Super Admin re-enables their account."
+              confirmLabel="Disable account"
+              pendingLabel="Disabling…"
+              cancelLabel="Keep enabled"
+              destructive
+              onConfirm={async () => {
+                const result = await setUserActiveAction(user.id, false);
+                if (result.ok) toast.success(`${user.fullName}: ${result.message}`);
+                else toast.error(result.message);
+                return result.ok;
+              }}
+            />
+          ) : (
+            <Button size="sm" variant="secondary" disabled={pending} onClick={() => run(() => setUserActiveAction(user.id, true))}>
+              {pending ? <LoaderCircle className="animate-spin" aria-hidden /> : null}
+              Re-enable
+              <span className="sr-only"> {user.fullName}</span>
+            </Button>
+          )}
           {disableProtected ? (
             <p id={guidanceId} className="max-w-48 text-xs text-muted-foreground">
               Demote to Admin before disabling this account.

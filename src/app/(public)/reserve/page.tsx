@@ -1,11 +1,13 @@
 import { DoorClosed } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { CatalogUnavailable } from "@/components/feedback/catalog-unavailable";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { ReservationWizard } from "@/components/reserve/reservation-wizard";
 import type { ReservePrefill } from "@/components/reserve/types";
+import { Button } from "@/components/ui/button";
 import { compareLocalDates, isLocalDate, isLocalTime } from "@/lib/datetime";
 import { loadCatalog } from "@/lib/data/catalog";
 import { getTurnstileSiteKey } from "@/lib/env/public";
@@ -27,7 +29,20 @@ export default async function ReservePage({ searchParams }: PageProps<"/reserve"
   const header = (
     <PageHeader
       title="Reserve a Room"
-      description="Choose a room and time, tell us about your reservation, then review and submit. No account needed."
+      description={
+        <>
+          Choose a room and time, tell us about your reservation, then review and submit. No account needed. See{" "}
+          <Link href="/availability" className="font-medium text-foreground underline decoration-brand-gold underline-offset-4 hover:text-primary">
+            Availability
+          </Link>
+          .
+        </>
+      }
+      actions={
+        <Button asChild variant="outline">
+          <Link href="/recurring-request">Request recurring dates</Link>
+        </Button>
+      }
     />
   );
 

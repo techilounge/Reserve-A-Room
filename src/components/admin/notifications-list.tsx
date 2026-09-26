@@ -9,7 +9,7 @@ import { markNotificationsRead, type NotificationItem } from "@/app/admin/(porta
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-import { notificationIcon } from "./notification-meta";
+import { notificationHref, notificationIcon } from "./notification-meta";
 
 export function NotificationsList({ items, dates, hasUnread }: { items: NotificationItem[]; dates: Record<string, string>; hasUnread: boolean }) {
   const [pending, startTransition] = useTransition();
@@ -54,10 +54,10 @@ export function NotificationsList({ items, dates, hasUnread }: { items: Notifica
                 <p className="mt-1 text-xs text-muted-foreground">{dates[n.id]}</p>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
-                {n.reservation_id ? (
+                {n.reservation_id || n.recurring_request_id ? (
                   <Button asChild size="sm" variant="outline">
-                    <Link href={`/admin/reservations/${n.reservation_id}`} onClick={() => !n.read_at && void markNotificationsRead([n.id])}>
-                      View<span className="sr-only"> reservation for {n.title}</span>
+                    <Link href={notificationHref(n)} onClick={() => !n.read_at && void markNotificationsRead([n.id])}>
+                      View<span className="sr-only"> details for {n.title}</span>
                     </Link>
                   </Button>
                 ) : null}

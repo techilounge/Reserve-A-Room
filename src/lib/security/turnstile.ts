@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getAppUrl } from "@/lib/app-url";
 import { getTurnstileSiteKey } from "@/lib/env/public";
 import { getServerEnv } from "@/lib/env/server";
 
@@ -18,8 +19,17 @@ export async function verifyTurnstile(token: string | undefined, ip: string): Pr
       body: new URLSearchParams({ secret: getServerEnv().TURNSTILE_SECRET_KEY!, response: token, remoteip: ip }),
       cache: "no-store",
     });
-    const result = (await response.json()) as { success?: boolean };
-    return result.success === true;
+    const result = (await response.json()) as { success?: boolean; action?: string; hostname?: string; "error-codes"?: string[] };
+    const expectedHostname = new URL(getAppUrl()).hostname;
+    const valid = result.success === true && result.action === "reserve" && result.hostname === expectedHostname;
+    if (!valid) {
+      console.warn("[turnstile] verification rejected", {
+        action: result.action,
+        hostname: result.hostname,
+        errorCodes: result["error-codes"],
+      });
+    }
+    return valid;
   } catch (error) {
     console.error("[turnstile] verification failed", error);
     return false;

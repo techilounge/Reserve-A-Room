@@ -195,6 +195,14 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/rest/v1/ministries") {
       return send(200, await json("select coalesce(jsonb_agg(jsonb_build_object('id', id, 'name', name) order by sort_order, name), '[]') as j from public.ministries where active"));
     }
+    if (req.method === "GET" && url.pathname === "/rest/v1/recurring_reservation_requests") {
+      const rows = (await jsonAs(req, "select coalesce(jsonb_agg(to_jsonb(r) order by created_at desc), '[]') as j from public.recurring_reservation_requests r")) as unknown[];
+      res.writeHead(200, {
+        "content-type": "application/json",
+        "content-range": rows.length ? `0-${rows.length - 1}/${rows.length}` : "*/0",
+      });
+      return res.end(JSON.stringify(rows));
+    }
     const rpc = url.pathname.match(/^\/rest\/v1\/rpc\/([a-z_]+)$/);
     if (req.method === "POST" && rpc) {
       let body = "";

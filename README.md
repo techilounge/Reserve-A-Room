@@ -172,6 +172,10 @@ The enhancement rollout adds these append-only migrations, in order:
 - `20260925120000_super_admin_disable_protection.sql`
 - `20260925130000_reservation_legal_consent.sql`
 - `20260925140000_reservation_exports.sql`
+- `20260926100000_audit_log_date_filters.sql`
+- `20260926110000_room_image_gallery.sql`
+- `20260926120000_recurring_reservation_requests.sql`
+- `20260926130000_staff_reservation_email_notifications.sql`
 
 After changing a migration, regenerate the TypeScript types:
 
@@ -272,6 +276,7 @@ Super Admins manage rooms under **Admin → Rooms**. Each room has:
 | Food & drinks | Allowed or Not Allowed. Shown before booking, on the review step, the confirmation and in emails. |
 | Active | Inactive rooms are archived: hidden everywhere, history kept. Rooms are never deleted. |
 | Open for reservations | Turn off to mark a room temporarily unavailable, with an optional message. |
+| Room images | Up to four ordered JPEG, PNG or WebP images, each no larger than 2 MB. Uploads are compressed automatically; the first image is the room-card image. |
 
 The editor shows a plain-language summary before saving, for example: *"Guests may
 reserve this room up to 4 weeks in advance. Reservations require approval. Food and
@@ -281,6 +286,17 @@ Changes apply to new reservations and to rescheduling. Existing reservations kee
 policies they were booked with. A Pending request stays Pending if a room stops
 requiring approval, and an Admin decides it. Every change is recorded in the
 **Audit Log**.
+
+The Audit Log searches the complete history before pagination and supports live text/type
+filters plus Today, Last 7 days, Last 30 days, This month and custom local-date ranges.
+Guests who need repeating dates use `/recurring-request`; the request is stored separately
+from confirmed reservations, appears under **Admin → Recurring Requests**, and notifies
+active staff.
+
+Opted-in active Admins and Super Admins, plus the extra addresses configured in Settings,
+receive a branded email for every new pending or confirmed reservation and every requester-
+or staff-initiated cancellation. These staff messages link to the admin reservation and
+never contain the requester's private management token.
 
 Other Super Admin areas:
 - **Ministries:** add, rename, reorder, deactivate.
@@ -343,7 +359,7 @@ Reserve-A-Room can be installed on phones, tablets and desktops (manifest:
   - Admin vs Super Admin pages;
   - the cron secret.
 - **Quality:**
-  - axe WCAG 2.2 AA on 23 pages in light and dark mode;
+  - axe WCAG 2.2 AA on 27 public/admin route states in light and dark mode;
   - no horizontal scrolling at 320, 768 and 1920 px;
   - security headers.
 - **PWA:** manifest and icons, the offline fallback, and that nothing private is cached.
@@ -388,6 +404,15 @@ relevant dashboard.
    not one copied from elsewhere.
 3. Wait for Vercel to show the domain as valid. HTTPS is issued automatically.
 4. Set `NEXT_PUBLIC_APP_URL=https://reservearoom.stonehillchurch.org` and redeploy.
+
+**3a. Turnstile (when enabled)**
+1. In Cloudflare → Turnstile → the production widget → **Hostname Management**, authorize
+   `reservearoom.stonehillchurch.org` (hostname only: no scheme, port or path).
+2. Confirm the matching site key and secret are set together in Vercel, then redeploy.
+3. If a church or visitor network filters domains, allow `challenges.cloudflare.com`,
+   `hagen.challenges.cloudflare.com`, and `brunhild.challenges.cloudflare.com`.
+4. The widget displays Cloudflare's client error code and a retry button. Code `110200`
+   means the hostname is not authorized; `200500` means the challenge iframe was blocked.
 
 **4. First administrator**
 1. Run `npm run bootstrap:super-admin` from your computer (see
@@ -435,5 +460,5 @@ relevant dashboard.
 | A time slot can't be chosen although it looks free | It's too soon (minimum notice), outside bookable hours, or beyond the room's advance limit. Check Settings and the room's rules. |
 | "That room was just reserved…" | Someone else took the time a moment earlier. Pick another time. The database never allows two reservations to overlap. |
 | The installed app shows an old version | Close and reopen it. Each deployment installs a fresh service worker on the next visit. |
-| Turnstile widget missing or failing | Both Turnstile keys must be set (or neither), and the site key must allow the production domain. |
+| Turnstile says “Unable to connect” | The application CSP already allows Cloudflare. Use the displayed error code: `110200` means add `reservearoom.stonehillchurch.org` in Turnstile Hostname Management; `200500` means a browser extension or network blocked the iframe. Try a private window/another network and allow the three Cloudflare challenge hostnames listed above. |
 | `npm run test:e2e` can't find a browser | Run `npx playwright install chromium`, or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE`. |

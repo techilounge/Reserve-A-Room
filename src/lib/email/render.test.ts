@@ -68,7 +68,7 @@ describe("email templates", () => {
   });
 
   it("staff emails link to the admin portal, not the requester's private link", async () => {
-    for (const event of ["admin_new_request", "admin_reservation_cancelled"] as const) {
+    for (const event of ["admin_new_request", "admin_reservation_created", "admin_reservation_cancelled"] as const) {
       const { html } = await renderEmail(event, data);
       expect(html).toContain(data.adminUrl);
       expect(html).not.toContain("token=");
@@ -77,7 +77,17 @@ describe("email templates", () => {
 
   it("warns staff when attendance exceeds capacity", async () => {
     expect((await renderEmail("admin_new_request", data)).html).toContain("Over the room");
+    expect((await renderEmail("admin_reservation_created", data)).html).toContain("Over the room");
     expect((await renderEmail("admin_new_request", { ...data, estimatedAttendance: 8 })).html).not.toContain("Over the room");
+  });
+
+  it("describes requester and staff cancellations accurately to administrators", async () => {
+    expect((await renderEmail("admin_reservation_cancelled", { ...data, cancelledByRequester: true })).text).toContain(
+      "Jane Doe cancelled their reservation",
+    );
+    expect((await renderEmail("admin_reservation_cancelled", data)).text).toContain(
+      "The church office cancelled Jane Doe's reservation",
+    );
   });
 
   it("shows the staff message on declines and staff cancellations only", async () => {

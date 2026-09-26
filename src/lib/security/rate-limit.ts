@@ -15,6 +15,8 @@ export type RateLimitRule = { bucket: string; limit: number; windowSeconds: numb
 export const RATE_LIMITS = {
   reservationPerIp: { bucket: "reserve:ip", limit: 10, windowSeconds: 60 * 60 },
   reservationPerEmail: { bucket: "reserve:email", limit: 8, windowSeconds: 24 * 60 * 60 },
+  recurringRequestPerIp: { bucket: "recurring:ip", limit: 5, windowSeconds: 60 * 60 },
+  recurringRequestPerEmail: { bucket: "recurring:email", limit: 3, windowSeconds: 24 * 60 * 60 },
   guestCancelPerIp: { bucket: "cancel:ip", limit: 20, windowSeconds: 60 * 60 },
   guestLookupPerIp: { bucket: "lookup:ip", limit: 60, windowSeconds: 60 * 60 },
   loginPerIp: { bucket: "login:ip", limit: 10, windowSeconds: 10 * 60 },

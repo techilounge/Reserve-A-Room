@@ -50,13 +50,28 @@ export default async function RoomDetailsPage({ params }: PageProps<"/rooms/[slu
       </Link>
 
       <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
-        <RoomImage
-          src={room.imageUrl}
-          name={room.name}
-          priority
-          sizes="(min-width: 1024px) 38rem, 100vw"
-          className="rounded-xl border"
-        />
+        <div className="space-y-3">
+          <RoomImage
+            src={room.imageUrl}
+            name={room.name}
+            priority
+            sizes="(min-width: 1024px) 38rem, 100vw"
+            className="rounded-xl border"
+          />
+          {room.imageUrls.length > 1 ? (
+            <div className="grid grid-cols-3 gap-3" aria-label="More room images">
+              {room.imageUrls.slice(1).map((imageUrl, index) => (
+                <RoomImage
+                  key={imageUrl}
+                  src={imageUrl}
+                  name={`${room.name}, view ${index + 2}`}
+                  sizes="(min-width: 1024px) 12rem, 30vw"
+                  className="rounded-lg border"
+                />
+              ))}
+            </div>
+          ) : null}
+        </div>
         <div className="flex flex-col gap-5">
           <div className="space-y-2">
             <h1 className="text-3xl font-bold">{room.name}</h1>

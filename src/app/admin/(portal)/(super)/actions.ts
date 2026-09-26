@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath, updateTag } from "next/cache";
-import { redirect } from "next/navigation";
 
 import { assertPermission } from "@/lib/auth/guards";
 import { authSetupUrl } from "@/lib/auth/setup-link";
@@ -76,11 +75,10 @@ export async function saveRoomAction(input: unknown): Promise<SuperActionResult>
     return result;
   }
   refreshCatalog(["/admin/rooms", `/rooms/${r.slug}`]);
-  if (!r.id) redirect(`/admin/rooms/${id}?created=1`);
   return { ok: true, message: "Room saved.", id: id ?? undefined };
 }
 
-export async function setRoomImageAction(roomId: string, imagePath: string | null): Promise<SuperActionResult> {
+export async function setRoomImagesAction(roomId: string, imagePaths: string[]): Promise<SuperActionResult> {
   try {
     await assertPermission("rooms.manage");
   } catch (error) {
@@ -88,10 +86,10 @@ export async function setRoomImageAction(roomId: string, imagePath: string | nul
   }
   if (!UUID.test(roomId)) return { ok: false, message: "Room not found." };
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.rpc("set_room_image", { p_id: roomId, p_image_path: imagePath ?? undefined });
+  const { error } = await supabase.rpc("set_room_images", { p_id: roomId, p_image_paths: imagePaths });
   if (error) return fail(error);
   refreshCatalog(["/admin/rooms"]);
-  return { ok: true, message: imagePath ? "Photo updated." : "Photo removed." };
+  return { ok: true, message: imagePaths.length ? "Room images updated." : "Room images removed." };
 }
 
 export async function createAmenityAction(input: unknown): Promise<SuperActionResult> {

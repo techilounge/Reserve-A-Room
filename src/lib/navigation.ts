@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Bell,
   Building2,
+  CalendarClock,
   CalendarDays,
   ClipboardList,
   LayoutDashboard,
@@ -36,6 +37,7 @@ export const ADMIN_NAV: readonly NavGroup[] = [
     items: [
       { href: "/admin", label: "Dashboard", icon: LayoutDashboard, permission: "reservations.viewAll" },
       { href: "/admin/reservations", label: "Reservations", icon: ClipboardList, permission: "reservations.viewAll" },
+      { href: "/admin/recurring-requests", label: "Recurring Requests", icon: CalendarClock, permission: "reservations.viewAll" },
       { href: "/admin/calendar", label: "Calendar", icon: CalendarDays, permission: "calendar.view" },
       { href: "/admin/notifications", label: "Notifications", icon: Bell, permission: "notifications.receive" },
     ],

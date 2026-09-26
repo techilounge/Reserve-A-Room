@@ -483,7 +483,10 @@ it refuses. There is no web route for this.
 Honeypot field, a minimum fill time, Zod payload limits, a 16 KB action body cap, and a
 Postgres-backed rate limit keyed by an HMAC of IP (and separately of email). This works
 across stateless Vercel instances with no extra service and stores no raw IPs.
-Optional Cloudflare Turnstile is enabled only when both Turnstile env vars are set.
+Optional Cloudflare Turnstile is enabled only when both Turnstile env vars are set. Client
+errors retain Cloudflare's code, show a recoverable retry state, and verification remains
+fail-closed. Siteverify responses must match both the `reserve` action and the configured
+application hostname.
 
 ### ADR-15 · Security headers
 Set in `next.config.ts`: CSP (self + Supabase URL for connect/img, Turnstile when enabled,
@@ -715,10 +718,11 @@ browser is redirected to `/reservation/<REF>?submitted=1`.
     hijacking.
   - Also sent: `Cross-Origin-Opener-Policy: same-origin`.
 - **Turnstile:** the widget (`TurnstileWidget`) renders on the review step when both keys are
-  configured. Tokens are single-use, so the widget remounts after each attempt. Before this
-  audit, enabling Turnstile would have rejected every guest submission.
+  configured. Tokens are single-use, so the widget remounts after each attempt. The error
+  callback captures Cloudflare's diagnostic code and offers an explicit retry. Production
+  operations must authorize the exact public hostname and allow the challenge hostnames.
 - **Accessibility** (axe-core, WCAG 2.2 A/AA, light and dark):
-  - Scope: 26 public and admin pages, plus the open states of the mobile menu, date
+  - Scope: 27 public and admin route states, plus the open states of the mobile menu, date
     picker, theme and account menus, approve/decline/cancel dialogs, notifications and
     invite dialog. All pass.
   - Fixed: the room-policy `<dl>` structure; disabled day-step and pagination controls
@@ -783,3 +787,57 @@ authorization check. Shared parsing applies the visible filters, a one-year rang
 1,000-row cap. CSV includes a UTF-8 BOM and neutralizes formula-like cells. The PDF is a
 landscape, paginated brand report with repeated headers and contains no tokens or private
 admin notes.
+
+### ADR-34 · Follow-up discovery, media, and request flows
+
+- Reservation previews, occurrences, and staff reservation lists use year-inclusive compact
+  dates. Calendar-only range labels may remain shorter when their context already establishes
+  the year.
+- `20260926100000_audit_log_date_filters.sql` moves inclusive local-date boundaries into the
+  Audit Log RPC. Text, entity, and date predicates run before `count(*) over()`, limit, and
+  offset; the client only controls URL state and debouncing.
+- `20260926110000_room_image_gallery.sql` adds an ordered, four-path room gallery while
+  preserving `image_path` as the primary compatibility field. A database CHECK/RPC validates
+  count, uniqueness, and room-scoped paths; Storage independently limits JPEG/PNG/WebP files
+  to 2 MB. The browser resizes to at most 1600 px and attempts WebP compression before upload.
+  Public catalog reads retry without `image_paths` only when PostgreSQL reports that exact
+  column as missing, keeping pre-migration local/rolling deployments available without hiding
+  unrelated database failures.
+- `20260926120000_recurring_reservation_requests.sql` stores guest recurrence inquiries apart
+  from reservations. The service-role-only creation RPC writes the request, staff notifications,
+  and guest audit entry atomically. Guests have no table access; active staff have read-only RLS.
+  The public action adds Zod validation, minimum-fill-time/honeypot checks, HMAC-keyed IP/email
+  rate limits, and versioned Privacy/Terms acceptance.
+- Turnstile's script and iframe were observed loading under the production CSP; the reported
+  failure occurs during Cloudflare's challenge. The app now surfaces the callback code so
+  operators can distinguish hostname authorization (`110200`) from blocked iframe/network
+  traffic (`200500`) and transient challenge failures.
+
+### ADR-35 · Staff reservation lifecycle emails
+
+`20260926130000_staff_reservation_email_notifications.sql` completes the staff-facing
+reservation lifecycle. Existing approval-required submissions retain `admin_new_request`,
+while every newly inserted approved reservation queues `admin_reservation_created` through
+an `AFTER INSERT` trigger. Staff-initiated cancellations are queued from the same trigger on
+the one-way status transition; requester cancellations keep their existing transactional
+queue call, preventing duplicate alerts. Recipients are the shared, de-duplicated set of
+active staff who opted into email plus configured extra notification addresses. All messages
+use the branded reservation outbox, staff-only admin links, requester-address reply-to, and
+provider idempotency keys.
+
+### ADR-36 · Consistent confirmations and rolling-schema compatibility
+
+- Destructive yes/no actions use the shared Radix-based `ConfirmationDialog`, which provides
+  branded presentation, alert-dialog semantics, focus management, keyboard dismissal, and a
+  protected pending state. Native browser confirmation prompts are not used.
+- Audit Log search normalizes punctuation into spaces, splits the query into terms, and requires
+  every term to appear somewhere in the combined display label, raw action, actor, entity, id, and JSON metadata
+  text. This lets copied display titles such as `Amenity created · Chairs` match even though their
+  visible label is assembled from multiple database fields. Filtering still precedes counting and
+  pagination. While application code is briefly ahead of this migration, a missing new RPC signature
+  falls back to chunking the older RPC and applying the same display-label-aware filters before local
+  pagination; the compatibility path is not used for authorization or other database failures.
+- The room editor reads the ordered gallery through `admin_room_image_paths`. During the narrow
+  rollout window where application code is ahead of the gallery migration, only a missing-function
+  response (`42883`/`PGRST202`) falls back to the legacy `image_path`; authorization and all other
+  database errors continue to fail closed.

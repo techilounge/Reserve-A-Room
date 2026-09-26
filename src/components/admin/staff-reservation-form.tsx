@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
-import { addMonthsToLocalDate, formatShortDate, formatTime, type LocalDate } from "@/lib/datetime";
+import { addMonthsToLocalDate, formatCompactDate, formatTime, type LocalDate } from "@/lib/datetime";
 import { availableEndTimes, availableStartTimes, type BusyBlock, type DayWindow } from "@/lib/domain/availability";
 import { weekdayOf } from "@/lib/recurrence/dates";
 import type { MonthlyOrdinal } from "@/lib/recurrence/types";
@@ -600,18 +600,18 @@ export function StaffReservationForm({
                         <p className="font-semibold">{previewResult.preview.label}</p>
                         <p className="text-sm text-muted-foreground">
                           {previewResult.preview.occurrences.length} occurrence
-                          {previewResult.preview.occurrences.length === 1 ? "" : "s"} currently inside this room&apos;s booking window through {formatShortDate(previewResult.materializedThrough)}.
+                          {previewResult.preview.occurrences.length === 1 ? "" : "s"} currently inside this room&apos;s booking window through {formatCompactDate(previewResult.materializedThrough)}.
                         </p>
                       </div>
                       <dl className="grid gap-2 rounded-lg bg-muted/50 p-3 text-sm sm:grid-cols-2">
                         <div>
                           <dt className="font-medium text-muted-foreground">Start date</dt>
-                          <dd className="font-semibold">{formatShortDate(previewResult.preview.seriesStartDate)}</dd>
+                          <dd className="font-semibold">{formatCompactDate(previewResult.preview.seriesStartDate)}</dd>
                         </div>
                         <div>
                           <dt className="font-medium text-muted-foreground">End date</dt>
                           <dd className="font-semibold">
-                            {formatShortDate(previewResult.preview.seriesEndDate)}
+                            {formatCompactDate(previewResult.preview.seriesEndDate)}
                             {previewResult.preview.seriesEndIsAutomatic ? " (automatic limit)" : ""}
                           </dd>
                         </div>
@@ -630,7 +630,7 @@ export function StaffReservationForm({
                               <CircleX className="size-4 shrink-0 text-destructive" aria-hidden />
                             )}
                             <span>
-                              {formatShortDate(occurrence.date)} · {occurrence.status === "available" ? "Available" : occurrence.status === "conflict" ? "Conflict" : "Invalid time"}
+                              {formatCompactDate(occurrence.date)} · {occurrence.status === "available" ? "Available" : occurrence.status === "conflict" ? "Conflict" : "Invalid time"}
                             </span>
                           </li>
                         ))}

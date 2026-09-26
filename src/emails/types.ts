@@ -1,6 +1,7 @@
 export const EMAIL_EVENTS = [
   "request_submitted",
   "admin_new_request",
+  "admin_reservation_created",
   "reservation_confirmed",
   "reservation_approved",
   "reservation_declined",
