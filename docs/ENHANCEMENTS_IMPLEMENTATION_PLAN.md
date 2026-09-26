@@ -654,21 +654,22 @@ Rollback principles:
 
 ## 10. Live implementation checkpoint
 
-Current phase: **Phase 13 complete locally — awaiting an authorized production rollout**  
-Last completed task: **Added multi-ordinal monthly schedules, explicit preview boundaries, a database-update-required error, and final integrated QA.**  
-Next exact task: **After explicit rollout authorization, review/commit the local changes, take a Supabase backup, apply the five append-only migrations in order during the coordinated consent-RPC maintenance window, deploy `main`, and complete the manual production smoke checklist.**
+Current phase: **Phase 13 and the authorized production rollout are complete.**
+Last completed task: **Committed and deployed the complete enhancement set, applied all five append-only migrations, and completed non-mutating production smoke checks.**
+Next exact task: **Monitor Vercel/Supabase/Resend during normal use and, when a staff test login is available, complete the remaining authenticated recurrence-create/export and first-login-email smoke checks without changing the deployed schema.**
 
 Current worktree:
 
-- All enhancement implementation, tests, and documentation remain local and uncommitted across 88 changed files.
+- Release commit `a0d92f3` (`Add recurring reservations and admin enhancements`) is on local and remote `main`.
 - New append-only migrations: `20260925100000_recurring_reservations.sql`, `20260925110000_staff_account_lifecycle.sql`, `20260925120000_super_admin_disable_protection.sql`, `20260925130000_reservation_legal_consent.sql`, and `20260925140000_reservation_exports.sql`.
-- Password-link fix commit `13d9042` is already on local and remote `main`.
-- Vercel commit status for `13d9042` was verified as successful through GitHub on 2026-09-25.
-- The new migrations exist only locally and have not been pushed to hosted Supabase. No production data, UI behavior, commits, pushes, or deployments were added for the enhancements.
-- Read-only `npx supabase migration list --linked` confirmed that the five `20260925*` enhancement migrations are not present remotely; this is the cause of the recurring-create error shown against the linked project.
+- `npx supabase db push --linked --skip-vault --yes` applied those five migrations successfully on 2026-09-26, and a follow-up linked migration listing confirmed local/remote alignment through `20260925140000`.
+- Supabase reported WAL-G enabled but no available physical backups and no PITR. Docker-based logical dumping could not run because WSL is not installed. After explicit user authorization, a temporary service-role snapshot of all 11 REST-exposed public relations (89 rows) was written outside the repository before migration; its SHA-256 was `2e9537dc2c4c994b98f818fc7e3d20c3cbf3bde714f879e511b7170810a7b9ef`. The temporary PII snapshot was securely removed from the local temp directory after deployment and smoke checks passed.
+- GitHub/Vercel reported a successful production deployment for `a0d92f3`.
+- Production smoke checks passed: `/`, `/reserve`, `/privacy`, and `/terms` returned 200; unauthenticated admin and CSV/PDF export requests redirected to login; the cron endpoint rejected an unauthenticated request with 401; and production PostgREST metadata exposed the new series tables and consent, recurrence, export, and login RPCs.
+- A headless, non-submitting production browser flow reached `Review & submit`, displayed the required Privacy & Terms checkbox, and verified that both legal links open in a new tab. No test reservation or email was created.
 - Latest verification: `npm run check` passed (typecheck, lint, 26 unit-test files / 176 tests, and 11 database-test files / 137 tests); `npm run build` passed; `npm run test:e2e` passed 85/85; `git diff --check` passed; and a changed-file secret-pattern scan passed after excluding the documented public E2E mock key.
 - Rendered PDF QA covered a three-page landscape export with repeated headers, pagination, and edge-clipping inspection; temporary QA artifacts were removed afterward.
-- No implementation blockers remain. Manual production smoke tests and the coordinated rollout remain intentionally unperformed pending authorization.
+- No implementation blockers remain. Authenticated production recurrence-create/export and first-login-email delivery were not exercised because no production staff credentials were used during this rollout.
 
 When handing off, replace this checkpoint with:
 
