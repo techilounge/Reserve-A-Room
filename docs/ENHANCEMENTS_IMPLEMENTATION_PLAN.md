@@ -1,8 +1,8 @@
 # Reserve-A-Room enhancements implementation plan
 
 Last updated: 2026-09-26
-Plan status: **Phase 14 local implementation and integrated QA complete**
-Implementation status: **Phases 0–13 are deployed; Phase 14 is local-only, uncommitted, and awaiting rollout authorization**
+Plan status: **Phases 0–16 complete and deployed**
+Implementation status: **Production migrations and application rollout completed on 2026-09-26**
 
 This is the execution and handoff document for the enhancements requested after the initial production launch. It is intentionally specific enough for a new agent to continue without reconstructing the architecture or making silent product decisions.
 
@@ -715,9 +715,9 @@ Rollback principles:
 
 ## 10. Live implementation checkpoint
 
-Current phase: **Phase 16 local implementation and complete regression verification are complete; production rollout still awaits explicit authorization.**
-Last completed task: **Replaced the final native confirmation prompt, made copied Audit Log titles searchable across their underlying fields, and restored room editing against a pre-gallery-migration database.**
-Next exact task: **After explicit rollout authorization, take the operator's normal database checkpoint, commit the reviewed changes, apply the four `20260926` migrations, push `main`, deploy the matching revision, and run the production smoke checklist.**
+Current phase: **Phase 16 and its production rollout are complete.**
+Last completed task: **Applied the four `20260926` migrations, deployed commit `43dccd1`, and completed production smoke checks.**
+Next exact task: **Monitor normal production use and investigate only if Supabase, Vercel, Resend, image-upload, recurring-request, or staff-notification telemetry reports a failure.**
 
 Current worktree:
 
@@ -730,10 +730,9 @@ Current worktree:
 - A headless, non-submitting production browser flow reached `Review & submit`, displayed the required Privacy & Terms checkbox, and verified that both legal links open in a new tab. No test reservation or email was created.
 - Latest verification: `npm run check` passed (typecheck, lint, 26 unit-test files / 176 tests, and 11 database-test files / 137 tests); `npm run build` passed; `npm run test:e2e` passed 85/85; `git diff --check` passed; and a changed-file secret-pattern scan passed after excluding the documented public E2E mock key.
 - Rendered PDF QA covered a three-page landscape export with repeated headers, pagination, and edge-clipping inspection; temporary QA artifacts were removed afterward.
-- Phase 14 adds `20260926100000_audit_log_date_filters.sql`, `20260926110000_room_image_gallery.sql`, and `20260926120000_recurring_reservation_requests.sql`. They are append-only and remain unapplied to the hosted project.
-- Phase 15 adds append-only migration `20260926130000_staff_reservation_email_notifications.sql`; it remains unapplied to the hosted project.
+- Phase 14 adds `20260926100000_audit_log_date_filters.sql`, `20260926110000_room_image_gallery.sql`, and `20260926120000_recurring_reservation_requests.sql`; Phase 15 adds `20260926130000_staff_reservation_email_notifications.sql`. All four append-only migrations are applied to the hosted project and recorded in `supabase_migrations.schema_migrations`.
 - Phase 14 adds year-inclusive reservation dates; result-set-wide Audit Log discovery; ordered four-image room galleries with browser compression and storage/database enforcement; a focused, legally consented guest recurring-request workflow with staff notifications/review; `/reserve` discovery links; and actionable Turnstile failure/retry states.
-- The Turnstile script and iframe load under the production CSP, while the challenge request fails downstream at Cloudflare. The application now exposes the callback code; production operations still need to confirm the exact hostname is authorized and that all documented Cloudflare challenge hostnames are allowed by network controls.
+- The Turnstile script and iframe load under the production CSP. The user confirmed the exact production hostname and matching Vercel keys, then successfully completed and cancelled a reservation. The application continues to expose actionable callback codes and retry behavior for future Cloudflare failures.
 - A narrow public-catalog compatibility fallback retries the room query without `image_paths` only for PostgreSQL missing-column error `42703`. This restored the local homepage against the intentionally pre-migration database while preserving all other failures.
 - Latest Phase 14 verification: `npm run check` passed (typecheck, lint, 28 unit-test files / 182 tests, and 11 database-test files / 140 tests); `npm run build` passed; `npm run test:e2e` passed 92/92, including the expanded 27-route-state accessibility/responsive matrix; `git diff --check` passed; and the secret-pattern scan found no matches. The build logged the expected linked-database warning that `rooms.image_paths` does not exist because the Phase 14 migration intentionally remains unapplied.
 - After the compatibility fix, `npm run typecheck` and `npm run lint` passed, and a live request to `http://localhost:3000` returned HTTP 200 with the room catalog rendered.
@@ -741,7 +740,10 @@ Current worktree:
 - Phase 16 adds a shared branded `ConfirmationDialog`, tokenized Audit Log search across display-title source fields, and a narrow `admin_room_image_paths` missing-RPC fallback to the room's legacy `image_path` during rolling/pre-migration operation.
 - Phase 16 focused verification: typecheck and lint passed; the focused Super Admin database file passed 21/21; confirmation and exact copied-title Playwright checks passed 2/2; and the room-detail light/dark accessibility checks passed 2/2.
 - Final Phase 16 verification: typecheck and lint passed; 28 unit-test files / 185 tests passed; 11 database-test files / 141 tests passed; the production build passed; the complete Playwright suite passed 92/92; and `git diff --check` passed (with pre-existing line-ending notices only).
-- Phase 14–15 changes are local-only; no new migration has been applied and no commit, push, or deployment is authorized yet. Authenticated production recurrence-create/export and first-login-email delivery were not exercised because no production staff credentials were used during the previous rollout.
+- Rollout commit `43dccd1` (`Add reservation operations and admin reliability`) is on local and remote `main`; Vercel reported a successful production deployment.
+- Direct Supabase CLI migration transport was unavailable because outbound PostgreSQL ports 5432/6543 were blocked. The four reviewed migration files were therefore applied in separate transactions through the authenticated Supabase SQL editor, recorded in the migration ledger, and verified with read-only schema checks.
+- Production smoke checks returned HTTP 200 for `/`, `/reserve`, `/recurring-request`, `/privacy`, `/terms`, and `/availability`. No synthetic production reservation, cancellation, email, image upload, or recurring request was created during rollout.
+- Authenticated production recurrence-create/export, room-image upload, recurring-request handling, and staff lifecycle email delivery remain operational checks to observe during normal staff use.
 
 When handing off, replace this checkpoint with:
 
