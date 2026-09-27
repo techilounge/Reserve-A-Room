@@ -1,8 +1,8 @@
 # Reserve-A-Room enhancements implementation plan
 
-Last updated: 2026-09-26
-Plan status: **Phases 0–16 complete and deployed**
-Implementation status: **Production migrations and application rollout completed on 2026-09-26**
+Last updated: 2026-09-27
+Plan status: **Phases 0–17 complete and deployed; Phase 18 complete locally**
+Implementation status: **The recurring-reservations guide is implemented and verified locally; no migration is required**
 
 This is the execution and handoff document for the enhancements requested after the initial production launch. It is intentionally specific enough for a new agent to continue without reconstructing the architecture or making silent product decisions.
 
@@ -42,6 +42,7 @@ Before implementing any phase:
 16. The `/reserve` introduction links directly to the public Availability page.
 17. Turnstile failures expose a useful retry/error state while verification remains mandatory; the production hostname and network prerequisites are documented for operators.
 18. Opted-in Admins and Super Admins receive branded email notifications for every new reservation and every requester- or staff-initiated cancellation.
+19. Admins and Super Admins have an intuitive in-app how-to guide for every supported recurring-reservation scenario, linked from the admin sidebar and mobile menu.
 
 ## 3. Product decisions and acceptance rules
 
@@ -617,6 +618,15 @@ Change `src/components/reserve/schedule-step.tsx` using token-based classes. Add
 - [x] Cover pointer and keyboard selection in Playwright using the local Supabase image mock.
 - [x] Keep private-IP image optimization limited to an explicitly configured local test origin.
 
+### Phase 18 — Recurring reservations how-to guide
+
+- [x] Review the implemented recurrence union and document every supported practical scenario.
+- [x] Add a staff-only guide with a four-step workflow, quick scenario chooser, exact field settings, examples, edge cases, and post-creation guidance.
+- [x] Add the guide to the permission-filtered desktop sidebar and mobile More menu for both Admins and Super Admins.
+- [x] Link directly to the recurrence section of New reservation without adding another client-side component.
+- [x] Add navigation, role, content, light/dark accessibility, and responsive browser coverage.
+- [x] Run all local quality gates and record the exact results.
+
 ## 7. Test matrix and acceptance criteria
 
 ### Unit tests
@@ -661,6 +671,7 @@ Change `src/components/reserve/schedule-step.tsx` using token-based classes. Add
 - Public reservation submission is blocked client- and server-side until both documents are accepted.
 - Filtered CSV/PDF exports require staff authorization and return safe downloadable content.
 - Axe WCAG 2.2 AA and responsive suite remain green.
+- Both staff roles can open the Recurring Guide from their available navigation, review all eight scenarios, and jump directly to the recurrence form.
 
 ### Manual smoke tests
 
@@ -722,9 +733,9 @@ Rollback principles:
 
 ## 10. Live implementation checkpoint
 
-Current phase: **Phase 17 and its production rollout are complete.**
-Last completed task: **Deployed interactive public room galleries in commit `f1a35d2` and verified thumbnail switching on the live Main Sanctuary page.**
-Next exact task: **Monitor normal production use and investigate only if room-image or gallery telemetry reports a failure.**
+Current phase: **Phase 18 is complete locally and awaits commit/deployment authorization.**
+Last completed task: **Implemented and fully verified the Admin/Super Admin recurring-reservations how-to guide and navigation.**
+Next exact task: **Review the final diff, then commit, push, and verify the Vercel deployment when authorized.**
 
 Current worktree:
 
@@ -754,6 +765,8 @@ Current worktree:
 - Phase 17 adds a narrow client-side room gallery: every uploaded image is a selectable native button, the large image updates without navigation, the active thumbnail has visible and `aria-pressed` state, and keyboard selection is covered by Playwright. No schema change or migration is required.
 - Phase 17 verification: typecheck and lint passed; 28 unit-test files / 185 tests passed; 11 database-test files / 141 tests passed; the production build passed; the focused room-gallery Playwright test passed 1/1; and the complete Playwright suite passed 93/93.
 - Phase 17 was committed as `f1a35d2` (`Make room galleries interactive`), pushed to `origin/main`, and deployed successfully by Vercel. A production HTTP smoke check returned 200 with the gallery markup, and a live headless-browser check selected the second of two Main Sanctuary thumbnails and observed the large preview update to image 2 of 2.
+- Phase 18 adds `/admin/recurring-guide`, eight exact-control recurrence scenarios, start/end/conflict/materialization guidance, a sidebar/mobile-menu entry for both staff roles, and a direct `#recurrence` form handoff. No migration or database change is required.
+- Phase 18 verification: typecheck and lint passed; 28 unit-test files / 185 tests passed; 11 database-test files / 141 tests passed; the production build passed; focused guide navigation tests passed 2/2; focused light/dark accessibility and responsive checks passed 2/2; and the complete Playwright suite passed 97/97.
 
 When handing off, replace this checkpoint with:
 

@@ -10,6 +10,7 @@ describe("navigationFor", () => {
   it("shows admins only the Manage section", () => {
     const actor: Actor = { kind: "staff", role: "admin", active: true };
     expect(navigationFor(actor).map((g) => g.label)).toEqual(["Manage"]);
+    expect(hrefs(actor)).toContain("/admin/recurring-guide");
     expect(hrefs(actor)).not.toContain("/admin/rooms");
     expect(hrefs(actor)).not.toContain("/admin/audit");
   });
@@ -17,6 +18,7 @@ describe("navigationFor", () => {
   it("shows super admins every section", () => {
     const actor: Actor = { kind: "staff", role: "super_admin", active: true };
     expect(navigationFor(actor).map((g) => g.label)).toEqual(["Manage", "Super Admin"]);
+    expect(hrefs(actor)).toContain("/admin/recurring-guide");
     expect(hrefs(actor)).toContain("/admin/users");
   });
 

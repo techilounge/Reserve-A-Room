@@ -5,8 +5,8 @@ Room reservations for **Stonehill Seventh-day Adventist Church**
 
 Production: https://reservearoom.stonehillchurch.org
 
-> **Status:** the production application and all migrations through the Phase 16 rollout
-> are live from `main`. Subsequent fixes are validated locally before their own release.
+> **Status:** the production application and all migrations through the Phase 17 rollout
+> are live from `main`. Subsequent enhancements are validated locally before their own release.
 
 ## What it does
 
@@ -21,6 +21,8 @@ Production: https://reservearoom.stonehillchurch.org
 - Admins can create bounded daily, weekday, weekly, monthly, and yearly recurring
   schedules—including combinations such as the second and fourth Saturday—and download
   the filtered reservation list as Excel-compatible CSV or PDF.
+- Admins and Super Admins have an in-app Recurring Guide with step-by-step field settings,
+  examples for every supported schedule, and direct links into the creation form.
 - Public room detail pages present uploaded room photos as a keyboard-accessible gallery;
   selecting a thumbnail updates the large preview and clearly identifies the active image.
 - Guests explicitly accept the published Privacy Policy and Terms of Service; the
@@ -294,6 +296,10 @@ Guests who need repeating dates use `/recurring-request`; the request is stored 
 from confirmed reservations, appears under **Admin → Recurring Requests**, and notifies
 active staff.
 
+Staff can open **Recurring Guide** from the admin sidebar (or the mobile More menu) for
+examples covering daily, weekday, weekly, monthly, and yearly schedules, including complex
+patterns such as the second and fourth Saturdays of each month.
+
 Opted-in active Admins and Super Admins, plus the extra addresses configured in Settings,
 receive a branded email for every new pending or confirmed reservation and every requester-
 or staff-initiated cancellation. These staff messages link to the admin reservation and
@@ -360,7 +366,7 @@ Reserve-A-Room can be installed on phones, tablets and desktops (manifest:
   - Admin vs Super Admin pages;
   - the cron secret.
 - **Quality:**
-  - axe WCAG 2.2 AA on 27 public/admin route states in light and dark mode;
+  - axe WCAG 2.2 AA on 28 public/admin route states in light and dark mode;
   - no horizontal scrolling at 320, 768 and 1920 px;
   - security headers.
 - **PWA:** manifest and icons, the offline fallback, and that nothing private is cached.

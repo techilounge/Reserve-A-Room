@@ -30,6 +30,7 @@ const ADMIN_PAGES = [
   "/admin/calendar",
   "/admin/notifications",
   "/admin/recurring-requests",
+  "/admin/recurring-guide",
   "/admin/rooms",
   `/admin/rooms/${ROOMS.conference.id}`,
   "/admin/rooms/new",

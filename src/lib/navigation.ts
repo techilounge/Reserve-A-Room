@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
+  BookOpenText,
   Building2,
   CalendarClock,
   CalendarDays,
@@ -40,6 +41,7 @@ export const ADMIN_NAV: readonly NavGroup[] = [
       { href: "/admin/recurring-requests", label: "Recurring Requests", icon: CalendarClock, permission: "reservations.viewAll" },
       { href: "/admin/calendar", label: "Calendar", icon: CalendarDays, permission: "calendar.view" },
       { href: "/admin/notifications", label: "Notifications", icon: Bell, permission: "notifications.receive" },
+      { href: "/admin/recurring-guide", label: "Recurring Guide", icon: BookOpenText, permission: "reservations.createApproved" },
     ],
   },
   {

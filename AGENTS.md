@@ -39,7 +39,7 @@ If `docs/ENHANCEMENTS_IMPLEMENTATION_PLAN.md` is missing, recreate it from the s
 
 ## Requested enhancement scope
 
-The user requested the original seven items plus sixteen follow-up expansions below. Treat `docs/ENHANCEMENTS_IMPLEMENTATION_PLAN.md` as the detailed specification and source of implementation status.
+The user requested the original seven items plus eighteen follow-up expansions below. Treat `docs/ENHANCEMENTS_IMPLEMENTATION_PLAN.md` as the detailed specification and source of implementation status.
 
 1. Admins and Super Admins can create recurring room reservations: weekly (for example every Saturday), monthly by ordinal weekday (for example first or second Saturday), and an optional end date.
 2. Add a premium floating bottom navigation bar on mobile, with agent-selected high-value menu items and no regression to desktop navigation.
@@ -65,8 +65,9 @@ The user requested the original seven items plus sixteen follow-up expansions be
 22. Make Audit Log search match copied human-readable entry titles such as `Amenity created · Chairs` across the full result set.
 23. Restore the room edit page when the application runs briefly against a database where the gallery migration is not yet available.
 24. Make every uploaded room image selectable from the public room detail page, with clear active state and keyboard accessibility.
+25. Add an intuitive Admin/Super Admin recurring-reservations how-to guide covering every supported scenario, with sidebar and mobile navigation access.
 
-## Live checkpoint — 2026-09-26
+## Live checkpoint — 2026-09-27
 
 ### Completed and deployed before this enhancement request
 
@@ -133,6 +134,13 @@ Verification completed for that fix before commit:
 - Verification: typecheck and lint passed; 28 unit-test files / 185 tests passed; 11 database-test files / 141 tests passed; the production build passed; the focused room-gallery Playwright test passed 1/1; and the complete Playwright suite passed 93/93.
 - Phase 17 was committed as `f1a35d2` (`Make room galleries interactive`), pushed to `origin/main`, and deployed successfully by Vercel. A production HTTP check returned 200 with the gallery markup, and a live headless-browser check confirmed that selecting the second Main Sanctuary thumbnail updates the large preview and `aria-pressed` state.
 - No migration was required. Next: monitor normal production use and investigate only if room-image or gallery telemetry reports a failure.
+
+### Phase 18 local follow-up status
+
+- `/admin/recurring-guide` documents all eight practical recurrence scenarios using the exact New reservation field labels, examples, edge cases, limits, conflict behavior, and post-creation actions.
+- `Recurring Guide` is permission-filtered for both active staff roles in the desktop sidebar and mobile More sheet. Guide calls to action link to the new `#recurrence` scroll target in the create form.
+- Verification: typecheck and lint passed; 28 unit-test files / 185 tests passed; 11 database-test files / 141 tests passed; the production build passed; focused guide tests passed 2/2; focused light/dark accessibility/responsive tests passed 2/2; and the complete Playwright suite passed 97/97.
+- No migration is required. These Phase 18 changes are local and uncommitted. Next: inspect the final diff, then commit/push/deploy only with user authorization.
 
 ## Required quality gates
 

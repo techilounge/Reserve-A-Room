@@ -342,7 +342,7 @@ export function StaffReservationForm({
           </div>
 
           {mode === "create" ? (
-            <div className="space-y-4 rounded-xl border border-dashed bg-muted/30 p-4">
+            <div id="recurrence" className="scroll-mt-24 space-y-4 rounded-xl border border-dashed bg-muted/30 p-4">
               <div className="flex items-start gap-3">
                 <Repeat2 className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
                 <div>

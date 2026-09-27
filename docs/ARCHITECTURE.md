@@ -113,7 +113,7 @@ is enforced in Postgres, and mirrored in TypeScript only to give good feedback e
 │  │  │  └─ (portal)/              ← authenticated layout, role guard, bell, nav
 │  │  │     ├─ page.tsx            ← dashboard
 │  │  │     ├─ reservations/  reservations/new/  reservations/[id]/  reservation-series/[id]/
-│  │  │     ├─ calendar/  notifications/
+│  │  │     ├─ calendar/  notifications/  recurring-guide/
 │  │  │     └─ (super)/            ← Super Admin guard
 │  │  │        ├─ rooms/  rooms/new/  rooms/[id]/
 │  │  │        ├─ ministries/  users/  settings/  audit/
@@ -722,7 +722,7 @@ browser is redirected to `/reservation/<REF>?submitted=1`.
   callback captures Cloudflare's diagnostic code and offers an explicit retry. Production
   operations must authorize the exact public hostname and allow the challenge hostnames.
 - **Accessibility** (axe-core, WCAG 2.2 A/AA, light and dark):
-  - Scope: 27 public and admin route states, plus the open states of the mobile menu, date
+  - Scope: 28 public and admin route states, plus the open states of the mobile menu, date
     picker, theme and account menus, approve/decline/cancel dialogs, notifications and
     invite dialog. All pass.
   - Fixed: the room-policy `<dl>` structure; disabled day-step and pagination controls
@@ -854,3 +854,18 @@ provider idempotency keys.
   production. Private-IP optimization is enabled only when the configured Supabase origin
   is explicitly `localhost` or `127.0.0.1`, which lets the E2E mock exercise real image
   switching without broadening production image access.
+
+### ADR-38 · Recurrence guidance is staff-only, static, and tied to the live controls
+
+- `/admin/recurring-guide` lives inside the authenticated portal, so both active Admins and
+  Super Admins can use it while guests retain no access. The same permission-filtered
+  navigation data exposes it in the desktop sidebar and mobile More sheet.
+- The page is a Server Component with no data access or client state. Its eight scenarios map
+  directly to the recurrence discriminated union and the labels on the New reservation form:
+  every day, every-X-days, weekdays, weekly, monthly date, monthly ordinal weekday(s), yearly
+  date, and yearly ordinal weekday.
+- Each scenario includes concrete field settings, examples, and edge behavior. Shared guidance
+  explains inclusive boundaries, the one-year/50-occurrence cap, room booking windows, atomic
+  initial conflicts, future exceptions, DST wall-clock preservation, and individual-versus-series
+  management. Calls to action link to `/admin/reservations/new#recurrence`; the form supplies a
+  scroll target without introducing another client boundary.
