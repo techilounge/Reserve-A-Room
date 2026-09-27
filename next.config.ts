@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV === "development";
+const configuredRoomImagePattern = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? new URL("/storage/v1/object/public/room-images/**", process.env.NEXT_PUBLIC_SUPABASE_URL)
+  : null;
+const configuredRoomImagesUseLocalhost =
+  configuredRoomImagePattern?.hostname === "localhost" || configuredRoomImagePattern?.hostname === "127.0.0.1";
 
 /**
  * Content-Security-Policy (ADR-29). Next.js streams inline bootstrap scripts, and
@@ -65,8 +70,11 @@ const nextConfig: NextConfig = {
   },
   images: {
     // Room photos live in the public `room-images` Supabase Storage bucket.
+    // Only the local E2E Supabase mock needs private-IP image optimization.
+    dangerouslyAllowLocalIP: configuredRoomImagesUseLocalhost,
     remotePatterns: [
       { protocol: "https", hostname: "*.supabase.co", pathname: "/storage/v1/object/public/room-images/**" },
+      ...(configuredRoomImagePattern ? [configuredRoomImagePattern] : []),
     ],
   },
   async headers() {

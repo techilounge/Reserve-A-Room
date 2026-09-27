@@ -610,6 +610,13 @@ Change `src/components/reserve/schedule-step.tsx` using token-based classes. Add
 - [x] Keep room details editable during a pre-migration rollout by falling back to the legacy primary image only when the gallery RPC is specifically unavailable.
 - [x] Run the complete local quality gates and record the final totals.
 
+### Phase 17 — Interactive public room gallery
+
+- [x] Replace static secondary room images with thumbnail controls that update the large preview.
+- [x] Preserve access to the primary image and expose selected state to sighted and assistive-technology users.
+- [x] Cover pointer and keyboard selection in Playwright using the local Supabase image mock.
+- [x] Keep private-IP image optimization limited to an explicitly configured local test origin.
+
 ## 7. Test matrix and acceptance criteria
 
 ### Unit tests
@@ -715,9 +722,9 @@ Rollback principles:
 
 ## 10. Live implementation checkpoint
 
-Current phase: **Phase 16 and its production rollout are complete.**
-Last completed task: **Applied the four `20260926` migrations, deployed commit `43dccd1`, and completed production smoke checks.**
-Next exact task: **Monitor normal production use and investigate only if Supabase, Vercel, Resend, image-upload, recurring-request, or staff-notification telemetry reports a failure.**
+Current phase: **Phase 17 is complete locally and awaits commit/deployment authorization.**
+Last completed task: **Implemented accessible thumbnail selection for the public room gallery and added focused browser coverage.**
+Next exact task: **Review the final diff, then commit, push, and verify the Vercel deployment when authorized.**
 
 Current worktree:
 
@@ -744,6 +751,8 @@ Current worktree:
 - Direct Supabase CLI migration transport was unavailable because outbound PostgreSQL ports 5432/6543 were blocked. The four reviewed migration files were therefore applied in separate transactions through the authenticated Supabase SQL editor, recorded in the migration ledger, and verified with read-only schema checks.
 - Production smoke checks returned HTTP 200 for `/`, `/reserve`, `/recurring-request`, `/privacy`, `/terms`, and `/availability`. No synthetic production reservation, cancellation, email, image upload, or recurring request was created during rollout.
 - Authenticated production recurrence-create/export, room-image upload, recurring-request handling, and staff lifecycle email delivery remain operational checks to observe during normal staff use.
+- Phase 17 adds a narrow client-side room gallery: every uploaded image is a selectable native button, the large image updates without navigation, the active thumbnail has visible and `aria-pressed` state, and keyboard selection is covered by Playwright. No schema change or migration is required.
+- Phase 17 verification: typecheck and lint passed; 28 unit-test files / 185 tests passed; 11 database-test files / 141 tests passed; the production build passed; the focused room-gallery Playwright test passed 1/1; and the complete Playwright suite passed 93/93.
 
 When handing off, replace this checkpoint with:
 

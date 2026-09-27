@@ -64,6 +64,7 @@ The user requested the original seven items plus sixteen follow-up expansions be
 21. Use a branded, accessible confirmation dialog instead of native browser confirmation prompts across the app.
 22. Make Audit Log search match copied human-readable entry titles such as `Amenity created · Chairs` across the full result set.
 23. Restore the room edit page when the application runs briefly against a database where the gallery migration is not yet available.
+24. Make every uploaded room image selectable from the public room detail page, with clear active state and keyboard accessibility.
 
 ## Live checkpoint — 2026-09-26
 
@@ -124,6 +125,13 @@ Verification completed for that fix before commit:
 - Phase 16 verification: typecheck and lint passed; 28 unit-test files / 185 tests passed; 11 database-test files / 141 tests passed; the production build passed; the custom-confirmation and exact-title Audit Log focused checks passed 2/2; room-detail light/dark accessibility checks passed 2/2; the complete Playwright suite passed 92/92; and `git diff --check` passed (with pre-existing line-ending notices only).
 - Vercel reported `Deployment has completed` for `43dccd1`. Production smoke checks returned HTTP 200 for `/`, `/reserve`, `/recurring-request`, `/privacy`, `/terms`, and `/availability`.
 - Remaining operational follow-up: monitor Supabase, Vercel, Resend, room-image uploads, recurring requests, and staff lifecycle emails during normal production use. No synthetic production reservation or cancellation was created during this rollout.
+
+### Phase 17 local follow-up status
+
+- Public room details now use a focused client-side gallery whose thumbnail buttons update the large preview, retain access to the primary image, expose `aria-pressed` state, and support native keyboard activation.
+- The E2E Supabase mock serves two room images and the focused Playwright test verifies pointer and keyboard selection. Local private-IP image optimization is allowed only when `NEXT_PUBLIC_SUPABASE_URL` explicitly points to `localhost` or `127.0.0.1`; production remains limited to the public Supabase storage path.
+- Verification: typecheck and lint passed; 28 unit-test files / 185 tests passed; 11 database-test files / 141 tests passed; the production build passed; the focused room-gallery Playwright test passed 1/1; and the complete Playwright suite passed 93/93.
+- These Phase 17 changes are local and uncommitted. Next: inspect the final diff, then commit/push/deploy only with user authorization.
 
 ## Required quality gates
 

@@ -21,6 +21,10 @@ import { createRoom, createTestDb, insertReservation, localTime, roomId } from "
 import { TEST_ACCOUNTS, TEST_JWT_SECRET, TEST_PASSWORD, TEST_SERVICE_KEY } from "./accounts.ts";
 
 const PORT = Number(process.env.MOCK_SUPABASE_PORT ?? 54400);
+const ROOM_IMAGE = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
 
 const db = await createTestDb();
 // Stable ids so the app's catalog cache survives mock restarts.
@@ -31,6 +35,10 @@ await db.query("update public.ministries set id = ('00000000-0000-4000-8000-1' |
 let hall = await createRoom(db, { slug: "fellowship-hall", capacity: 120, approval_required: true, max_advance_value: 8, max_advance_unit: "week", food_drinks_allowed: true });
 await db.query("update public.rooms set name='Fellowship Hall', description='Large hall for fellowship meals, programs and events.', location='Main building, lower level', sort_order=20, id='00000000-0000-4000-8000-000000000002' where id=$1", [hall]);
 hall = '00000000-0000-4000-8000-000000000002';
+await db.query(
+  "update public.rooms set image_path=$2, image_paths=array[$2, $3] where id=$1",
+  [hall, `rooms/${hall}/front.png`, `rooms/${hall}/side.png`],
+);
 const classroom = await createRoom(db, { slug: "classroom-a", capacity: 25, approval_required: true, max_advance_value: 6, max_advance_unit: "week", food_drinks_allowed: true });
 await db.query("update public.rooms set id='00000000-0000-4000-8000-000000000003', name='Classroom A', description='Classroom for Bible study, training and small classes.', sort_order=30, reservable=false, unavailable_message='Closed for carpet cleaning this week.' where id=$1", [classroom]);
 const conf = await roomId(db, "conference-room");
@@ -123,6 +131,10 @@ const server = http.createServer(async (req, res) => {
   };
   try {
     if (url.pathname === "/health") return send(200, { ok: true });
+    if (req.method === "GET" && url.pathname.startsWith("/storage/v1/object/public/room-images/")) {
+      res.writeHead(200, { "content-type": "image/png", "cache-control": "public, max-age=3600" });
+      return res.end(ROOM_IMAGE);
+    }
     // --- Test helper: a ready-made @supabase/ssr session cookie for a test account ---
     if (url.pathname === "/qa/cookie") {
       const user = staff.get(url.searchParams.get("email") ?? "");

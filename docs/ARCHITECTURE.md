@@ -841,3 +841,16 @@ provider idempotency keys.
   rollout window where application code is ahead of the gallery migration, only a missing-function
   response (`42883`/`PGRST202`) falls back to the legacy `image_path`; authorization and all other
   database errors continue to fail closed.
+
+### ADR-37 · Room detail galleries are interactive and progressively bounded
+
+- Public room detail pages keep data loading and page composition on the server, while a
+  narrow `RoomGallery` client component owns only the selected-image index.
+- When a room has multiple images, every image—including the primary one—is exposed as a
+  native thumbnail button. Pointer activation, Enter/Space keyboard activation,
+  `aria-pressed`, a visible gold selected ring, and a polite status announcement all track
+  the large preview. A single-image room retains the original static presentation.
+- The image optimizer continues to allow only the public Supabase room-image path in
+  production. Private-IP optimization is enabled only when the configured Supabase origin
+  is explicitly `localhost` or `127.0.0.1`, which lets the E2E mock exercise real image
+  switching without broadening production image access.

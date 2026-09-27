@@ -5,9 +5,8 @@ Room reservations for **Stonehill Seventh-day Adventist Church**
 
 Production: https://reservearoom.stonehillchurch.org
 
-> **Status:** the production baseline is live from `main`. Recurrence, lifecycle,
-> navigation, legal-consent, and export enhancements are implemented locally and remain
-> pending the migration/deployment checklist below.
+> **Status:** the production application and all migrations through the Phase 16 rollout
+> are live from `main`. Subsequent fixes are validated locally before their own release.
 
 ## What it does
 
@@ -22,6 +21,8 @@ Production: https://reservearoom.stonehillchurch.org
 - Admins can create bounded daily, weekday, weekly, monthly, and yearly recurring
   schedules—including combinations such as the second and fourth Saturday—and download
   the filtered reservation list as Excel-compatible CSV or PDF.
+- Public room detail pages present uploaded room photos as a keyboard-accessible gallery;
+  selecting a thumbnail updates the large preview and clearly identifies the active image.
 - Guests explicitly accept the published Privacy Policy and Terms of Service; the
   accepted document versions and timestamps are retained with the reservation.
 - Mobile users receive context-aware floating navigation without changing the desktop
