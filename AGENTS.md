@@ -131,7 +131,8 @@ Verification completed for that fix before commit:
 - Public room details now use a focused client-side gallery whose thumbnail buttons update the large preview, retain access to the primary image, expose `aria-pressed` state, and support native keyboard activation.
 - The E2E Supabase mock serves two room images and the focused Playwright test verifies pointer and keyboard selection. Local private-IP image optimization is allowed only when `NEXT_PUBLIC_SUPABASE_URL` explicitly points to `localhost` or `127.0.0.1`; production remains limited to the public Supabase storage path.
 - Verification: typecheck and lint passed; 28 unit-test files / 185 tests passed; 11 database-test files / 141 tests passed; the production build passed; the focused room-gallery Playwright test passed 1/1; and the complete Playwright suite passed 93/93.
-- These Phase 17 changes are local and uncommitted. Next: inspect the final diff, then commit/push/deploy only with user authorization.
+- Phase 17 was committed as `f1a35d2` (`Make room galleries interactive`), pushed to `origin/main`, and deployed successfully by Vercel. A production HTTP check returned 200 with the gallery markup, and a live headless-browser check confirmed that selecting the second Main Sanctuary thumbnail updates the large preview and `aria-pressed` state.
+- No migration was required. Next: monitor normal production use and investigate only if room-image or gallery telemetry reports a failure.
 
 ## Required quality gates
 

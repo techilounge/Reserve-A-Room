@@ -722,9 +722,9 @@ Rollback principles:
 
 ## 10. Live implementation checkpoint
 
-Current phase: **Phase 17 is complete locally and awaits commit/deployment authorization.**
-Last completed task: **Implemented accessible thumbnail selection for the public room gallery and added focused browser coverage.**
-Next exact task: **Review the final diff, then commit, push, and verify the Vercel deployment when authorized.**
+Current phase: **Phase 17 and its production rollout are complete.**
+Last completed task: **Deployed interactive public room galleries in commit `f1a35d2` and verified thumbnail switching on the live Main Sanctuary page.**
+Next exact task: **Monitor normal production use and investigate only if room-image or gallery telemetry reports a failure.**
 
 Current worktree:
 
@@ -753,6 +753,7 @@ Current worktree:
 - Authenticated production recurrence-create/export, room-image upload, recurring-request handling, and staff lifecycle email delivery remain operational checks to observe during normal staff use.
 - Phase 17 adds a narrow client-side room gallery: every uploaded image is a selectable native button, the large image updates without navigation, the active thumbnail has visible and `aria-pressed` state, and keyboard selection is covered by Playwright. No schema change or migration is required.
 - Phase 17 verification: typecheck and lint passed; 28 unit-test files / 185 tests passed; 11 database-test files / 141 tests passed; the production build passed; the focused room-gallery Playwright test passed 1/1; and the complete Playwright suite passed 93/93.
+- Phase 17 was committed as `f1a35d2` (`Make room galleries interactive`), pushed to `origin/main`, and deployed successfully by Vercel. A production HTTP smoke check returned 200 with the gallery markup, and a live headless-browser check selected the second of two Main Sanctuary thumbnails and observed the large preview update to image 2 of 2.
 
 When handing off, replace this checkpoint with:
 
