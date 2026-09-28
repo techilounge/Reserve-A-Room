@@ -5,7 +5,7 @@ Room reservations for **Stonehill Seventh-day Adventist Church**
 
 Production: https://reservearoom.stonehillchurch.org
 
-> **Status:** the production application and all migrations through the Phase 17 rollout
+> **Status:** the production application and all migrations through the Phase 18 rollout
 > are live from `main`. Subsequent enhancements are validated locally before their own release.
 
 ## What it does
@@ -142,7 +142,8 @@ Project: `atnwrwrehexnwgqqnyek` (region us-west-2).
 4. **Authentication email:** no Supabase SMTP or template customization is required.
    The app asks Supabase to generate/verify one-time invitation and recovery tokens, then
    renders and sends the branded messages directly through Resend. Supabase does not send
-   those messages.
+   those messages. Super Admins can resend an unaccepted invitation from **Users & Roles**;
+   the replacement uses the same branded template and a fresh secure setup link.
 
 ## Database migrations
 
@@ -294,7 +295,10 @@ The Audit Log searches the complete history before pagination and supports live 
 filters plus Today, Last 7 days, Last 30 days, This month and custom local-date ranges.
 Guests who need repeating dates use `/recurring-request`; the request is stored separately
 from confirmed reservations, appears under **Admin → Recurring Requests**, and notifies
-active staff.
+active staff. The requester also receives a branded acknowledgement with their reference,
+requested room/date/time/schedule, and a clear reminder that the dates are not confirmed yet.
+Start/end times use the same configured interval dropdowns as the one-time reservation flow,
+and a rejected submission retains the guest's completed fields for correction.
 
 Staff can open **Recurring Guide** from the admin sidebar (or the mobile More menu) for
 examples covering daily, weekday, weekly, monthly, and yearly schedules, including complex
@@ -307,8 +311,8 @@ never contain the requester's private management token.
 
 Other Super Admin areas:
 - **Ministries:** add, rename, reorder, deactivate.
-- **Users & Roles:** invite, set Admin or Super Admin, disable or re-enable. The last
-  active Super Admin can't be demoted or disabled.
+- **Users & Roles:** invite, resend a pending invitation, set Admin or Super Admin, disable
+  or re-enable. The last active Super Admin can't be demoted or disabled.
 - **Settings:** timezone, bookable hours, time increments, minimum notice, default
   advance limit, guest cancellation, and extra notification emails.
 ## PWA behavior
@@ -467,5 +471,5 @@ relevant dashboard.
 | A time slot can't be chosen although it looks free | It's too soon (minimum notice), outside bookable hours, or beyond the room's advance limit. Check Settings and the room's rules. |
 | "That room was just reserved…" | Someone else took the time a moment earlier. Pick another time. The database never allows two reservations to overlap. |
 | The installed app shows an old version | Close and reopen it. Each deployment installs a fresh service worker on the next visit. |
-| Turnstile says “Unable to connect” | The application CSP already allows Cloudflare. Use the displayed error code: `110200` means add `reservearoom.stonehillchurch.org` in Turnstile Hostname Management; `200500` means a browser extension or network blocked the iframe. Try a private window/another network and allow the three Cloudflare challenge hostnames listed above. |
+| Turnstile says “Unable to connect” | The application CSP already allows Cloudflare. Use the displayed error code: `110200` means the widget's hostname list does not exactly match `reservearoom.stonehillchurch.org` (including the `.org` TLD); `200500` means a browser extension or network blocked the iframe. Try a private window/another network and allow the three Cloudflare challenge hostnames listed above. |
 | `npm run test:e2e` can't find a browser | Run `npx playwright install chromium`, or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE`. |

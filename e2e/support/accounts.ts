@@ -10,6 +10,13 @@ export const TEST_ACCOUNTS = {
   admin: { id: "00000000-0000-4000-9000-000000000002", email: "admin@example.org", role: "admin", name: "Ada Admin" },
 } as const;
 
+export const PENDING_INVITEE = {
+  id: "00000000-0000-4000-9000-000000000003",
+  email: "pending.admin@example.org",
+  role: "admin",
+  name: "Pat Pending",
+} as const;
+
 export const ROOMS = {
   conference: { id: "00000000-0000-4000-8000-000000000001", slug: "conference-room", name: "Conference Room" },
   hall: { id: "00000000-0000-4000-8000-000000000002", slug: "fellowship-hall", name: "Fellowship Hall" },

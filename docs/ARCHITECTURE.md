@@ -808,10 +808,13 @@ admin notes.
   and guest audit entry atomically. Guests have no table access; active staff have read-only RLS.
   The public action adds Zod validation, minimum-fill-time/honeypot checks, HMAC-keyed IP/email
   rate limits, and versioned Privacy/Terms acceptance.
-- Turnstile's script and iframe were observed loading under the production CSP; the reported
-  failure occurs during Cloudflare's challenge. The app now surfaces the callback code so
-  operators can distinguish hostname authorization (`110200`) from blocked iframe/network
-  traffic (`200500`) and transient challenge failures.
+- Turnstile's script and iframe were observed loading under the production CSP. The production
+  `110200` failure was traced to the widget authorizing `reservearoom.stonehillchurch.com`
+  instead of the live `.org` hostname. Hostname Management was corrected to the exact FQDN,
+  and a live review-step smoke test reached Cloudflare's `Success!` state without submitting a
+  reservation. The app surfaces callback codes so operators can distinguish hostname
+  authorization (`110200`) from blocked iframe/network traffic (`200500`) and transient
+  challenge failures.
 
 ### ADR-35 · Staff reservation lifecycle emails
 
@@ -869,3 +872,48 @@ provider idempotency keys.
   initial conflicts, future exceptions, DST wall-clock preservation, and individual-versus-series
   management. Calls to action link to `/admin/reservations/new#recurrence`; the form supplies a
   scroll target without introducing another client boundary.
+
+### ADR-39 · Invitation resends reuse recovery tokens without weakening acceptance tracking
+
+- A profile is eligible to resend only when it is active, has an `invited_by` value, and has
+  no `invitation_accepted_at`. The Users & Roles page merges those profile fields with the
+  existing Super-Admin-only user-list RPC and labels eligible rows as `Invitation pending`.
+- The resend Server Action reasserts `users.manage`, validates the user id, and reloads the
+  profile with the server-only service-role client before generating or sending anything.
+  Accepted, bootstrap, disabled, and missing accounts fail closed even if a request bypasses
+  the UI. A branded confirmation dialog protects the external email side effect.
+- Supabase Auth cannot issue a second `invite` token for an existing Auth user, so resends use
+  a fresh recovery token but retain the invitation email template. Password setup invokes the
+  idempotent `complete_staff_password_setup` RPC for both invite and recovery setup sessions;
+  only a still-pending invited profile can transition to accepted and enqueue the one-time
+  Super Admin notification. Ordinary password resets therefore do not create acceptance events.
+- This enhancement needs no schema migration: the required lifecycle fields and RPC already
+  exist, and the service-role key, generated token, and provider credentials remain server-only.
+
+### ADR-40 · Recurring-request acknowledgements share the durable system-email outbox
+
+- `20260927100000_recurring_requester_confirmation_email.sql` adds an `AFTER INSERT` trigger
+  that queues one `recurring_request_received` system email to the normalized requester address.
+  The queue insert occurs in the same transaction as the request, and the existing unique
+  event/entity/recipient constraint makes it idempotent. Applying the migration does not enqueue
+  messages for historical requests.
+- `system_email_context` now resolves the recurring request and its room without exposing either
+  relation to guests. The public Server Action schedules an immediate post-response delivery
+  attempt, while `/api/cron/email-outbox` retains durable retry coverage after crashes or provider
+  failures.
+- The branded acknowledgement repeats the request reference, room, preferred start/date range,
+  free-form recurrence description, purpose, and attendance. It explicitly says the submission is
+  not a confirmed reservation and that staff will follow up; it does not create or promise dates.
+
+### ADR-41 · Recurring-request drafts use the configured time grid and survive validation
+
+- The recurring-request page derives its time boundaries from the same public settings used by
+  `/reserve`: `bookable_day_start`, `bookable_day_end`, and `booking_interval_minutes`. Start/end
+  controls use the shared native-select presentation and 12-hour labels; end choices remain disabled
+  until a start is selected and contain only later grid boundaries.
+- The Server Action independently verifies that both submitted times are on the configured grid and
+  that the start is not the final boundary. This keeps direct or modified POST requests aligned with
+  the UI while preserving the existing end-after-start schema rule.
+- The client keeps one controlled draft for every visible field. Hydrated submissions prevent the
+  framework's automatic action-form reset and dispatch the same Server Action in a transition; the
+  action also echoes safe submitted values on every error for progressive-enhancement recovery.

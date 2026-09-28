@@ -126,7 +126,10 @@ export async function setPassword(_prev: AuthFormState, form: FormData): Promise
   const cookieStore = await cookies();
   const setupKind = cookieStore.get(PASSWORD_SETUP_KIND_COOKIE)?.value;
   cookieStore.delete(PASSWORD_SETUP_KIND_COOKIE);
-  if (setupKind === "invite") {
+  // A resent invitation uses a recovery token because the Auth user already exists.
+  // The database RPC only accepts a still-pending invited profile, so calling it for
+  // ordinary recovery links is safe and preserves the one-time acceptance lifecycle.
+  if (setupKind === "invite" || setupKind === "recovery") {
     const { data: accepted, error: lifecycleError } = await supabase.rpc("complete_staff_password_setup");
     if (lifecycleError) console.error("[auth] invitation acceptance could not be recorded", lifecycleError.message);
     if (accepted) scheduleSystemEmailDelivery(user.id);

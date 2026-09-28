@@ -7,6 +7,7 @@ import {
   buildSystemEmail,
   isSystemEmailEvent,
   type AdminFirstLoginEmailData,
+  type RecurringRequestEmailData,
   type RecurringSeriesEmailData,
 } from "@/emails/system-templates";
 import { getAppUrl } from "@/lib/app-url";
@@ -56,6 +57,16 @@ type SystemEmailContext = {
     local_start_time: string;
     local_end_time: string;
     requester_first_name: string;
+  } | null;
+  recurring_request: {
+    reference_code: string;
+    preferred_start_date: LocalDate;
+    local_start_time: string;
+    local_end_time: string;
+    recurrence_description: string;
+    requester_first_name: string;
+    purpose: string;
+    estimated_attendance: number;
   } | null;
   room: { name: string } | null;
   user: {
@@ -115,7 +126,7 @@ async function send(supabase: Service, id: string): Promise<{ status: Outcome; p
     contactEmail: ctx.settings.contact_email,
     contactPhone: ctx.settings.contact_phone,
   };
-  let emailData: RecurringSeriesEmailData | AdminFirstLoginEmailData;
+  let emailData: RecurringSeriesEmailData | RecurringRequestEmailData | AdminFirstLoginEmailData;
   if (ctx.event_type === "admin_first_login") {
     if (!ctx.user) return { status: "failed", error: "The administrator email context no longer exists." };
     emailData = {
@@ -128,6 +139,24 @@ async function send(supabase: Service, id: string): Promise<{ status: Outcome; p
         ctx.settings.timezone,
       ),
       usersUrl: `${appUrl}/admin/users`,
+    };
+  } else if (ctx.event_type === "recurring_request_received") {
+    if (!ctx.recurring_request || !ctx.room) {
+      return { status: "failed", error: "The recurring request email context no longer exists." };
+    }
+    emailData = {
+      ...brand,
+      requesterFirstName: ctx.recurring_request.requester_first_name,
+      referenceCode: ctx.recurring_request.reference_code,
+      roomName: ctx.room.name,
+      preferredStartDate: formatLongDate(ctx.recurring_request.preferred_start_date),
+      preferredTime: formatTimeRange(
+        normalizeTime(ctx.recurring_request.local_start_time),
+        normalizeTime(ctx.recurring_request.local_end_time),
+      ),
+      recurrenceDescription: ctx.recurring_request.recurrence_description,
+      purpose: ctx.recurring_request.purpose,
+      estimatedAttendance: ctx.recurring_request.estimated_attendance,
     };
   } else {
     if (!ctx.series || !ctx.room) return { status: "failed", error: "The recurring series email context no longer exists." };

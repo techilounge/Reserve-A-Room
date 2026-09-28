@@ -8,7 +8,8 @@ type Fn = Database["public"]["Functions"];
 export type AdminRoom = Fn["admin_list_rooms"]["Returns"][number];
 export type AdminAmenity = Fn["admin_list_amenities"]["Returns"][number];
 export type AdminMinistry = Fn["admin_list_ministries"]["Returns"][number];
-export type AdminUser = Fn["admin_list_users"]["Returns"][number];
+export type AdminUser = Fn["admin_list_users"]["Returns"][number] &
+  Pick<Tables<"profiles">, "invited_by" | "invitation_accepted_at">;
 export type AuditEntry = Fn["admin_audit_log"]["Returns"][number];
 export type AdminSettings = Fn["get_admin_settings"]["Returns"];
 
@@ -22,7 +23,25 @@ async function rpc<T>(call: (s: Awaited<ReturnType<typeof createSupabaseServerCl
 export const listRooms = () => rpc<AdminRoom[]>((s) => s.rpc("admin_list_rooms"));
 export const listAmenities = () => rpc<AdminAmenity[]>((s) => s.rpc("admin_list_amenities"));
 export const listMinistries = () => rpc<AdminMinistry[]>((s) => s.rpc("admin_list_ministries"));
-export const listUsers = () => rpc<AdminUser[]>((s) => s.rpc("admin_list_users"));
+export async function listUsers(): Promise<AdminUser[]> {
+  const supabase = await createSupabaseServerClient();
+  const [usersResult, invitationResult] = await Promise.all([
+    supabase.rpc("admin_list_users"),
+    supabase.from("profiles").select("id, invited_by, invitation_accepted_at"),
+  ]);
+  if (usersResult.error) throw usersResult.error;
+  if (invitationResult.error) throw invitationResult.error;
+
+  const invitationByUser = new Map(invitationResult.data.map((profile) => [profile.id, profile]));
+  return usersResult.data.map((user) => {
+    const invitation = invitationByUser.get(user.id);
+    return {
+      ...user,
+      invited_by: invitation?.invited_by ?? null,
+      invitation_accepted_at: invitation?.invitation_accepted_at ?? null,
+    };
+  });
+}
 export const getAdminSettings = () => rpc<AdminSettings>((s) => s.rpc("get_admin_settings"));
 
 export async function getRecurringReservationRequests(page: number, pageSize: number) {

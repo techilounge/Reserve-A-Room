@@ -1,8 +1,8 @@
 # Reserve-A-Room enhancements implementation plan
 
 Last updated: 2026-09-27
-Plan status: **Phases 0–17 complete and deployed; Phase 18 complete locally**
-Implementation status: **The recurring-reservations guide is implemented and verified locally; no migration is required**
+Plan status: **Phases 0–18 complete and deployed; Phases 19–21 complete locally with production rollout in progress**
+Implementation status: **Invitation resend, recurring-request requester acknowledgement, and recurring-request form reliability are implemented and verified; the Phase 20 migration is applied**
 
 This is the execution and handoff document for the enhancements requested after the initial production launch. It is intentionally specific enough for a new agent to continue without reconstructing the architecture or making silent product decisions.
 
@@ -43,6 +43,9 @@ Before implementing any phase:
 17. Turnstile failures expose a useful retry/error state while verification remains mandatory; the production hostname and network prerequisites are documented for operators.
 18. Opted-in Admins and Super Admins receive branded email notifications for every new reservation and every requester- or staff-initiated cancellation.
 19. Admins and Super Admins have an intuitive in-app how-to guide for every supported recurring-reservation scenario, linked from the admin sidebar and mobile menu.
+20. Super Admins can identify unaccepted administrator invitations and resend a fresh branded password-setup link safely.
+21. Guests receive a branded acknowledgement after submitting a recurring-date request, with the reference and submitted details plus a clear notice that no reservation is confirmed yet.
+22. The recurring-date request form uses the standard configured time dropdowns and retains all entered values after validation errors.
 
 ## 3. Product decisions and acceptance rules
 
@@ -122,6 +125,8 @@ These decisions remove ambiguity for implementation. Change them only if the use
 - The ordinary `/reserve` wizard remains unchanged except for a compact link to a separate recurring-request page.
 - The request captures contact details, preferred room/date/time, recurrence description, purpose, and attendance. It does not create or promise a reservation.
 - Submission is protected with server validation, a honeypot/minimum-fill-time check, and database-backed rate limiting. Guests receive a reference code and staff receive an in-app notification.
+- Start/end controls use the configured public booking interval and shared native-select presentation. End choices are later than the selected start, and the Server Action rejects off-grid values.
+- Server validation errors preserve the complete guest draft—including room/date/time, description, contact details, notes, and legal acceptance—so the guest corrects only the invalid field.
 - Authenticated staff can view submitted requests; only staff authorization policies/RPCs expose request details.
 
 ### 3.14 Turnstile recovery
@@ -627,6 +632,33 @@ Change `src/components/reserve/schedule-step.tsx` using token-based classes. Add
 - [x] Add navigation, role, content, light/dark accessibility, and responsive browser coverage.
 - [x] Run all local quality gates and record the exact results.
 
+### Phase 19 — Resend pending administrator invitations
+
+- [x] Identify pending invitations from the existing invited/accepted lifecycle fields and show a clear status in Users & Roles.
+- [x] Add a branded confirmation-protected resend action for active, unaccepted invited accounts.
+- [x] Recheck authorization and eligibility on the server before generating a fresh token or sending email.
+- [x] Preserve first-acceptance auditing and notification when the replacement setup link uses an Auth recovery token.
+- [x] Extend the production-style Auth mock and Playwright coverage through the resend Server Action.
+- [x] Run all local quality gates and record the exact results.
+
+### Phase 20 — Recurring-request requester acknowledgement
+
+- [x] Queue one requester acknowledgement transactionally whenever a recurring-date request is inserted.
+- [x] Extend the service-only system-email context and branded templates with the request reference, room, preferred date/time, schedule, purpose, and attendance.
+- [x] State clearly in HTML and plain text that the submission is a request and no dates are confirmed yet.
+- [x] Schedule a post-response delivery attempt while retaining the existing cron retry and idempotency protections.
+- [x] Add template and database coverage for queueing, context resolution, escaping, links, and request-status language.
+- [x] Apply `20260927100000_recurring_requester_confirmation_email.sql` to the hosted project after commit/deployment authorization.
+
+### Phase 21 — Recurring-request time controls and draft preservation
+
+- [x] Replace native clock inputs with the shared styled time dropdowns and configured booking interval grid.
+- [x] Restrict end choices to configured boundaries after the selected start and validate the grid again server-side.
+- [x] Preserve room, date, time, schedule, requester details, notes, and legal acceptance after every validation error.
+- [x] Retain progressive enhancement while preventing the hydrated action form from clearing its controlled draft.
+- [x] Add a browser regression that fails validation, verifies every representative value remains, corrects the missing field, and submits successfully.
+- [x] Run the complete local quality gates and record the exact results.
+
 ## 7. Test matrix and acceptance criteria
 
 ### Unit tests
@@ -672,6 +704,7 @@ Change `src/components/reserve/schedule-step.tsx` using token-based classes. Add
 - Filtered CSV/PDF exports require staff authorization and return safe downloadable content.
 - Axe WCAG 2.2 AA and responsive suite remain green.
 - Both staff roles can open the Recurring Guide from their available navigation, review all eight scenarios, and jump directly to the recurrence form.
+- Super Admins see a pending-invitation status and confirmation-protected resend action only for eligible accounts; server checks reject ineligible requests.
 
 ### Manual smoke tests
 
@@ -733,9 +766,9 @@ Rollback principles:
 
 ## 10. Live implementation checkpoint
 
-Current phase: **Phase 18 is complete locally and awaits commit/deployment authorization.**
-Last completed task: **Implemented and fully verified the Admin/Super Admin recurring-reservations how-to guide and navigation.**
-Next exact task: **Review the final diff, then commit, push, and verify the Vercel deployment when authorized.**
+Current phase: **Phases 19–21 are complete locally; the Phase 20 migration is applied and the authorized application rollout is in progress.**
+Last completed task: **Applied the requester-acknowledgement migration after all local quality gates passed.**
+Next exact task: **Commit and push the combined Phase 19–21 application revision, then verify the Vercel production deployment and public health checks.**
 
 Current worktree:
 
@@ -750,7 +783,7 @@ Current worktree:
 - Rendered PDF QA covered a three-page landscape export with repeated headers, pagination, and edge-clipping inspection; temporary QA artifacts were removed afterward.
 - Phase 14 adds `20260926100000_audit_log_date_filters.sql`, `20260926110000_room_image_gallery.sql`, and `20260926120000_recurring_reservation_requests.sql`; Phase 15 adds `20260926130000_staff_reservation_email_notifications.sql`. All four append-only migrations are applied to the hosted project and recorded in `supabase_migrations.schema_migrations`.
 - Phase 14 adds year-inclusive reservation dates; result-set-wide Audit Log discovery; ordered four-image room galleries with browser compression and storage/database enforcement; a focused, legally consented guest recurring-request workflow with staff notifications/review; `/reserve` discovery links; and actionable Turnstile failure/retry states.
-- The Turnstile script and iframe load under the production CSP. The user confirmed the exact production hostname and matching Vercel keys, then successfully completed and cancelled a reservation. The application continues to expose actionable callback codes and retry behavior for future Cloudflare failures.
+- The Turnstile script and iframe load under the production CSP, and the production site key matches the Cloudflare widget. A later `110200` regression was traced to Hostname Management authorizing `reservearoom.stonehillchurch.com` instead of the live `.org` domain. The widget was corrected to `reservearoom.stonehillchurch.org`, and a live review-step smoke test reached Cloudflare's `Success!` state without submitting a reservation. The application continues to expose actionable callback codes and retry behavior for future Cloudflare failures.
 - A narrow public-catalog compatibility fallback retries the room query without `image_paths` only for PostgreSQL missing-column error `42703`. This restored the local homepage against the intentionally pre-migration database while preserving all other failures.
 - Latest Phase 14 verification: `npm run check` passed (typecheck, lint, 28 unit-test files / 182 tests, and 11 database-test files / 140 tests); `npm run build` passed; `npm run test:e2e` passed 92/92, including the expanded 27-route-state accessibility/responsive matrix; `git diff --check` passed; and the secret-pattern scan found no matches. The build logged the expected linked-database warning that `rooms.image_paths` does not exist because the Phase 14 migration intentionally remains unapplied.
 - After the compatibility fix, `npm run typecheck` and `npm run lint` passed, and a live request to `http://localhost:3000` returned HTTP 200 with the room catalog rendered.
@@ -767,6 +800,13 @@ Current worktree:
 - Phase 17 was committed as `f1a35d2` (`Make room galleries interactive`), pushed to `origin/main`, and deployed successfully by Vercel. A production HTTP smoke check returned 200 with the gallery markup, and a live headless-browser check selected the second of two Main Sanctuary thumbnails and observed the large preview update to image 2 of 2.
 - Phase 18 adds `/admin/recurring-guide`, eight exact-control recurrence scenarios, start/end/conflict/materialization guidance, a sidebar/mobile-menu entry for both staff roles, and a direct `#recurrence` form handoff. No migration or database change is required.
 - Phase 18 verification: typecheck and lint passed; 28 unit-test files / 185 tests passed; 11 database-test files / 141 tests passed; the production build passed; focused guide navigation tests passed 2/2; focused light/dark accessibility and responsive checks passed 2/2; and the complete Playwright suite passed 97/97.
+- Phase 18 was committed as `0687c40` (`Add recurring reservations guide`), pushed to `origin/main`, and deployed successfully by Vercel on 2026-09-27.
+- Phase 19 adds an `Invitation pending` state and confirmation-protected `Resend invite` action to Users & Roles. Eligibility is rechecked server-side; replacement links use the existing branded invitation template and preserve idempotent first-acceptance tracking. No migration or database change is required.
+- Phase 19 verification: typecheck and lint passed; 28 unit-test files / 185 tests passed; 11 database-test files / 141 tests passed; the production build passed; the focused invitation-resend browser test passed 1/1; the focused Admin access file passed 10/10; and the complete Playwright suite passed 98/98.
+- Phase 20 adds append-only migration `20260927100000_recurring_requester_confirmation_email.sql`, which transactionally queues one idempotent requester acknowledgement through `system_email_logs`; the request action schedules immediate background delivery and the existing cron retains retry coverage. The user confirmed the migration was applied to the hosted project on 2026-09-27.
+- Phase 20 verification: typecheck and lint passed; 28 unit-test files / 186 tests passed; 11 database-test files / 141 tests passed; the focused template file passed 3/3; the focused Super Admin database file passed 21/21; the production build passed; the focused recurring-request browser test passed 1/1; and the complete Playwright suite passed 98/98.
+- Phase 21 replaces recurring-request clock inputs with configured native-select time grids, enforces those boundaries server-side, and keeps every field in a controlled draft dispatched without the action form's automatic reset. No migration is required.
+- Phase 21 verification: typecheck and lint passed; 28 unit-test files / 186 tests passed; 11 database-test files / 141 tests passed; the production build passed; the focused recurring-request dropdown/preservation flow passed 1/1; and the complete Playwright suite passed 98/98.
 
 When handing off, replace this checkpoint with:
 

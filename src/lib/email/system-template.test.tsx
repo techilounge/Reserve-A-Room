@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSystemEmail,
   type AdminFirstLoginEmailData,
+  type RecurringRequestEmailData,
   type RecurringSeriesEmailData,
 } from "@/emails/system-templates";
 
@@ -32,6 +33,34 @@ describe("recurring-series summary email", () => {
     expect(html).toContain("https://reservearoom.example.org/availability");
     expect(text).toContain("Saturday, October 10, 2026");
     expect(text).toContain("No end date");
+  });
+});
+
+describe("recurring-request acknowledgement email", () => {
+  it("makes the request status explicit and includes the submitted schedule", async () => {
+    const request: RecurringRequestEmailData = {
+      appUrl: data.appUrl,
+      appName: data.appName,
+      churchName: data.churchName,
+      contactEmail: data.contactEmail,
+      contactPhone: data.contactPhone,
+      requesterFirstName: "Jamie",
+      referenceCode: "RRR-20260927-JTP3",
+      roomName: "Main Sanctuary",
+      preferredStartDate: "Saturday, October 3, 2026",
+      preferredTime: "2:00 PM – 4:00 PM",
+      recurrenceDescription: "Second & fourth <Saturday> of every month",
+      purpose: "Monthly ministry meeting",
+      estimatedAttendance: 20,
+    };
+    const built = buildSystemEmail("recurring_request_received", request);
+    const [html, text] = await Promise.all([render(built.element), render(built.element, { plainText: true })]);
+    expect(built.subject).toContain("RRR-20260927-JTP3");
+    expect(html).toContain("Second &amp; fourth &lt;Saturday&gt;");
+    expect(html).toContain("https://reservearoom.example.org/availability");
+    expect(text).toContain("not a confirmed reservation");
+    expect(text).toContain("Saturday, October 3, 2026");
+    expect(text).toContain("2:00 PM – 4:00 PM");
   });
 });
 

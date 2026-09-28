@@ -199,6 +199,54 @@ export async function inviteUserAction(input: unknown): Promise<SuperActionResul
   return { ok: true, message: `Branded invitation sent to ${email} through Resend.` };
 }
 
+export async function resendInviteAction(userId: string): Promise<SuperActionResult> {
+  try {
+    await assertPermission("users.manage");
+  } catch (error) {
+    return fail(error);
+  }
+  if (!UUID.test(userId)) return { ok: false, message: "Invalid request." };
+
+  const service = createSupabaseServiceClient();
+  const { data: profile, error: profileError } = await service
+    .from("profiles")
+    .select("email, full_name, active, invited_by, invitation_accepted_at")
+    .eq("id", userId)
+    .maybeSingle();
+  if (profileError) return fail(profileError);
+  if (!profile) return { ok: false, message: "Administrator account not found." };
+  if (!profile.invited_by) return { ok: false, message: "This account was not created by an invitation." };
+  if (profile.invitation_accepted_at) return { ok: false, message: "This invitation has already been accepted." };
+  if (!profile.active) return { ok: false, message: "Re-enable this account before resending its invitation." };
+
+  const redirectTo = new URL("/admin/auth/confirm?next=/admin/set-password", getAppUrl()).toString();
+  const { data: link, error: linkError } = await service.auth.admin.generateLink({
+    type: "recovery",
+    email: profile.email,
+    options: { redirectTo },
+  });
+  if (linkError) {
+    console.error("[super-admin] resend invite link generation failed", linkError);
+    return { ok: false, message: "A new invitation link couldn't be created. Please try again." };
+  }
+
+  const delivered = await sendAuthEmail({
+    kind: "invitation",
+    to: profile.email,
+    fullName: profile.full_name,
+    actionUrl: authSetupUrl(link.properties.hashed_token, "recovery"),
+    service,
+  });
+  if (!delivered.ok) {
+    console.error("[super-admin] resent invitation email failed", delivered.error);
+    return {
+      ok: false,
+      message: `A new setup link was created, but the email couldn't be sent to ${profile.email}. Please try again after email delivery is available.`,
+    };
+  }
+  return { ok: true, message: `A new invitation was sent to ${profile.email}.` };
+}
+
 export async function setUserRoleAction(userId: string, role: "admin" | "super_admin"): Promise<SuperActionResult> {
   try {
     await assertPermission("roles.assign");

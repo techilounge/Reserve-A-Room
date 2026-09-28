@@ -18,7 +18,7 @@ import http from "node:http";
 
 import { createRoom, createTestDb, insertReservation, localTime, roomId } from "../../supabase/tests/support/db.ts";
 
-import { TEST_ACCOUNTS, TEST_JWT_SECRET, TEST_PASSWORD, TEST_SERVICE_KEY } from "./accounts.ts";
+import { PENDING_INVITEE, TEST_ACCOUNTS, TEST_JWT_SECRET, TEST_PASSWORD, TEST_SERVICE_KEY } from "./accounts.ts";
 
 const PORT = Number(process.env.MOCK_SUPABASE_PORT ?? 54400);
 const ROOM_IMAGE = Buffer.from(
@@ -67,6 +67,11 @@ await db.query("update public.profiles set invited_by = $1 where id = $2", [
   TEST_ACCOUNTS.superAdmin.id,
   TEST_ACCOUNTS.admin.id,
 ]);
+await db.query("insert into auth.users (id, email) values ($1, $2)", [PENDING_INVITEE.id, PENDING_INVITEE.email]);
+await db.query(
+  "insert into public.profiles (id, email, full_name, role, invited_by) values ($1, $2, $3, $4, $5)",
+  [PENDING_INVITEE.id, PENDING_INVITEE.email, PENDING_INVITEE.name, PENDING_INVITEE.role, TEST_ACCOUNTS.superAdmin.id],
+);
 await db.query(`insert into public.notifications (user_id, type, title, message, reservation_id, created_at)
   select p.id, 'reservation_pending', 'New request: ' || rm.name, r.requester_first_name || ' ' || r.requester_last_name || ' requested ' || rm.name || '.', r.id, now() - interval '25 minutes'
   from public.reservations r join public.rooms rm on rm.id = r.room_id cross join public.profiles p where r.status = 'pending'`);
@@ -188,6 +193,23 @@ const server = http.createServer(async (req, res) => {
       const { rows } = await db.query<{ id: string; email: string }>("select id, email from auth.users");
       return send(200, { users: rows.map(userJson), aud: "authenticated" });
     }
+    if (url.pathname === "/auth/v1/admin/generate_link" && req.method === "POST") {
+      const body = await readBody(req);
+      const email = String(body.email).toLowerCase();
+      const { rows: [user] } = await db.query<{ id: string; email: string }>(
+        "select id, email from auth.users where lower(email) = $1",
+        [email],
+      );
+      if (!user) return send(404, { code: 404, error_code: "user_not_found", msg: "User not found" });
+      return send(200, {
+        action_link: `http://localhost:${PORT}/verify`,
+        email_otp: "123456",
+        hashed_token: "e2e-password-setup-token",
+        redirect_to: body.redirect_to,
+        verification_type: body.type,
+        user: userJson(user),
+      });
+    }
     if (url.pathname.startsWith("/auth/v1/admin/users/") && req.method === "PUT") {
       await readBody(req);
       const id = url.pathname.split("/").pop()!;
@@ -196,6 +218,28 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/auth/v1/logout") { res.writeHead(204); return res.end(); }
     if (url.pathname === "/auth/v1/recover") { await readBody(req); return send(200, {}); }
 
+    if (req.method === "GET" && url.pathname === "/rest/v1/profiles") {
+      const idFilter = url.searchParams.get("id");
+      const id = idFilter?.startsWith("eq.") ? idFilter.slice(3) : null;
+      const rows = (await jsonAs(
+        req,
+        `select coalesce(jsonb_agg(jsonb_build_object(
+          'id', id,
+          'email', email,
+          'full_name', full_name,
+          'active', active,
+          'invited_by', invited_by,
+          'invitation_accepted_at', invitation_accepted_at
+        ) order by full_name), '[]') as j
+        from public.profiles
+        where ($1::uuid is null or id = $1::uuid)`,
+        [id],
+      )) as unknown[];
+      if ((req.headers.accept ?? "").includes("vnd.pgrst.object")) {
+        return rows.length ? send(200, rows[0]) : send(200, null);
+      }
+      return send(200, rows);
+    }
     if (req.method === "GET" && url.pathname === "/rest/v1/app_settings") {
       return send(200, await json("select to_jsonb(s) - 'extra_admin_notification_emails' as j from public.app_settings s"));
     }

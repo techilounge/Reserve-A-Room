@@ -240,6 +240,30 @@ describe("recurring reservation requests", () => {
       )).rows[0],
     );
     expect(result.reference_code).toMatch(/^RRR-/);
+    const emails = await db.query<{
+      id: string;
+      recipient: string;
+      event_type: string;
+      entity_type: string;
+    }>(
+      "select id, recipient, event_type, entity_type from public.system_email_logs where entity_id = $1",
+      [result.id],
+    );
+    expect(emails.rows).toEqual([
+      expect.objectContaining({
+        recipient: "jamie@example.org",
+        event_type: "recurring_request_received",
+        entity_type: "recurring_request",
+      }),
+    ]);
+    const context = await asRole(db, "service_role", async (tx) =>
+      (await tx.query<{ context: { recurring_request: { reference_code: string }; room: { id: string } } }>(
+        "select public.system_email_context($1) as context",
+        [emails.rows[0].id],
+      )).rows[0].context,
+    );
+    expect(context.recurring_request.reference_code).toBe(result.reference_code);
+    expect(context.room.id).toBe(room.id);
     const notices = await db.query<{ n: number }>("select count(*)::int as n from public.notifications where recurring_request_id = $1", [result.id]);
     expect(notices.rows[0].n).toBeGreaterThanOrEqual(2);
     const staffRows = await as(admin, async (tx) => (await tx.query("select reference_code from public.recurring_reservation_requests where id = $1", [result.id])).rows);

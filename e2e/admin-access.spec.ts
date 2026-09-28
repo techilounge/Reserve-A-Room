@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { TEST_ACCOUNTS, TEST_PASSWORD } from "./support/accounts";
+import { PENDING_INVITEE, TEST_ACCOUNTS, TEST_PASSWORD } from "./support/accounts";
 import { newVisitor, signInAs } from "./support/helpers";
 
 test("signed-out visitors are sent to sign in, then back", async ({ browser }) => {
@@ -138,6 +138,36 @@ test("Super Admin accounts must be demoted before the Disable control is availab
   await expect(page.getByText("They will be signed out and won't be able to sign in until a Super Admin re-enables their account.")).toBeVisible();
   await page.getByRole("button", { name: "Keep enabled" }).click();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
+
+  await context.close();
+});
+
+test("Super Admins can confirm resending an unaccepted invitation", async ({ browser }) => {
+  const context = await browser.newContext();
+  await signInAs(context, "superAdmin");
+  const page = await context.newPage();
+  await page.goto("/admin/users");
+
+  const invitee = page.getByRole("listitem").filter({ hasText: PENDING_INVITEE.email });
+  await expect(invitee.getByText("Invitation pending", { exact: true })).toBeVisible();
+  await invitee.getByRole("button", { name: `Resend invite to ${PENDING_INVITEE.name}` }).click();
+  await expect(page.getByRole("alertdialog")).toBeVisible();
+  await expect(page.getByRole("heading", { name: `Resend invitation to ${PENDING_INVITEE.name}?` })).toBeVisible();
+  await expect(
+    page.getByText(
+      `A new secure password setup link will be emailed to ${PENDING_INVITEE.email}. Previously issued links may stop working.`,
+    ),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Keep current invitation" }).click();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+
+  await invitee.getByRole("button", { name: `Resend invite to ${PENDING_INVITEE.name}` }).click();
+  await page.getByRole("button", { name: "Resend invitation" }).click();
+  await expect(
+    page.getByText(`A new setup link was created, but the email couldn't be sent to ${PENDING_INVITEE.email}.`, {
+      exact: false,
+    }),
+  ).toBeVisible();
 
   await context.close();
 });

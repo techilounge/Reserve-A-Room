@@ -1,7 +1,9 @@
 "use server";
 
 import { addDaysToLocalDate, todayInZone } from "@/lib/datetime";
+import { timeGrid } from "@/lib/availability-query";
 import { loadCatalog } from "@/lib/data/catalog";
+import { scheduleSystemEmailDelivery } from "@/lib/email/schedule";
 import { LEGAL_DOCUMENT_VERSIONS } from "@/lib/legal";
 import { hitRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
 import { clientIp } from "@/lib/security/request";
@@ -14,49 +16,94 @@ export type RecurringRequestState = {
   message?: string;
   reference?: string;
   fieldErrors?: Record<string, string>;
+  values?: RecurringRequestFormValues;
+};
+
+export type RecurringRequestFormValues = {
+  roomId: string;
+  preferredStartDate: string;
+  start: string;
+  end: string;
+  recurrenceDescription: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  purpose: string;
+  estimatedAttendance: string;
+  requesterNotes: string;
+  legalAccepted: boolean;
 };
 
 const MIN_FILL_MS = 3000;
+
+function submittedValues(formData: FormData): RecurringRequestFormValues {
+  const text = (name: string) => {
+    const value = formData.get(name);
+    return typeof value === "string" ? value : "";
+  };
+  return {
+    roomId: text("roomId"),
+    preferredStartDate: text("preferredStartDate"),
+    start: text("start"),
+    end: text("end"),
+    recurrenceDescription: text("recurrenceDescription"),
+    firstName: text("firstName"),
+    lastName: text("lastName"),
+    email: text("email"),
+    phone: text("phone"),
+    purpose: text("purpose"),
+    estimatedAttendance: text("estimatedAttendance"),
+    requesterNotes: text("requesterNotes"),
+    legalAccepted: formData.get("legalAccepted") === "on",
+  };
+}
+
+function errorState(
+  message: string,
+  values: RecurringRequestFormValues,
+  errors?: Record<string, string>,
+): RecurringRequestState {
+  return { status: "error", message, fieldErrors: errors, values };
+}
 
 export async function submitRecurringRequest(
   _previous: RecurringRequestState,
   formData: FormData,
 ): Promise<RecurringRequestState> {
+  const values = submittedValues(formData);
   const startedAt = Number(formData.get("startedAt"));
   if (formData.get("website") || !Number.isFinite(startedAt) || Date.now() - startedAt < MIN_FILL_MS) {
-    return { status: "error", message: "We couldn't submit your request. Please review the form and try again." };
+    return errorState("We couldn't submit your request. Please review the form and try again.", values);
   }
 
-  const parsed = recurringRequestSchema.safeParse({
-    roomId: formData.get("roomId"),
-    preferredStartDate: formData.get("preferredStartDate"),
-    start: formData.get("start"),
-    end: formData.get("end"),
-    recurrenceDescription: formData.get("recurrenceDescription"),
-    firstName: formData.get("firstName"),
-    lastName: formData.get("lastName"),
-    email: formData.get("email"),
-    phone: formData.get("phone"),
-    purpose: formData.get("purpose"),
-    estimatedAttendance: formData.get("estimatedAttendance"),
-    requesterNotes: formData.get("requesterNotes"),
-    legalAccepted: formData.get("legalAccepted") === "on",
-  });
+  const parsed = recurringRequestSchema.safeParse(values);
   if (!parsed.success) {
-    return { status: "error", message: "Please check the highlighted fields.", fieldErrors: fieldErrors(parsed.error) };
+    return errorState("Please check the highlighted fields.", values, fieldErrors(parsed.error));
   }
 
   const input = parsed.data;
   const catalog = await loadCatalog();
-  if (!catalog.ok) return { status: "error", message: "Room information is temporarily unavailable. Please try again shortly." };
+  if (!catalog.ok) return errorState("Room information is temporarily unavailable. Please try again shortly.", values);
   const room = catalog.catalog.rooms.find((item) => item.id === input.roomId);
-  if (!room) return { status: "error", message: "Please choose an available room.", fieldErrors: { roomId: "Please choose an available room." } };
+  if (!room) return errorState("Please choose an available room.", values, { roomId: "Please choose an available room." });
+  const grid = timeGrid(
+    catalog.catalog.settings.dayStart,
+    catalog.catalog.settings.dayEnd,
+    catalog.catalog.settings.intervalMinutes,
+  );
+  if (!grid.includes(input.start) || input.start === grid.at(-1)) {
+    return errorState("Please choose a start time from the list.", values, { start: "Please choose a start time from the list." });
+  }
+  if (!grid.includes(input.end)) {
+    return errorState("Please choose an end time from the list.", values, { end: "Please choose an end time from the list." });
+  }
   const today = todayInZone(catalog.catalog.settings.timeZone);
   if (input.preferredStartDate < today) {
-    return { status: "error", message: "Please choose today or a future date.", fieldErrors: { preferredStartDate: "Please choose today or a future date." } };
+    return errorState("Please choose today or a future date.", values, { preferredStartDate: "Please choose today or a future date." });
   }
   if (input.preferredStartDate > addDaysToLocalDate(today, 730)) {
-    return { status: "error", message: "Please choose a start date within the next two years.", fieldErrors: { preferredStartDate: "Choose a date within the next two years." } };
+    return errorState("Please choose a start date within the next two years.", values, { preferredStartDate: "Choose a date within the next two years." });
   }
 
   const ip = await clientIp();
@@ -65,7 +112,7 @@ export async function submitRecurringRequest(
     hitRateLimit(RATE_LIMITS.recurringRequestPerEmail, input.email),
   ]);
   if (!ipAllowed || !emailAllowed) {
-    return { status: "error", message: "Too many requests were submitted. Please wait and try again later." };
+    return errorState("Too many requests were submitted. Please wait and try again later.", values);
   }
 
   const { data, error } = await createSupabaseServiceClient()
@@ -90,8 +137,9 @@ export async function submitRecurringRequest(
     .single();
   if (error || !data) {
     console.error("[recurring-request] create failed", error);
-    return { status: "error", message: "We couldn't submit your request. Please try again or contact the church office." };
+    return errorState("We couldn't submit your request. Please try again or contact the church office.", values);
   }
+  scheduleSystemEmailDelivery(data.id);
   return {
     status: "success",
     reference: data.reference_code,

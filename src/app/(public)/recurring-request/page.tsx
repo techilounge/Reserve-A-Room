@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { CatalogUnavailable } from "@/components/feedback/catalog-unavailable";
 import { PageHeader } from "@/components/layout/page-header";
 import { RecurringRequestForm } from "@/components/reserve/recurring-request-form";
+import { timeGrid } from "@/lib/availability-query";
 import { loadCatalog } from "@/lib/data/catalog";
 import { todayInZone } from "@/lib/datetime";
 
@@ -27,6 +28,11 @@ export default async function RecurringRequestPage() {
         <RecurringRequestForm
           rooms={catalog.catalog.rooms.map(({ id, name }) => ({ id, name }))}
           today={todayInZone(catalog.catalog.settings.timeZone)}
+          timeOptions={timeGrid(
+            catalog.catalog.settings.dayStart,
+            catalog.catalog.settings.dayEnd,
+            catalog.catalog.settings.intervalMinutes,
+          )}
         />
       )}
     </div>

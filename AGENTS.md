@@ -39,7 +39,7 @@ If `docs/ENHANCEMENTS_IMPLEMENTATION_PLAN.md` is missing, recreate it from the s
 
 ## Requested enhancement scope
 
-The user requested the original seven items plus eighteen follow-up expansions below. Treat `docs/ENHANCEMENTS_IMPLEMENTATION_PLAN.md` as the detailed specification and source of implementation status.
+The user requested the original seven items plus twenty-one follow-up expansions below. Treat `docs/ENHANCEMENTS_IMPLEMENTATION_PLAN.md` as the detailed specification and source of implementation status.
 
 1. Admins and Super Admins can create recurring room reservations: weekly (for example every Saturday), monthly by ordinal weekday (for example first or second Saturday), and an optional end date.
 2. Add a premium floating bottom navigation bar on mobile, with agent-selected high-value menu items and no regression to desktop navigation.
@@ -66,6 +66,9 @@ The user requested the original seven items plus eighteen follow-up expansions b
 23. Restore the room edit page when the application runs briefly against a database where the gallery migration is not yet available.
 24. Make every uploaded room image selectable from the public room detail page, with clear active state and keyboard accessibility.
 25. Add an intuitive Admin/Super Admin recurring-reservations how-to guide covering every supported scenario, with sidebar and mobile navigation access.
+26. Let Super Admins safely resend a fresh branded password-setup link for an active administrator whose invitation is still unaccepted.
+27. Send the requester a branded acknowledgement whenever they submit a recurring-date request, while clearly stating that the dates are not yet confirmed.
+28. Use the standard configured time dropdowns in the recurring-date request form and retain every entered value when validation fails.
 
 ## Live checkpoint — 2026-09-27
 
@@ -117,7 +120,7 @@ Verification completed for that fix before commit:
 - New append-only migrations are `20260926100000_audit_log_date_filters.sql`, `20260926110000_room_image_gallery.sql`, and `20260926120000_recurring_reservation_requests.sql`; `database.types.ts` was regenerated.
 - Phase 15 adds append-only migration `20260926130000_staff_reservation_email_notifications.sql`, which completes branded staff emails for confirmed reservations and staff cancellations without duplicating the existing pending-request and requester-cancellation alerts.
 - The application now uses year-inclusive compact dates in recurrence previews and reservation lists; server-side Audit Log search/date filters/pagination; ordered four-image room galleries with JPEG/PNG/WebP validation, a 2 MB limit, and browser compression; a focused public recurring-request flow with legal consent, rate limiting, staff notifications, and staff read-only review; and clean Availability/recurring-request discovery from `/reserve`.
-- Production inspection confirmed the Turnstile script and iframe are allowed and load under the application CSP. The user subsequently confirmed the exact production hostname and matching Vercel keys, and successfully completed and cancelled a reservation; the application retains actionable Cloudflare callback codes and retry behavior for future failures.
+- Production inspection confirmed the Turnstile script and iframe are allowed and load under the application CSP. A later `110200` regression was traced to Cloudflare Hostname Management authorizing `reservearoom.stonehillchurch.com` instead of the live `.org` hostname. The widget was corrected to `reservearoom.stonehillchurch.org`, the production site key remained unchanged, and a live review-step smoke test reached Cloudflare's `Success!` state without submitting a reservation. The application retains actionable callback codes and retry behavior for future failures.
 - A narrow public-catalog compatibility fallback retries without `image_paths` only for PostgreSQL missing-column error `42703`, so the local/pre-migration homepage remains available while unrelated database failures still surface.
 - The four append-only migrations `20260926100000` through `20260926130000` were applied to the hosted Supabase project through the authenticated SQL editor because outbound PostgreSQL ports were blocked on the rollout host. Each migration ran in its own transaction and was recorded in `supabase_migrations.schema_migrations`; a follow-up query confirmed all four versions and the gallery column/RPC, recurring-request table/RPC, and staff-email trigger.
 - After the compatibility fix, `npm run typecheck` and `npm run lint` passed, and `http://localhost:3000` returned HTTP 200 with the room catalog rendered against the pre-migration database.
@@ -135,12 +138,47 @@ Verification completed for that fix before commit:
 - Phase 17 was committed as `f1a35d2` (`Make room galleries interactive`), pushed to `origin/main`, and deployed successfully by Vercel. A production HTTP check returned 200 with the gallery markup, and a live headless-browser check confirmed that selecting the second Main Sanctuary thumbnail updates the large preview and `aria-pressed` state.
 - No migration was required. Next: monitor normal production use and investigate only if room-image or gallery telemetry reports a failure.
 
-### Phase 18 local follow-up status
+### Phase 18 rollout status
 
 - `/admin/recurring-guide` documents all eight practical recurrence scenarios using the exact New reservation field labels, examples, edge cases, limits, conflict behavior, and post-creation actions.
 - `Recurring Guide` is permission-filtered for both active staff roles in the desktop sidebar and mobile More sheet. Guide calls to action link to the new `#recurrence` scroll target in the create form.
 - Verification: typecheck and lint passed; 28 unit-test files / 185 tests passed; 11 database-test files / 141 tests passed; the production build passed; focused guide tests passed 2/2; focused light/dark accessibility/responsive tests passed 2/2; and the complete Playwright suite passed 97/97.
-- No migration is required. These Phase 18 changes are local and uncommitted. Next: inspect the final diff, then commit/push/deploy only with user authorization.
+- No migration was required. Phase 18 was committed as `0687c40` (`Add recurring reservations guide`), pushed to `origin/main`, and deployed successfully by Vercel on 2026-09-27.
+
+### Phase 19 local follow-up status
+
+- Users & Roles marks active invited profiles with no acceptance timestamp as `Invitation pending` and offers a confirmation-protected `Resend invite` action.
+- The Server Action reasserts Super Admin permission and reloads the profile before generating a fresh recovery/setup token and sending the existing branded invitation template. Ineligible profiles fail closed. Password setup now invokes the idempotent invitation lifecycle RPC for invite and recovery setup sessions so a resent link preserves the one-time acceptance audit and notification.
+- No migration is required. Verification: typecheck and lint passed; 28 unit-test files / 185 tests passed; 11 database-test files / 141 tests passed; the production build passed; the focused resend check passed 1/1; the focused Admin access file passed 10/10; and the complete Playwright suite passed 98/98.
+- These Phase 19 changes are local and uncommitted. Next: inspect the final diff, then commit/push/deploy only with user authorization.
+
+### Phase 20 local follow-up status
+
+- Recurring-date request inserts now queue one idempotent branded acknowledgement to the requester
+  through the existing durable system-email outbox. The request Server Action schedules an immediate
+  post-response attempt, and the existing cron continues to retry queued or failed delivery.
+- New append-only migration `20260927100000_recurring_requester_confirmation_email.sql` adds the
+  transactional queue trigger and extends service-role email context with the recurring request and
+  room. The user confirmed it was applied to the hosted project on 2026-09-27.
+- Verification: typecheck and lint passed; 28 unit-test files / 186 tests passed; 11 database-test
+  files / 141 tests passed; the production build passed; the focused recurring-request browser test
+  passed 1/1; and the complete Playwright suite passed 98/98.
+- The worktree also contains the completed, fully verified Phase 19 invitation-resend implementation;
+  Phases 19–20 are awaiting the authorized application commit, push, and production deployment.
+
+### Phase 21 local follow-up status
+
+- The recurring-date request form now uses the same configured booking grid and native-select styling
+  as the one-time reservation flow. End times unlock after a start selection and include only later
+  boundaries; the Server Action rejects off-grid times independently.
+- All visible inputs use one controlled client draft. Hydrated submission dispatches the Server Action
+  without the framework's automatic form reset, and every error response carries the submitted values
+  as a progressive-enhancement fallback.
+- Verification: typecheck and lint passed; 28 unit-test files / 186 tests passed; 11 database-test
+  files / 141 tests passed; the production build passed; the focused browser regression passed 1/1;
+  and the complete Playwright suite passed 98/98.
+- No migration is required for Phase 21. Phases 19–21 remain local and uncommitted; the Phase 20
+  migration is applied and the matching application rollout is authorized and in progress.
 
 ## Required quality gates
 

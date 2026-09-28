@@ -17,7 +17,7 @@ export default async function AdminUsersPage() {
 
   return (
     <div className="flex max-w-5xl flex-col gap-6">
-      <PageHeader title="Users & Roles" description="Invite administrators, assign roles, and disable accounts." />
+      <PageHeader title="Users & Roles" description="Invite administrators, resend pending invitations, assign roles, and disable accounts." />
       <UsersManager
         currentUserId={me.id}
         users={users.map((u) => ({
@@ -26,6 +26,8 @@ export default async function AdminUsersPage() {
           fullName: u.full_name,
           role: u.role,
           active: u.active,
+          invitedBy: u.invited_by,
+          invitationAcceptedAt: u.invitation_accepted_at,
           createdLabel: formatInstant(u.created_at, tz, "MMM d, yyyy"),
           lastSignInLabel: u.last_sign_in_at ? formatInstant(u.last_sign_in_at, tz) : "never",
         }))}

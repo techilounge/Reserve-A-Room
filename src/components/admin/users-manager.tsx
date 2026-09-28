@@ -1,10 +1,10 @@
 "use client";
 
-import { LoaderCircle, ShieldCheck, UserPlus, UserRound } from "lucide-react";
+import { LoaderCircle, MailPlus, ShieldCheck, UserPlus, UserRound } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { inviteUserAction, setUserActiveAction, setUserRoleAction } from "@/app/admin/(portal)/(super)/actions";
+import { inviteUserAction, resendInviteAction, setUserActiveAction, setUserRoleAction } from "@/app/admin/(portal)/(super)/actions";
 import { PolicyPill } from "@/components/rooms/policy-badges";
 import { Button } from "@/components/ui/button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
@@ -28,6 +28,8 @@ export type ManagedUser = {
   fullName: string;
   role: "admin" | "super_admin";
   active: boolean;
+  invitedBy: string | null;
+  invitationAcceptedAt: string | null;
   createdLabel: string;
   lastSignInLabel: string;
 };
@@ -113,6 +115,7 @@ function InviteDialog() {
 function UserRow({ user, isSelf }: { user: ManagedUser; isSelf: boolean }) {
   const [pending, startTransition] = useTransition();
   const disableProtected = user.active && user.role === "super_admin";
+  const invitationPending = Boolean(user.invitedBy && !user.invitationAcceptedAt);
   const guidanceId = `disable-guidance-${user.id}`;
   const run = (fn: () => Promise<{ ok: boolean; message: string }>) =>
     startTransition(async () => {
@@ -143,6 +146,33 @@ function UserRow({ user, isSelf }: { user: ManagedUser; isSelf: boolean }) {
           <PolicyPill icon={UserRound} tone="neutral">
             Disabled
           </PolicyPill>
+        ) : null}
+        {invitationPending ? (
+          <PolicyPill icon={MailPlus} tone="warning">
+            Invitation pending
+          </PolicyPill>
+        ) : null}
+        {invitationPending && user.active ? (
+          <ConfirmationDialog
+            trigger={
+              <Button size="sm" variant="secondary" disabled={pending}>
+                <MailPlus aria-hidden />
+                Resend invite
+                <span className="sr-only"> to {user.fullName}</span>
+              </Button>
+            }
+            title={`Resend invitation to ${user.fullName}?`}
+            description={`A new secure password setup link will be emailed to ${user.email}. Previously issued links may stop working.`}
+            confirmLabel="Resend invitation"
+            pendingLabel="Sending…"
+            cancelLabel="Keep current invitation"
+            onConfirm={async () => {
+              const result = await resendInviteAction(user.id);
+              if (result.ok) toast.success(result.message);
+              else toast.error(result.message);
+              return result.ok;
+            }}
+          />
         ) : null}
         <label className="sr-only" htmlFor={`role-${user.id}`}>
           Role for {user.fullName}
