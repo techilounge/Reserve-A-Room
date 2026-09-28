@@ -1,8 +1,8 @@
 # Reserve-A-Room enhancements implementation plan
 
 Last updated: 2026-09-27
-Plan status: **Phases 0–18 complete and deployed; Phases 19–21 complete locally with production rollout in progress**
-Implementation status: **Invitation resend, recurring-request requester acknowledgement, and recurring-request form reliability are implemented and verified; the Phase 20 migration is applied**
+Plan status: **Phases 0–21 complete and deployed**
+Implementation status: **Invitation resend, recurring-request requester acknowledgement, and recurring-request form reliability are live in production; the Phase 20 migration is applied**
 
 This is the execution and handoff document for the enhancements requested after the initial production launch. It is intentionally specific enough for a new agent to continue without reconstructing the architecture or making silent product decisions.
 
@@ -766,9 +766,9 @@ Rollback principles:
 
 ## 10. Live implementation checkpoint
 
-Current phase: **Phases 19–21 are complete locally; the Phase 20 migration is applied and the authorized application rollout is in progress.**
-Last completed task: **Applied the requester-acknowledgement migration after all local quality gates passed.**
-Next exact task: **Commit and push the combined Phase 19–21 application revision, then verify the Vercel production deployment and public health checks.**
+Current phase: **Phases 0–21 are complete and deployed.**
+Last completed task: **Committed and deployed Phases 19–21 after the requester-acknowledgement migration was applied, then verified Vercel and public production health.**
+Next exact task: **Monitor normal staff use of invitation resend and recurring-request requester delivery; begin the next user-prioritized change when requested.**
 
 Current worktree:
 
@@ -807,6 +807,7 @@ Current worktree:
 - Phase 20 verification: typecheck and lint passed; 28 unit-test files / 186 tests passed; 11 database-test files / 141 tests passed; the focused template file passed 3/3; the focused Super Admin database file passed 21/21; the production build passed; the focused recurring-request browser test passed 1/1; and the complete Playwright suite passed 98/98.
 - Phase 21 replaces recurring-request clock inputs with configured native-select time grids, enforces those boundaries server-side, and keeps every field in a controlled draft dispatched without the action form's automatic reset. No migration is required.
 - Phase 21 verification: typecheck and lint passed; 28 unit-test files / 186 tests passed; 11 database-test files / 141 tests passed; the production build passed; the focused recurring-request dropdown/preservation flow passed 1/1; and the complete Playwright suite passed 98/98.
+- Phases 19–21 were committed as `1c2e55d` (`Improve invitations and recurring requests`) and pushed to `origin/main`. Vercel reported a successful production deployment, and public HTTP smoke checks returned 200 for `/`, `/reserve`, `/recurring-request`, and `/admin/login`.
 
 When handing off, replace this checkpoint with:
 

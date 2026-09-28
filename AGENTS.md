@@ -145,14 +145,14 @@ Verification completed for that fix before commit:
 - Verification: typecheck and lint passed; 28 unit-test files / 185 tests passed; 11 database-test files / 141 tests passed; the production build passed; focused guide tests passed 2/2; focused light/dark accessibility/responsive tests passed 2/2; and the complete Playwright suite passed 97/97.
 - No migration was required. Phase 18 was committed as `0687c40` (`Add recurring reservations guide`), pushed to `origin/main`, and deployed successfully by Vercel on 2026-09-27.
 
-### Phase 19 local follow-up status
+### Phase 19 rollout status
 
 - Users & Roles marks active invited profiles with no acceptance timestamp as `Invitation pending` and offers a confirmation-protected `Resend invite` action.
 - The Server Action reasserts Super Admin permission and reloads the profile before generating a fresh recovery/setup token and sending the existing branded invitation template. Ineligible profiles fail closed. Password setup now invokes the idempotent invitation lifecycle RPC for invite and recovery setup sessions so a resent link preserves the one-time acceptance audit and notification.
 - No migration is required. Verification: typecheck and lint passed; 28 unit-test files / 185 tests passed; 11 database-test files / 141 tests passed; the production build passed; the focused resend check passed 1/1; the focused Admin access file passed 10/10; and the complete Playwright suite passed 98/98.
-- These Phase 19 changes are local and uncommitted. Next: inspect the final diff, then commit/push/deploy only with user authorization.
+- Phase 19 shipped with Phases 20–21 in commit `1c2e55d` (`Improve invitations and recurring requests`), which was pushed to `origin/main` and deployed successfully by Vercel on 2026-09-27.
 
-### Phase 20 local follow-up status
+### Phase 20 rollout status
 
 - Recurring-date request inserts now queue one idempotent branded acknowledgement to the requester
   through the existing durable system-email outbox. The request Server Action schedules an immediate
@@ -163,10 +163,9 @@ Verification completed for that fix before commit:
 - Verification: typecheck and lint passed; 28 unit-test files / 186 tests passed; 11 database-test
   files / 141 tests passed; the production build passed; the focused recurring-request browser test
   passed 1/1; and the complete Playwright suite passed 98/98.
-- The worktree also contains the completed, fully verified Phase 19 invitation-resend implementation;
-  Phases 19–20 are awaiting the authorized application commit, push, and production deployment.
+- Phase 20 shipped with Phases 19 and 21 in commit `1c2e55d`; Vercel reported a successful production deployment after the migration was applied.
 
-### Phase 21 local follow-up status
+### Phase 21 rollout status
 
 - The recurring-date request form now uses the same configured booking grid and native-select styling
   as the one-time reservation flow. End times unlock after a start selection and include only later
@@ -177,8 +176,7 @@ Verification completed for that fix before commit:
 - Verification: typecheck and lint passed; 28 unit-test files / 186 tests passed; 11 database-test
   files / 141 tests passed; the production build passed; the focused browser regression passed 1/1;
   and the complete Playwright suite passed 98/98.
-- No migration is required for Phase 21. Phases 19–21 remain local and uncommitted; the Phase 20
-  migration is applied and the matching application rollout is authorized and in progress.
+- No migration is required for Phase 21. Phases 19–21 shipped in commit `1c2e55d`; production smoke checks returned HTTP 200 for `/`, `/reserve`, `/recurring-request`, and `/admin/login`.
 
 ## Required quality gates
 
