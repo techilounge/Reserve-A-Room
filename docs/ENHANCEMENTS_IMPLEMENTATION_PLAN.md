@@ -811,11 +811,12 @@ Current worktree:
 
 ### Phase 22 local follow-up status
 
-- **Duplicate staff emails:** root cause documented as ADR-42. Series occurrences no longer queue per-reservation staff emails; creating a series queues one `recurring_series_staff_created` summary per staff recipient. Append-only migration `20261003100000_series_staff_email_summary.sql` also deletes still-queued per-occurrence staff emails. **Not yet applied to the hosted project.**
+- **Duplicate staff emails:** root cause documented as ADR-42. Series occurrences no longer queue per-reservation staff emails; creating a series queues one `recurring_series_staff_created` summary per staff recipient. Append-only migration `20261003100000_series_staff_email_summary.sql` also deletes still-queued per-occurrence staff emails. **Applied to the hosted project on 2026-10-03** with `supabase db push`; a follow-up query confirmed no per-occurrence staff emails remain queued.
 - **Primary image:** the room editor's image list has a `Make primary` button on every non-primary image (reorder only; the first path is the primary). No schema change.
 - **10 MB source images:** accepted source size is 10 MB; the browser compresses stepwise to under 1.5 MB and rejects an image that cannot fit under the unchanged 2 MB storage cap. Browsers that cannot encode WebP fall back to JPEG.
 - Verification: typecheck and lint passed; 28 unit-test files / 192 tests passed; 11 database-test files / 142 tests passed; the production build passed; the complete Playwright suite passed 99/99.
-- Rollout order matters: deploy this code first, then apply the migration. The migration queues a new system-email event type that code before this change would reject as unknown.
+- Rollout: the code was deployed from `45de824` first, then the migration was applied. `20260927100000_recurring_requester_confirmation_email.sql` had been run earlier through the SQL editor without a ledger entry, so it was marked applied with `supabase migration repair --status applied 20260927100000` before the push.
+- Still to observe: the next recurring series created should send each opted-in staff member one "New recurring reservation" email.
 
 When handing off, replace this checkpoint with:
 
