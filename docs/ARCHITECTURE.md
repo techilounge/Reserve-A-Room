@@ -800,6 +800,11 @@ admin notes.
   preserving `image_path` as the primary compatibility field. A database CHECK/RPC validates
   count, uniqueness, and room-scoped paths; Storage independently limits JPEG/PNG/WebP files
   to 2 MB. The browser resizes to at most 1600 px and attempts WebP compression before upload.
+  Phase 22 raised the accepted *source* size to 10 MB while keeping the stored cap at 2 MB:
+  compression steps quality and then dimensions down until the file is under 1.5 MB, and an
+  image that can't be brought under the cap is rejected with a clear message rather than
+  uploaded. The first path in `image_paths` is the primary image, so choosing a primary is a
+  reorder with no schema change.
   Public catalog reads retry without `image_paths` only when PostgreSQL reports that exact
   column as missing, keeping pre-migration local/rolling deployments available without hiding
   unrelated database failures.
@@ -917,3 +922,22 @@ provider idempotency keys.
 - The client keeps one controlled draft for every visible field. Hydrated submissions prevent the
   framework's automatic action-form reset and dispatch the same Server Action in a transition; the
   action also echoes safe submitted values on every error for progressive-enhancement recovery.
+
+### ADR-42 · One staff email per recurring series, not per occurrence
+- **Symptom:** after a recurring series was created, opted-in staff received many "New
+  reservation" emails, each for a different date, delivered at about 6:25 AM over several
+  days.
+- **Cause:** every occurrence is an ordinary approved reservation, so the Phase 15 insert
+  trigger queued one staff email per occurrence. A series can hold 50 dates, and each date is
+  emailed to every opted-in staff member. Only the series summary was sent immediately; the
+  per-reservation emails waited for the daily outbox sweep (`0 11 * * *`, about 6 AM Central),
+  which delivers at most 50 per run. The queue therefore drained over several mornings.
+- **Fix** (`20261003100000_series_staff_email_summary.sql`):
+  - Reservations that belong to a series no longer queue the per-reservation staff email.
+    This covers the initial dates and the daily top-ups.
+  - An insert trigger on `reservation_series` queues exactly one
+    `recurring_series_staff_created` email per staff recipient in the idempotent system-email
+    outbox. It is rendered at delivery time, so the date list is complete.
+  - Single reservations are unchanged, and cancellation alerts are unchanged.
+  - Unsent per-occurrence staff emails left in the queue are deleted. Already-sent emails stay
+    in the log.

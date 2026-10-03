@@ -9,8 +9,10 @@ import {
   type AdminFirstLoginEmailData,
   type RecurringRequestEmailData,
   type RecurringSeriesEmailData,
+  type RecurringSeriesStaffEmailData,
 } from "@/emails/system-templates";
 import { getAppUrl } from "@/lib/app-url";
+import { formatPhone } from "@/lib/format";
 import {
   formatLongDate,
   formatTimeRange,
@@ -57,7 +59,13 @@ type SystemEmailContext = {
     local_start_time: string;
     local_end_time: string;
     requester_first_name: string;
+    requester_last_name: string;
+    requester_email: string;
+    requester_phone: string;
+    purpose: string;
+    estimated_attendance: number;
   } | null;
+  ministry_name: string | null;
   recurring_request: {
     reference_code: string;
     preferred_start_date: LocalDate;
@@ -68,7 +76,7 @@ type SystemEmailContext = {
     purpose: string;
     estimated_attendance: number;
   } | null;
-  room: { name: string } | null;
+  room: { name: string; capacity: number } | null;
   user: {
     id: string;
     full_name: string;
@@ -126,7 +134,11 @@ async function send(supabase: Service, id: string): Promise<{ status: Outcome; p
     contactEmail: ctx.settings.contact_email,
     contactPhone: ctx.settings.contact_phone,
   };
-  let emailData: RecurringSeriesEmailData | RecurringRequestEmailData | AdminFirstLoginEmailData;
+  let emailData:
+    | RecurringSeriesEmailData
+    | RecurringSeriesStaffEmailData
+    | RecurringRequestEmailData
+    | AdminFirstLoginEmailData;
   if (ctx.event_type === "admin_first_login") {
     if (!ctx.user) return { status: "failed", error: "The administrator email context no longer exists." };
     emailData = {
@@ -157,6 +169,31 @@ async function send(supabase: Service, id: string): Promise<{ status: Outcome; p
       recurrenceDescription: ctx.recurring_request.recurrence_description,
       purpose: ctx.recurring_request.purpose,
       estimatedAttendance: ctx.recurring_request.estimated_attendance,
+    };
+  } else if (ctx.event_type === "recurring_series_staff_created") {
+    if (!ctx.series || !ctx.room) return { status: "failed", error: "The recurring series email context no longer exists." };
+    const rule = recurrenceRuleFromStorage(ctx.series);
+    const shown = ctx.occurrences.slice(0, 12).map((occurrence) => formatLongDate(occurrence.occurrence_date));
+    if (ctx.occurrences.length > shown.length) shown.push(`…and ${ctx.occurrences.length - shown.length} more`);
+    emailData = {
+      ...brand,
+      roomName: ctx.room.name,
+      requesterName: `${ctx.series.requester_first_name} ${ctx.series.requester_last_name}`.trim(),
+      requesterEmail: ctx.series.requester_email,
+      requesterPhone: formatPhone(ctx.series.requester_phone),
+      ministry: ctx.ministry_name,
+      purpose: ctx.series.purpose,
+      estimatedAttendance: ctx.series.estimated_attendance,
+      schedule: `${rule ? recurrenceRuleLabel(rule) : "Recurring schedule"}, ${formatTimeRange(normalizeTime(ctx.series.local_start_time), normalizeTime(ctx.series.local_end_time))}`,
+      starts: formatLongDate(ctx.series.start_date),
+      ends: ctx.series.end_date ? formatLongDate(ctx.series.end_date) : "After one year or 50 instances",
+      occurrenceCount: ctx.occurrences.length,
+      occurrenceSummary: shown.join("\n"),
+      capacityWarning:
+        ctx.series.estimated_attendance > ctx.room.capacity
+          ? `Expected attendance (${ctx.series.estimated_attendance}) is more than ${ctx.room.name}'s capacity of ${ctx.room.capacity}.`
+          : null,
+      seriesUrl: `${appUrl}/admin/reservation-series/${ctx.series.id}`,
     };
   } else {
     if (!ctx.series || !ctx.room) return { status: "failed", error: "The recurring series email context no longer exists." };

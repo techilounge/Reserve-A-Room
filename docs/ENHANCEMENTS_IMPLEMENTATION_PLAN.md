@@ -809,6 +809,14 @@ Current worktree:
 - Phase 21 verification: typecheck and lint passed; 28 unit-test files / 186 tests passed; 11 database-test files / 141 tests passed; the production build passed; the focused recurring-request dropdown/preservation flow passed 1/1; and the complete Playwright suite passed 98/98.
 - Phases 19–21 were committed as `1c2e55d` (`Improve invitations and recurring requests`) and pushed to `origin/main`. Vercel reported a successful production deployment, and public HTTP smoke checks returned 200 for `/`, `/reserve`, `/recurring-request`, and `/admin/login`.
 
+### Phase 22 local follow-up status
+
+- **Duplicate staff emails:** root cause documented as ADR-42. Series occurrences no longer queue per-reservation staff emails; creating a series queues one `recurring_series_staff_created` summary per staff recipient. Append-only migration `20261003100000_series_staff_email_summary.sql` also deletes still-queued per-occurrence staff emails. **Not yet applied to the hosted project.**
+- **Primary image:** the room editor's image list has a `Make primary` button on every non-primary image (reorder only; the first path is the primary). No schema change.
+- **10 MB source images:** accepted source size is 10 MB; the browser compresses stepwise to under 1.5 MB and rejects an image that cannot fit under the unchanged 2 MB storage cap. Browsers that cannot encode WebP fall back to JPEG.
+- Verification: typecheck and lint passed; 28 unit-test files / 192 tests passed; 11 database-test files / 142 tests passed; the production build passed; the complete Playwright suite passed 99/99.
+- Rollout order matters: deploy this code first, then apply the migration. The migration queues a new system-email event type that code before this change would reject as unknown.
+
 When handing off, replace this checkpoint with:
 
 - phase and checklist item completed;

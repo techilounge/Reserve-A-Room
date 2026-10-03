@@ -1,10 +1,11 @@
 import type { ReactElement } from "react";
 
-import { DetailsTable, EmailLayout, Paragraph, PrimaryButton } from "./components";
+import { Callout, DetailsTable, EmailLayout, Paragraph, PrimaryButton } from "./components";
 import type { EmailBrandData } from "./types";
 
 export const SYSTEM_EMAIL_EVENTS = [
   "recurring_series_created",
+  "recurring_series_staff_created",
   "recurring_request_received",
   "admin_first_login",
 ] as const;
@@ -22,6 +23,24 @@ export type RecurringSeriesEmailData = EmailBrandData & {
   ends: string;
   occurrenceCount: number;
   occurrenceSummary: string;
+};
+
+/** One staff summary for a whole series (instead of one email per occurrence). */
+export type RecurringSeriesStaffEmailData = EmailBrandData & {
+  roomName: string;
+  requesterName: string;
+  requesterEmail: string;
+  requesterPhone: string;
+  ministry: string | null;
+  purpose: string;
+  estimatedAttendance: number;
+  schedule: string;
+  starts: string;
+  ends: string;
+  occurrenceCount: number;
+  occurrenceSummary: string;
+  capacityWarning: string | null;
+  seriesUrl: string;
 };
 
 export type AdminFirstLoginEmailData = EmailBrandData & {
@@ -47,9 +66,51 @@ type Built = { subject: string; element: ReactElement };
 
 export function buildSystemEmail(
   event: SystemEmailEvent,
-  data: RecurringSeriesEmailData | RecurringRequestEmailData | AdminFirstLoginEmailData,
+  data: RecurringSeriesEmailData | RecurringSeriesStaffEmailData | RecurringRequestEmailData | AdminFirstLoginEmailData,
 ): Built {
   switch (event) {
+    case "recurring_series_staff_created": {
+      const series = data as RecurringSeriesStaffEmailData;
+      return {
+        subject: `New recurring reservation: ${series.roomName} (${series.occurrenceCount} date${series.occurrenceCount === 1 ? "" : "s"})`,
+        element: (
+          <EmailLayout
+            data={series}
+            preview={`${series.requesterName} has a new recurring reservation for ${series.roomName}.`}
+            heading="A recurring reservation was created"
+          >
+            <Paragraph>
+              A recurring schedule was created for {series.requesterName}. This single message covers every date in
+              the series, so you won&apos;t receive one email per occurrence.
+            </Paragraph>
+            {series.capacityWarning ? (
+              <Callout title="Over the room's capacity">{series.capacityWarning}</Callout>
+            ) : null}
+            <DetailsTable
+              rows={[
+                ["Room", series.roomName],
+                ["Schedule", series.schedule],
+                ["Starts", series.starts],
+                ["Ends", series.ends],
+                ["Created", `${series.occurrenceCount} date${series.occurrenceCount === 1 ? "" : "s"} so far`],
+                ["Dates", series.occurrenceSummary],
+                ["Requester", series.requesterName],
+                ["Email", series.requesterEmail],
+                ["Phone", series.requesterPhone],
+                ["Ministry", series.ministry],
+                ["Purpose", series.purpose],
+                ["Attendance", String(series.estimatedAttendance)],
+              ]}
+            />
+            <Paragraph>
+              Later dates are added automatically as they enter the room&apos;s advance-booking window, without further
+              email.
+            </Paragraph>
+            <PrimaryButton href={series.seriesUrl}>Review the series</PrimaryButton>
+          </EmailLayout>
+        ),
+      };
+    }
     case "recurring_series_created": {
       const series = data as RecurringSeriesEmailData;
       return {

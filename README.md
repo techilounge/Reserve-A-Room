@@ -250,7 +250,9 @@ Emails sent:
 | Request approved / not approved | Requester |
 | Reservation updated by staff (date, time or room of an approved reservation) | Requester |
 | Reservation cancelled (by the requester or by staff) | Requester |
-| Cancelled by requester | Staff |
+| Cancelled by requester, or by staff | Staff |
+| New confirmed reservation (instant room, or created by staff) | Staff, one email per reservation |
+| New recurring series | Staff, **one summary email for the whole series** (not one per date) |
 | Staff invitation | Invited administrator |
 | Password reset | Administrator |
 | Invited administrator accepts and enters the portal for the first time | Active Super Admins |
@@ -280,7 +282,7 @@ Super Admins manage rooms under **Admin → Rooms**. Each room has:
 | Food & drinks | Allowed or Not Allowed. Shown before booking, on the review step, the confirmation and in emails. |
 | Active | Inactive rooms are archived: hidden everywhere, history kept. Rooms are never deleted. |
 | Open for reservations | Turn off to mark a room temporarily unavailable, with an optional message. |
-| Room images | Up to four ordered JPEG, PNG or WebP images, each no larger than 2 MB. Uploads are compressed automatically; the first image is the room-card image. |
+| Room images | Up to four JPEG, PNG or WebP images, each up to 10 MB. They are resized and compressed in the browser before upload (stored files are held under 2 MB, which the storage bucket also enforces). Choose **Make primary** on any image to change the room-card and gallery-opening image. |
 
 The editor shows a plain-language summary before saving, for example: *"Guests may
 reserve this room up to 4 weeks in advance. Reservations require approval. Food and

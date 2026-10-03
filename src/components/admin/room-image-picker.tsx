@@ -1,6 +1,6 @@
 "use client";
 
-import { ImagePlus, LoaderCircle, Trash2 } from "lucide-react";
+import { ImagePlus, LoaderCircle, Star, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -26,6 +26,7 @@ export function RoomImagePicker({
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [compressing, setCompressing] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
 
   async function addFiles(files: File[]) {
     const remaining = ROOM_IMAGE_MAX_COUNT - images.length;
@@ -55,6 +56,13 @@ export function RoomImagePicker({
     }
   }
 
+  // The first image is the primary: it's the room-card photo and the gallery's opening image.
+  function makePrimary(index: number) {
+    if (index === 0) return;
+    onChange([images[index], ...images.filter((_, itemIndex) => itemIndex !== index)]);
+    setAnnouncement(`Image ${index + 1} is now the primary image. Save the room to apply the change.`);
+  }
+
   function remove(index: number) {
     const item = images[index];
     if (item.file) URL.revokeObjectURL(item.url);
@@ -65,8 +73,14 @@ export function RoomImagePicker({
     <section aria-labelledby="room-images-heading" className="space-y-4 rounded-xl border bg-card p-4 sm:p-6">
       <div>
         <h2 id="room-images-heading" className="text-lg font-semibold">Room images</h2>
-        <p className="text-sm text-muted-foreground">Add up to four images. The first image is used on room cards.</p>
+        <p className="text-sm text-muted-foreground">
+          Add up to four images. The primary image appears on room cards and opens the gallery. Choose{" "}
+          <strong className="font-medium">Make primary</strong> on any other image to change it, then save the room.
+        </p>
       </div>
+      <p role="status" aria-live="polite" className="sr-only">
+        {announcement}
+      </p>
 
       {images.length ? (
         <ol className="grid gap-3 sm:grid-cols-2">
@@ -76,10 +90,23 @@ export function RoomImagePicker({
                 <Image src={image.url} alt={`Room image ${index + 1}`} fill sizes="(min-width: 640px) 20rem, 100vw" unoptimized={image.url.startsWith("blob:")} className="object-cover" />
               </div>
               <div className="flex items-center justify-between gap-2 p-2">
-                <span className="text-sm font-medium">{index === 0 ? "Primary image" : `Image ${index + 1}`}</span>
-                <Button type="button" size="sm" variant="ghost" onClick={() => remove(index)} disabled={disabled || compressing} aria-label={`Remove image ${index + 1}`}>
-                  <Trash2 aria-hidden /> Remove
-                </Button>
+                {index === 0 ? (
+                  <span className="inline-flex items-center gap-1.5 text-sm font-medium">
+                    <Star className="size-4 fill-current text-gold-text" aria-hidden /> Primary image
+                  </span>
+                ) : (
+                  <span className="text-sm font-medium">Image {index + 1}</span>
+                )}
+                <div className="flex items-center gap-1">
+                  {index > 0 ? (
+                    <Button type="button" size="sm" variant="outline" onClick={() => makePrimary(index)} disabled={disabled || compressing} aria-label={`Make image ${index + 1} the primary image`}>
+                      <Star aria-hidden /> Make primary
+                    </Button>
+                  ) : null}
+                  <Button type="button" size="sm" variant="ghost" onClick={() => remove(index)} disabled={disabled || compressing} aria-label={`Remove image ${index + 1}`}>
+                    <Trash2 aria-hidden /> Remove
+                  </Button>
+                </div>
               </div>
             </li>
           ))}
@@ -103,7 +130,7 @@ export function RoomImagePicker({
           {compressing ? <LoaderCircle className="animate-spin" aria-hidden /> : <ImagePlus aria-hidden />}
           {compressing ? "Compressing…" : "Add images"}
         </Button>
-        <p className="text-sm text-muted-foreground">JPEG, PNG, or WebP; maximum 2 MB per source image. Images are compressed automatically.</p>
+        <p className="text-sm text-muted-foreground">JPEG, PNG, or WebP, up to 10 MB each. Images are resized and compressed automatically when added.</p>
       </div>
     </section>
   );

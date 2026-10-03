@@ -6,6 +6,7 @@ import {
   type AdminFirstLoginEmailData,
   type RecurringRequestEmailData,
   type RecurringSeriesEmailData,
+  type RecurringSeriesStaffEmailData,
 } from "@/emails/system-templates";
 
 const data: RecurringSeriesEmailData = {
@@ -85,5 +86,47 @@ describe("administrator first-login email", () => {
     expect(html).toContain("https://reservearoom.example.org/admin/users");
     expect(text).toContain("ada@example.org");
     expect(text).toContain("Sep 25, 2026, 2:30 PM");
+  });
+});
+
+describe("recurring-series staff summary email", () => {
+  const staff: RecurringSeriesStaffEmailData = {
+    appUrl: data.appUrl,
+    appName: data.appName,
+    churchName: data.churchName,
+    contactEmail: data.contactEmail,
+    contactPhone: data.contactPhone,
+    roomName: "Conference Room",
+    requesterName: "Michelle Escalante",
+    requesterEmail: "michelle@example.org",
+    requesterPhone: "(512) 555-0123",
+    ministry: "Women's Ministry",
+    purpose: "Weekly prayer <circle>",
+    estimatedAttendance: 20,
+    schedule: "Every Sunday, 2:00 PM – 3:00 PM",
+    starts: "Sunday, October 4, 2026",
+    ends: "After one year or 50 instances",
+    occurrenceCount: 50,
+    occurrenceSummary: "Sunday, October 4, 2026\n…and 49 more",
+    capacityWarning: "Expected attendance (20) is more than Conference Room's capacity of 15.",
+    seriesUrl: "https://reservearoom.example.org/admin/reservation-series/abc",
+  };
+
+  it("summarizes the whole series in one message", async () => {
+    const built = buildSystemEmail("recurring_series_staff_created", staff);
+    const [html, text] = await Promise.all([render(built.element), render(built.element, { plainText: true })]);
+    expect(built.subject).toBe("New recurring reservation: Conference Room (50 dates)");
+    expect(html).toContain("Weekly prayer &lt;circle&gt;");
+    expect(html).toContain("https://reservearoom.example.org/admin/reservation-series/abc");
+    expect(text).toContain("so far");
+    expect(text).toContain("Over the room");
+    expect(text).toContain("…and 49 more");
+  });
+
+  it("omits the capacity warning when attendance fits", async () => {
+    const built = buildSystemEmail("recurring_series_staff_created", { ...staff, capacityWarning: null, occurrenceCount: 1 });
+    const text = await render(built.element, { plainText: true });
+    expect(built.subject).toBe("New recurring reservation: Conference Room (1 date)");
+    expect(text).not.toContain("Over the room");
   });
 });

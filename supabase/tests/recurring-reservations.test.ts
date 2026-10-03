@@ -153,18 +153,22 @@ describe("atomic recurring-series creation", () => {
       ),
     ).toBe(true);
 
-    const emails = await db.query<{ event_type: string; recipient: string }>(
-      "select event_type, recipient from public.email_logs where reservation_id in (select id from public.reservations where series_id = $1) order by recipient, reservation_id",
+    // Three occurrences must not mean three "new reservation" emails per staff member.
+    const perOccurrence = await db.query(
+      "select id from public.email_logs where reservation_id in (select id from public.reservations where series_id = $1)",
       [seriesId],
     );
-    expect(emails.rows).toHaveLength(6);
-    expect(emails.rows.every((email) => email.event_type === "admin_reservation_created")).toBe(true);
-    expect([...new Set(emails.rows.map((email) => email.recipient))]).toEqual(["series-admin@example.org", "series-super@example.org"]);
+    expect(perOccurrence.rows).toHaveLength(0);
+    // Instead: one requester summary and exactly one staff summary per active, opted-in staff member.
     const systemEmails = await db.query<{ event_type: string; recipient: string; status: string }>(
-      "select event_type, recipient, status from public.system_email_logs where entity_id = $1",
+      "select event_type, recipient, status from public.system_email_logs where entity_id = $1 order by event_type, recipient",
       [seriesId],
     );
-    expect(systemEmails.rows).toEqual([{ event_type: "recurring_series_created", recipient: "katherine@example.org", status: "queued" }]);
+    expect(systemEmails.rows).toEqual([
+      { event_type: "recurring_series_created", recipient: "katherine@example.org", status: "queued" },
+      { event_type: "recurring_series_staff_created", recipient: "series-admin@example.org", status: "queued" },
+      { event_type: "recurring_series_staff_created", recipient: "series-super@example.org", status: "queued" },
+    ]);
     const audit = await db.query<{ metadata: { occurrence_count: number } }>(
       "select metadata from public.audit_logs where action = 'reservation_series.created' and entity_id = $1",
       [seriesId],
@@ -172,10 +176,39 @@ describe("atomic recurring-series creation", () => {
     expect(audit.rows[0].metadata.occurrence_count).toBe(3);
   });
 
-  it("does not queue a series summary when staff turns requester email off", async () => {
+  it("does not email the requester when staff turns requester email off, but still informs staff once", async () => {
     const noEmailRoom = await createRoom(db, { slug: "series-no-email", max_advance_value: 12, max_advance_unit: "week" });
     const result = await createSeries(noEmailRoom, dates.slice(0, 1), { notify: false });
-    expect((await db.query("select id from public.system_email_logs where entity_id = $1", [result.series_id])).rows).toHaveLength(0);
+    const queued = await db.query<{ event_type: string }>(
+      "select event_type from public.system_email_logs where entity_id = $1",
+      [result.series_id],
+    );
+    expect(queued.rows.map((row) => row.event_type)).toEqual(["recurring_series_staff_created", "recurring_series_staff_created"]);
+  });
+
+  it("still emails staff about an ordinary reservation and about cancelling one occurrence", async () => {
+    const ordinaryRoom = await createRoom(db, { slug: "series-ordinary", max_advance_value: 12, max_advance_unit: "week" });
+    const ordinary = await insertReservation(db, {
+      roomId: ordinaryRoom,
+      startAt: dates[0].startAt,
+      endAt: dates[0].endAt,
+      status: "approved",
+    });
+    const created = await db.query<{ event_type: string }>(
+      "select event_type from public.email_logs where reservation_id = $1",
+      [ordinary.id],
+    );
+    expect(created.rows.map((row) => row.event_type)).toEqual(["admin_reservation_created", "admin_reservation_created"]);
+
+    const [occurrence] = (
+      await db.query<{ id: string }>("select id from public.reservations where series_id = $1 order by occurrence_date", [seriesId])
+    ).rows;
+    await asAdmin((tx) => tx.query("select public.cancel_reservation($1, null)", [occurrence.id]));
+    const cancelled = await db.query<{ event_type: string }>(
+      "select event_type from public.email_logs where reservation_id = $1 and event_type = 'admin_reservation_cancelled'",
+      [occurrence.id],
+    );
+    expect(cancelled.rows).toHaveLength(2);
   });
 
   it("keeps the generic outbox service-role only and exposes a complete series context", async () => {
@@ -186,7 +219,14 @@ describe("atomic recurring-series creation", () => {
     const claimed = await asRole(db, "service_role", async (tx) =>
       (await tx.query<{ id: string }>("select public.claim_system_emails(10, $1) as id", [seriesId])).rows,
     );
-    expect(claimed).toHaveLength(1);
+    expect(claimed).toHaveLength(3); // requester summary + two staff summaries
+    const requesterEmail = (
+      await db.query<{ id: string }>(
+        "select id from public.system_email_logs where entity_id = $1 and event_type = 'recurring_series_created'",
+        [seriesId],
+      )
+    ).rows[0];
+    claimed.splice(0, claimed.length, requesterEmail);
     const [context] = await asRole(db, "service_role", async (tx) =>
       (
         await tx.query<{ context: { event_type: string; series: { id: string }; occurrences: unknown[] } }>(
@@ -362,6 +402,18 @@ describe("rolling materialization", () => {
       [created.series_id],
     );
     expect(uniqueDates.rows.map((row) => row.occurrence_date)).toEqual([dates[0].date, dates[2].date, dates[3].date]);
+
+    // Daily top-ups add reservations quietly: staff were told about the series once, at creation.
+    const topUpEmails = await db.query(
+      "select id from public.email_logs where reservation_id in (select id from public.reservations where series_id = $1)",
+      [created.series_id],
+    );
+    expect(topUpEmails.rows).toHaveLength(0);
+    const summaries = await db.query<{ event_type: string }>(
+      "select event_type from public.system_email_logs where entity_id = $1 and event_type = 'recurring_series_staff_created'",
+      [created.series_id],
+    );
+    expect(summaries.rows).toHaveLength(2);
   });
 
   it("pauses a series and records an actionable exception when its room becomes unavailable", async () => {
