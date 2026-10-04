@@ -1,8 +1,8 @@
-import { formatMediumDate } from "@/lib/datetime";
 import { getStaffSession } from "@/lib/auth/session";
 import { exportReservations } from "@/lib/data/admin";
 import { loadCatalog } from "@/lib/data/catalog";
 import { createReservationsCsv, createReservationsPdf } from "@/lib/reservations/export-formats";
+import { describeExportRange, EXPORT_MAX_ROWS, ExportTooLargeError } from "@/lib/reservations/export-limits";
 import { parseReservationExportFilters } from "@/lib/reservations/filters";
 
 export const dynamic = "force-dynamic";
@@ -44,8 +44,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ form
       "Cache-Control": "private, no-store",
       "Content-Disposition": `attachment; filename="reservations-${stamp}.${format}"`,
       "X-Content-Type-Options": "nosniff",
-      "X-Export-Row-Limit": "1000",
-      ...(rows.length === 1000 ? { "X-Export-Truncated": "possible" } : {}),
+      "X-Export-Row-Count": String(rows.length),
     };
 
     if (format === "csv") {
@@ -57,13 +56,21 @@ export async function GET(request: Request, { params }: { params: Promise<{ form
     const pdf = createReservationsPdf(rows, {
       timeZone: catalog.catalog.settings.timeZone,
       generatedAt: now,
-      rangeLabel: `${formatMediumDate(parsed.filters.from)} - ${formatMediumDate(parsed.filters.to)}`,
+      rangeLabel: describeExportRange(parsed.filters.from, parsed.filters.to),
       filterLabel: filterSummary(url.searchParams, roomName, ministryName),
     });
     return new Response(pdf.buffer as ArrayBuffer, {
       headers: { ...commonHeaders, "Content-Type": "application/pdf" },
     });
   } catch (error) {
+    if (error instanceof ExportTooLargeError) {
+      return Response.json(
+        {
+          error: `This export has more than ${EXPORT_MAX_ROWS.toLocaleString("en-US")} reservations. Narrow the search, filters or dates and try again.`,
+        },
+        { status: 413 },
+      );
+    }
     console.error("[reservation export] failed", error);
     return Response.json({ error: "The export could not be created. Please try again." }, { status: 500 });
   }

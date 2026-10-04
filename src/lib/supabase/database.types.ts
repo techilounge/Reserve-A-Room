@@ -963,7 +963,7 @@ export type Database = {
         Returns: boolean;
       };
       admin_export_reservations: {
-        Args: { p_from: string; p_to: string; p_search?: string; p_statuses?: Database["public"]["Enums"]["reservation_status"][]; p_room_id?: string; p_ministry_id?: string; p_approval?: string; p_sort?: string; p_limit?: number };
+        Args: { p_from?: string; p_to?: string; p_search?: string; p_statuses?: Database["public"]["Enums"]["reservation_status"][]; p_room_id?: string; p_ministry_id?: string; p_approval?: string; p_sort?: string; p_limit?: number; p_offset?: number };
         Returns: { id: string; reference_code: string; status: Database["public"]["Enums"]["reservation_status"]; source: Database["public"]["Enums"]["reservation_source"]; room_name: string; start_at: string; end_at: string; requester_first_name: string; requester_last_name: string; requester_email: string; requester_phone: string; ministry_name: string; purpose: string; estimated_attendance: number; approval_required_at_submission: boolean; created_at: string }[];
       };
       admin_get_reservation: {

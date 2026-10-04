@@ -16,16 +16,34 @@ describe("reservation filters", () => {
     expect(filters.roomId).toBeUndefined();
   });
 
-  it("uses the current calendar year when export dates are omitted", () => {
+  it("exports every date when none are chosen", () => {
     const result = parseReservationExportFilters(new URLSearchParams(), TZ);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const year = todayInZone(TZ).slice(0, 4);
-    expect(result.filters).toMatchObject({ from: `${year}-01-01`, to: `${year}-12-31`, pageSize: 1000 });
+    expect(result.filters.from).toBeUndefined();
+    expect(result.filters.to).toBeUndefined();
   });
 
-  it("rejects reversed and over-one-year export ranges", () => {
+  it("accepts open-ended and multi-year export ranges", () => {
+    const wide = parseReservationExportFilters(new URLSearchParams("from=2020-01-01&to=2031-12-31"), TZ);
+    expect(wide.ok && wide.filters).toMatchObject({ from: "2020-01-01", to: "2031-12-31" });
+    const fromOnly = parseReservationExportFilters(new URLSearchParams("from=2026-03-01"), TZ);
+    expect(fromOnly.ok && fromOnly.filters).toMatchObject({ from: "2026-03-01", to: undefined });
+    const toOnly = parseReservationExportFilters(new URLSearchParams("to=2026-03-01"), TZ);
+    expect(toOnly.ok && toOnly.filters).toMatchObject({ from: undefined, to: "2026-03-01" });
+  });
+
+  it("starts upcoming exports today, never in the past", () => {
+    const today = todayInZone(TZ);
+    const open = parseReservationExportFilters(new URLSearchParams("status=upcoming"), TZ);
+    expect(open.ok && open.filters.from).toBe(today);
+    const past = parseReservationExportFilters(new URLSearchParams("status=upcoming&from=2001-01-01"), TZ);
+    expect(past.ok && past.filters.from).toBe(today);
+  });
+
+  it("rejects reversed and malformed export ranges", () => {
     expect(parseReservationExportFilters(new URLSearchParams("from=2026-10-01&to=2026-09-01"), TZ).ok).toBe(false);
-    expect(parseReservationExportFilters(new URLSearchParams("from=2026-01-01&to=2027-01-02"), TZ).ok).toBe(false);
+    expect(parseReservationExportFilters(new URLSearchParams("from=nonsense"), TZ).ok).toBe(false);
+    expect(parseReservationExportFilters(new URLSearchParams("to=2026-13-45"), TZ).ok).toBe(false);
   });
 });

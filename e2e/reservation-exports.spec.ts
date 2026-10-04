@@ -39,10 +39,16 @@ test("staff can download filtered Excel-compatible CSV and branded PDF files", a
     await writeFile(output, pdfBody);
   }
 
-  const invalid = await context.request.get(
-    "/admin/reservations/export/pdf?from=2026-01-01&to=2027-12-31",
-  );
-  expect(invalid.status()).toBe(400);
+  // No calendar-year or one-year limit: a multi-year range and an undated export both succeed.
+  const wide = await context.request.get("/admin/reservations/export/csv?from=2020-01-01&to=2031-12-31");
+  expect(wide.status()).toBe(200);
+  expect(Number(wide.headers()["x-export-row-count"])).toBeGreaterThan(0);
+  const everything = await context.request.get("/admin/reservations/export/pdf");
+  expect(everything.status()).toBe(200);
+  expect((await everything.body()).toString("ascii")).toContain("All dates");
+
+  const reversed = await context.request.get("/admin/reservations/export/pdf?from=2027-12-31&to=2026-01-01");
+  expect(reversed.status()).toBe(400);
   await context.close();
 });
 

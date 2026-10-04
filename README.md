@@ -180,6 +180,8 @@ The enhancement rollout adds these append-only migrations, in order:
 - `20260926110000_room_image_gallery.sql`
 - `20260926120000_recurring_reservation_requests.sql`
 - `20260926130000_staff_reservation_email_notifications.sql`
+- `20261003100000_series_staff_email_summary.sql`
+- `20261004100000_unbounded_reservation_export.sql`
 
 After changing a migration, regenerate the TypeScript types:
 

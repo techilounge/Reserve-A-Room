@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { LocalDate } from "@/lib/datetime";
+import { collectExportPages } from "@/lib/reservations/export-limits";
 import type { ReservationFilters } from "@/lib/reservations/filter-types";
 import type { Database, Enums, Tables } from "@/lib/supabase/database.types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -67,21 +68,25 @@ export async function listReservations(filters: ReservationFilters): Promise<{ r
   return { rows, total: Number(data[0]?.total_count ?? 0) };
 }
 
-export async function exportReservations(filters: ReservationFilters & { from: LocalDate; to: LocalDate }): Promise<ExportReservationRow[]> {
+/** Every reservation matching the filters, read in pages. Throws `ExportTooLargeError` past the safety ceiling. */
+export async function exportReservations(filters: ReservationFilters): Promise<ExportReservationRow[]> {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("admin_export_reservations", {
-    p_from: filters.from,
-    p_to: filters.to,
-    p_search: filters.search || undefined,
-    p_statuses: filters.statuses?.length ? filters.statuses : undefined,
-    p_room_id: filters.roomId || undefined,
-    p_ministry_id: filters.ministryId || undefined,
-    p_approval: filters.approval || undefined,
-    p_sort: filters.sort ?? "start_asc",
-    p_limit: 1000,
+  return collectExportPages(async (offset, limit) => {
+    const { data, error } = await supabase.rpc("admin_export_reservations", {
+      p_from: filters.from || undefined,
+      p_to: filters.to || undefined,
+      p_search: filters.search || undefined,
+      p_statuses: filters.statuses?.length ? filters.statuses : undefined,
+      p_room_id: filters.roomId || undefined,
+      p_ministry_id: filters.ministryId || undefined,
+      p_approval: filters.approval || undefined,
+      p_sort: filters.sort ?? "start_asc",
+      p_limit: limit,
+      p_offset: offset,
+    });
+    if (error) throw error;
+    return data;
   });
-  if (error) throw error;
-  return data;
 }
 
 export async function getReservation(id: string): Promise<AdminReservation | null> {

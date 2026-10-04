@@ -1,17 +1,9 @@
-import {
-  addDaysToLocalDate,
-  compareLocalDates,
-  isLocalDate,
-  localDateToUtcMidnight,
-  todayInZone,
-  type LocalDate,
-} from "@/lib/datetime";
+import { compareLocalDates, isLocalDate, todayInZone, type LocalDate } from "@/lib/datetime";
 import { RESERVATION_SORTS, type ReservationFilters } from "@/lib/reservations/filter-types";
 import type { Enums } from "@/lib/supabase/database.types";
 
 export const RESERVATION_STATUSES = ["pending", "approved", "declined", "cancelled"] as const;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const EXPORT_MAX_DAYS = 365;
 
 export type SearchParamSource = URLSearchParams | Record<string, string | string[] | undefined>;
 
@@ -60,43 +52,33 @@ export function parseReservationListFilters(
   };
 }
 
-export type ExportFilters = ReservationFilters & { from: LocalDate; to: LocalDate; pageSize: number };
+export type ExportFilters = ReservationFilters;
 
+/**
+ * Export filters mirror the reservation list. Dates are optional bounds: with none, every
+ * matching reservation is exported (there is no calendar-year default or range limit).
+ */
 export function parseReservationExportFilters(
   source: SearchParamSource,
   timeZone: string,
 ): { ok: true; filters: ExportFilters } | { ok: false; message: string } {
   const common = commonFilters(source);
-  const today = todayInZone(timeZone);
-  const year = today.slice(0, 4);
   const rawFrom = one(source, "from");
   const rawTo = one(source, "to");
-  let from: LocalDate;
-  let to: LocalDate;
 
   if (rawFrom && !isLocalDate(rawFrom)) return { ok: false, message: "Choose a valid export start date." };
   if (rawTo && !isLocalDate(rawTo)) return { ok: false, message: "Choose a valid export end date." };
 
-  if (isLocalDate(rawFrom) && isLocalDate(rawTo)) {
-    from = rawFrom;
-    to = rawTo;
-  } else if (isLocalDate(rawFrom)) {
-    from = rawFrom;
-    to = addDaysToLocalDate(from, EXPORT_MAX_DAYS);
-  } else if (isLocalDate(rawTo)) {
-    to = rawTo;
-    from = addDaysToLocalDate(to, -EXPORT_MAX_DAYS);
-  } else {
-    from = `${year}-01-01`;
-    to = `${year}-12-31`;
+  let from: LocalDate | undefined = rawFrom || undefined;
+  const to: LocalDate | undefined = rawTo || undefined;
+  // "Upcoming" never reaches into the past, matching the reservation list.
+  if (one(source, "status") === "upcoming") {
+    const today = todayInZone(timeZone);
+    if (!from || compareLocalDates(from, today) < 0) from = today;
+  }
+  if (from && to && compareLocalDates(from, to) > 0) {
+    return { ok: false, message: "The export start date must be on or before the end date." };
   }
 
-  if (one(source, "status") === "upcoming" && compareLocalDates(from, today) < 0) from = today;
-  if (compareLocalDates(from, to) > 0) return { ok: false, message: "The export start date must be on or before the end date." };
-  const days = Math.round((localDateToUtcMidnight(to).getTime() - localDateToUtcMidnight(from).getTime()) / 86_400_000);
-  if (days > EXPORT_MAX_DAYS) {
-    return { ok: false, message: "Exports are limited to a one-year date range. Choose a narrower range." };
-  }
-
-  return { ok: true, filters: { ...common, from, to, page: 1, pageSize: 1000 } };
+  return { ok: true, filters: { ...common, from, to } };
 }

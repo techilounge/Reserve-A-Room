@@ -83,21 +83,52 @@ describe("dashboard", () => {
 });
 
 describe("admin_export_reservations", () => {
-  it("requires active staff and a bounded date range", async () => {
-    const year = (await db.query<{ y: string }>("select extract(year from now())::int::text as y")).rows[0].y;
-    const from = `${year}-01-01`;
-    const to = `${year}-12-31`;
-    const rows = await asAdmin(async (tx) =>
-      (await tx.query<Record<string, unknown>>("select * from public.admin_export_reservations($1, $2)", [from, to])).rows,
+  const exportRows = (args: string, params: unknown[] = []) =>
+    asAdmin(async (tx) =>
+      (await tx.query<{ id: string; start_at: string }>(`select * from public.admin_export_reservations(${args})`, params)).rows,
     );
+
+  it("requires active staff and never exposes token hashes", async () => {
+    const rows = await exportRows("");
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).not.toHaveProperty("guest_token_hash");
     await expect(
-      asRole(db, "anon", (tx) => tx.query("select * from public.admin_export_reservations($1, $2)", [from, to])),
+      asRole(db, "anon", (tx) => tx.query("select * from public.admin_export_reservations()")),
     ).rejects.toMatchObject({ code: "42501" });
-    await expect(
-      asAdmin((tx) => tx.query("select * from public.admin_export_reservations('2026-01-01', '2027-12-31')")),
-    ).rejects.toMatchObject({ code: "RAR10" });
+  });
+
+  it("returns every date when no range is given, and honors open-ended and wide ranges", async () => {
+    const all = await exportRows("");
+    const total = (await db.query<{ n: number }>("select count(*)::int as n from public.reservations")).rows[0].n;
+    expect(all.length).toBe(total);
+    // Far wider than the old one-year limit.
+    expect((await exportRows("p_from => '2000-01-01', p_to => '2099-12-31'")).length).toBe(total);
+    expect((await exportRows("p_from => '2099-01-01'")).length).toBe(0);
+    expect((await exportRows("p_to => '2000-01-01'")).length).toBe(0);
+    const first = new Date(all[0].start_at).toISOString().slice(0, 10);
+    expect((await exportRows("p_from => $1::date", [first])).length).toBeGreaterThan(0);
+  });
+
+  it("rejects a reversed range", async () => {
+    await expect(exportRows("p_from => '2026-12-31', p_to => '2026-01-01'")).rejects.toMatchObject({ code: "RAR10" });
+  });
+
+  it("pages deterministically so no row repeats or is skipped", async () => {
+    const whole = (await exportRows("p_limit => 1000")).map((row) => row.id);
+    expect(whole.length).toBeGreaterThanOrEqual(3);
+    const stitched: string[] = [];
+    for (let offset = 0; offset < whole.length; offset += 2) {
+      stitched.push(...(await exportRows("p_limit => 2, p_offset => $1::int", [offset])).map((row) => row.id));
+    }
+    expect(stitched).toEqual(whole);
+    expect(new Set(stitched).size).toBe(whole.length);
+    // Same guarantee for a sort whose primary key can tie.
+    const byCreated = (await exportRows("p_sort => 'created_desc', p_limit => 1000")).map((row) => row.id);
+    const pagedByCreated: string[] = [];
+    for (let offset = 0; offset < byCreated.length; offset += 1) {
+      pagedByCreated.push(...(await exportRows("p_sort => 'created_desc', p_limit => 1, p_offset => $1::int", [offset])).map((row) => row.id));
+    }
+    expect(pagedByCreated).toEqual(byCreated);
   });
 });
 

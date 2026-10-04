@@ -780,13 +780,25 @@ The shared Zod schema, Server Action, and consent-only guest RPC all require acc
 `20260925130000_reservation_legal_consent.sql` stores both timestamps and version ids;
 legacy and staff-created reservations retain null consent fields.
 
-### ADR-33 · Bounded reservation exports
+### ADR-33 · Reservation exports
 
 CSV and PDF downloads are server-generated after a fresh staff-session and database
-authorization check. Shared parsing applies the visible filters, a one-year range, and a
-1,000-row cap. CSV includes a UTF-8 BOM and neutralizes formula-like cells. The PDF is a
-landscape, paginated brand report with repeated headers and contains no tokens or private
-admin notes.
+authorization check. Shared parsing applies the visible filters and optional dates. CSV
+includes a UTF-8 BOM and neutralizes formula-like cells. The PDF is a landscape, paginated
+brand report with repeated headers and contains no tokens or private admin notes.
+
+**Revised in Phase 23 (`20261004100000_unbounded_reservation_export.sql`).** The original
+version required both dates, capped the range at one year (defaulting to the current year),
+and returned at most 1,000 rows. Now:
+- `from` and `to` are optional bounds. With neither, every reservation matching the other
+  filters is exported; the PDF header says "All dates". "Upcoming" still starts today.
+- The RPC takes `p_offset`. The server reads pages of 1,000 (which is also the API's own
+  per-response cap) until a short page ends the result. Ordering is deterministic (the id is
+  the final tie-break), so paging never repeats or skips a row.
+- A safety ceiling of 20,000 rows protects the serverless function's memory and time. An export
+  past it fails with a 413 and a clear message instead of returning a silently truncated file.
+- The new function accepts every call the old one did (the new parameters are optional), so
+  the migration can be applied before the application is deployed.
 
 ### ADR-34 · Follow-up discovery, media, and request flows
 

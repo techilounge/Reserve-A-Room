@@ -71,8 +71,8 @@ export default async function AdminReservationsPage({ searchParams }: PageProps<
         }
       />
       <p className="-mt-4 text-xs text-muted-foreground">
-        Exports use the active filters, include up to 1,000 rows, and are limited to one calendar year. Without dates,
-        the current year is used.
+        Exports include every reservation that matches the active search, filters and dates. Without dates, all dates are
+        included.
       </p>
       <ReservationFilters
         rooms={catalog.ok ? catalog.catalog.rooms.map(({ id, name }) => ({ id, name })) : []}
