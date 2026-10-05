@@ -991,3 +991,25 @@ provider idempotency keys.
   `CapacityWarning`. It is informational only, matching ADR-4: it never blocks sending and
   never changes the entered number.
 
+### ADR-45 · The 3-step reservation form survives a refresh
+- **Same model as ADR-44** (tab-scoped `sessionStorage`, consent never stored, restored data
+  treated as untrusted), extended for a multi-step form:
+  - **Step restored:** the visitor lands on the step they were on, but never past one whose
+    answers no longer validate. The saved answers are run through `reservationSchema`, and a
+    failure in the schedule or details fields sets the step back to that point.
+  - **Offerings re-checked:** the room must still exist, the date must be today or later and
+    within that room's booking horizon, and the ministry must still be offered (or be "Other").
+    Availability is not stored; the server and the database still decide conflicts at submit,
+    and a conflict returns the visitor to step 1 as before.
+  - **Links:** a draft records the URL pre-fill (room, date, times) it was started from.
+    Opening a differently pre-filled link ignores and clears it, so an availability link is never
+    overridden by an old draft, while a plain refresh (same URL) restores.
+  - **Bot check unchanged:** the form-shown time (`startedAt`) is saved with the draft, so the
+    3-second minimum-fill rule keeps counting from when the form was first shown. A refresh can
+    neither restart that clock (blocking a real visitor) nor be used to skip it.
+  - **Cleanup:** an untouched form removes its draft, "Start over" clears it, and the
+    confirmation page clears it after a successful submit.
+- **Implementation notes:** saving is driven by `useForm().subscribe` rather than `watch`, which
+  keeps the component compiler-compatible; the one-time restore sets state from an effect, with
+  a documented lint exception, because browser storage can't be read during server rendering.
+

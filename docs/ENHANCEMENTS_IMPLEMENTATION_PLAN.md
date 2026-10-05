@@ -841,6 +841,14 @@ Current worktree:
 - Verification: typecheck and lint passed; 32 unit-test files / 214 tests passed; 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 101/101. Screenshots at 1000px, 320px and dark mode showed no horizontal overflow.
 - Status: committed locally; not yet pushed or deployed.
 
+### Phase 26 local follow-up status
+
+- **Draft kept across a refresh in the 3-step reservation form:** `/reserve` now saves its answers and the current step in `sessionStorage` and restores them after a reload, with the same "We restored what you had entered" notice and "Start over" button as the recurring-request form. Logic lives in `src/lib/drafts/reservation-draft.ts`; the storage accessor is shared in `src/lib/drafts/storage.ts`. See ADR-45.
+- The Privacy/Terms acceptance is never saved. Restored data is re-validated: a room that is gone, a past or beyond-horizon date, a removed ministry, or answers that no longer pass validation send the visitor back to the first step that needs attention. A draft belongs to the link it was started from: a different pre-filled URL ignores and clears it. The original form-shown time is saved too, so the 3-second minimum-fill check still counts from when the form was first shown (a refresh cannot restart or skip it). The confirmation page clears the draft.
+- No migration or environment change. The one lint exception (`react-hooks/set-state-in-effect`, around the one-time restore) is documented in the code.
+- Verification: typecheck and lint passed with no warnings; 33 unit-test files / 227 tests passed; 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 103/103. A restored-state check at 1000px, 320px and in dark mode showed no axe violations and no horizontal overflow.
+- Status: committed locally; not yet pushed or deployed.
+
 When handing off, replace this checkpoint with:
 
 - phase and checklist item completed;

@@ -2,6 +2,7 @@ import { CircleCheck, Hourglass, Link2Off, MailQuestion, MessageSquareText, Uten
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { ClearReservationDraft } from "@/components/reserve/clear-reservation-draft";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { CancelReservation } from "@/components/reservations/cancel-reservation";
 import { CapacityWarning } from "@/components/reservations/capacity-warning";
@@ -57,6 +58,7 @@ export default async function ReservationStatusPage({ params, searchParams }: Pa
 
   return (
     <div className="page-container flex max-w-3xl flex-col gap-6 py-10 sm:py-14">
+      {justSubmitted ? <ClearReservationDraft /> : null}
       {justSubmitted ? <Confirmation reservation={r} /> : <Heading reservation={r} />}
 
       <section aria-labelledby="details-heading" className="rounded-xl border bg-card p-5 sm:p-6">

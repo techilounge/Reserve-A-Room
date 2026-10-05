@@ -129,3 +129,106 @@ test.describe("guest reservation (instant room)", () => {
     await expect(page.getByText(ROOMS.classroom.name)).toHaveCount(0);
   });
 });
+
+test.describe("refreshing the 3-step form", () => {
+  async function fillSchedule(page: import("@playwright/test").Page, date: string, start: string, end: string) {
+    await page.goto(`/reserve?room=${ROOMS.conference.slug}&date=${date}`);
+    await expect(page.locator("#reserve-start")).toBeEnabled();
+    await page.locator("#reserve-start").selectOption(start);
+    await page.locator("#reserve-end").selectOption(end);
+  }
+
+  test("keeps the answers and the step, never the consent, and still lets the visitor submit right away", async ({ browser }) => {
+    const context = await newVisitor(browser);
+    const page = await context.newPage();
+    const date = daysFromToday(15);
+    const g = guest({ ministry: "Prayer Ministry", purpose: "Refresh test", attendance: 9 });
+
+    await fillSchedule(page, date, "08:00", "09:00");
+    const formShownAt = Date.now();
+    await expect(page.getByText("We restored what you had entered")).toHaveCount(0);
+
+    // Refresh on step 1.
+    await page.reload();
+    await expect(page.getByText("We restored what you had entered")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Room & time" })).toBeVisible();
+    await expect(page.locator("#reserve-start")).toHaveValue("08:00");
+    await expect(page.locator("#reserve-end")).toHaveValue("09:00");
+    await page.getByRole("button", { name: "Continue" }).click();
+
+    // Refresh on step 2 with details typed.
+    await expect(page.getByRole("heading", { name: "Your details" })).toBeVisible();
+    await page.locator("#firstName").fill(g.firstName);
+    await page.locator("#lastName").fill(g.lastName);
+    await page.locator("#email").fill(g.email);
+    await page.locator("#phone").fill(g.phone);
+    await page.locator("#ministryId").selectOption({ label: g.ministry });
+    await page.locator("#purpose").fill(g.purpose);
+    await page.locator("#estimatedAttendance").fill(String(g.attendance));
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Your details" })).toBeVisible();
+    await expect(page.locator("#firstName")).toHaveValue(g.firstName);
+    await expect(page.locator("#lastName")).toHaveValue(g.lastName);
+    await expect(page.locator("#email")).toHaveValue(g.email);
+    await expect(page.locator("#phone")).toHaveValue(g.phone);
+    await expect(page.locator("#ministryId")).toHaveValue(/[0-9a-f-]{36}/);
+    await expect(page.locator("#purpose")).toHaveValue(g.purpose);
+    await expect(page.locator("#estimatedAttendance")).toHaveValue(String(g.attendance));
+    await page.getByRole("button", { name: "Continue" }).click();
+
+    // Refresh on step 3: still there, with consent to be given again.
+    await expect(page.getByRole("heading", { name: "Review & submit" })).toBeVisible();
+    await page.getByRole("checkbox", { name: /I have read and accept/ }).check();
+    // The server refuses forms completed within 3 s of first being shown (bot defense). Let that
+    // time pass *before* the refresh: a refresh must not restart the clock, so a prompt submit
+    // right after it is still accepted.
+    await page.waitForTimeout(Math.max(0, 3400 - (Date.now() - formShownAt)));
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Review & submit" })).toBeVisible();
+    await expect(page.getByText(g.email)).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: /I have read and accept/ })).not.toBeChecked();
+
+    // The saved form-shown time means a prompt submit after a refresh isn't mistaken for a bot.
+    await page.getByRole("checkbox", { name: /I have read and accept/ }).check();
+    await page.getByRole("button", { name: "Reserve Room" }).click();
+    await expect(page.getByRole("heading", { name: "Room Reserved" })).toBeVisible();
+
+    // A submitted reservation leaves nothing behind.
+    await page.goto(`/reserve?room=${ROOMS.conference.slug}`);
+    await expect(page.getByRole("heading", { name: "Room & time" })).toBeVisible();
+    await page.reload();
+    await expect(page.getByText("We restored what you had entered")).toHaveCount(0);
+    await context.close();
+  });
+
+  test("Start over clears it, and a different pre-filled link isn't overridden by an old draft", async ({ browser }) => {
+    const context = await newVisitor(browser);
+    const page = await context.newPage();
+    const date = daysFromToday(16);
+
+    await fillSchedule(page, date, "10:00", "11:00");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.locator("#firstName").fill("Casey");
+    await page.reload();
+    await expect(page.locator("#firstName")).toHaveValue("Casey");
+
+    await page.getByRole("button", { name: "Start over" }).click();
+    await expect(page.getByRole("heading", { name: "Room & time" })).toBeVisible();
+    await expect(page.getByText("We restored what you had entered")).toHaveCount(0);
+    await expect(page.locator("#reserve-start")).toHaveValue("");
+    await page.reload();
+    await expect(page.getByText("We restored what you had entered")).toHaveCount(0);
+
+    // A draft started from one link doesn't hijack a different link.
+    await fillSchedule(page, date, "13:00", "14:00");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.locator("#firstName").fill("Casey");
+    const otherDate = daysFromToday(17);
+    await page.goto(`/reserve?room=${ROOMS.conference.slug}&date=${otherDate}`);
+    await expect(page.getByText("We restored what you had entered")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Room & time" })).toBeVisible();
+    await page.goto(`/reserve?room=${ROOMS.conference.slug}&date=${otherDate}`);
+    await expect(page.getByText("We restored what you had entered")).toHaveCount(0);
+    await context.close();
+  });
+});

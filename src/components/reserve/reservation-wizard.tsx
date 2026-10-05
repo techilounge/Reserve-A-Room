@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, ArrowRight, LoaderCircle, TriangleAlert, WifiOff } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { FormProvider, useForm, useWatch } from "react-hook-form";
 
 import { fetchDayAvailability, submitReservation } from "@/app/(public)/reserve/actions";
@@ -10,6 +10,15 @@ import { TurnstileWidget } from "@/components/security/turnstile-widget";
 import { Button } from "@/components/ui/button";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import type { LocalDate, LocalTime } from "@/lib/datetime";
+import {
+  clearReservationDraft,
+  initialReservationValues,
+  loadReservationDraft,
+  prefillKeyOf,
+  saveReservationDraft,
+  toDraftValues,
+} from "@/lib/drafts/reservation-draft";
+import { browserStorage } from "@/lib/drafts/storage";
 import { availableEndTimes, availableStartTimes, type BusyBlock, type DayWindow } from "@/lib/domain/availability";
 import { cn } from "@/lib/utils";
 import {
@@ -49,31 +58,21 @@ export function ReservationWizard({
   /** Set only when Turnstile is fully configured (site + secret key). */
   turnstileSiteKey: string | null;
 }) {
+  // What the untouched form holds, and which link it was opened from (see the draft module).
+  const [initialValues] = useState(() => initialReservationValues(prefill, rooms));
+  const prefillKey = useMemo(() => prefillKeyOf(prefill), [prefill]);
   const form = useForm<ReservationInput, unknown, ReservationValues>({
     resolver: zodResolver(reservationSchema),
     mode: "onTouched",
-    defaultValues: {
-      roomId: prefill.roomId ?? (rooms.length === 1 ? rooms[0].id : ""),
-      date: prefill.date ?? "",
-      start: prefill.start ?? "",
-      end: prefill.end ?? "",
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-      ministryId: "",
-      otherMinistryName: "",
-      purpose: "",
-      estimatedAttendance: "",
-      setupRequirements: "",
-      requesterNotes: "",
-      legalAccepted: false,
-    },
+    defaultValues: { ...initialValues, legalAccepted: false },
   });
   const { setValue, setError, clearErrors, trigger, getValues } = form;
   const legalAcceptanceInvalid = Boolean(form.formState.errors.legalAccepted);
 
   const [step, setStep] = useState<Step>("schedule");
+  const [restored, setRestored] = useState(false);
+  const restoreAttempted = useRef(false);
+  const stepSeen = useRef(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [refreshKey, setRefreshKey] = useState(0);
@@ -93,6 +92,70 @@ export function ReservationWizard({
   useEffect(() => {
     startedAt.current = Date.now();
   }, []);
+
+  // Saves the answers and the current step after every change, so a refresh doesn't lose them.
+  const persist = useCallback(
+    (currentStep: Step) => {
+      const storage = browserStorage();
+      if (!storage) return;
+      saveReservationDraft(
+        storage,
+        { values: toDraftValues(form.getValues()), step: currentStep, startedAt: startedAt.current, prefillKey },
+        initialValues,
+      );
+    },
+    [form, initialValues, prefillKey],
+  );
+
+  // After a refresh: bring back the answers and the step (this tab only; see the draft module).
+  useEffect(() => {
+    if (restoreAttempted.current) return;
+    restoreAttempted.current = true;
+    const storage = browserStorage();
+    if (!storage) return;
+    const draft = loadReservationDraft(storage, {
+      rooms,
+      ministryIds: ministries.map((ministry) => ministry.id),
+      today,
+      now: Date.now(),
+      initial: initialValues,
+      prefillKey,
+    });
+    if (!draft) {
+      // Unusable (another link, a stale room or date, or just the untouched form): drop it.
+      clearReservationDraft(storage);
+      return;
+    }
+    startedAt.current = draft.startedAt;
+    form.reset({ ...draft.values, legalAccepted: false }, { keepDefaultValues: true });
+    /* eslint-disable react-hooks/set-state-in-effect -- one-time restore from sessionStorage, an
+       external system that can only be read in the browser after hydration */
+    setStep(draft.step);
+    setRestored(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [form, rooms, ministries, today, initialValues, prefillKey]);
+
+  useEffect(() => {
+    return form.subscribe({ formState: { values: true }, callback: () => persist(step) });
+  }, [form, persist, step]);
+
+  useEffect(() => {
+    if (!stepSeen.current) {
+      stepSeen.current = true;
+      return;
+    }
+    persist(step);
+  }, [step, persist]);
+
+  function startOver() {
+    const storage = browserStorage();
+    if (storage) clearReservationDraft(storage);
+    form.reset({ ...initialValues, legalAccepted: false });
+    setStep("schedule");
+    setRestored(false);
+    setSubmitError(null);
+    startedAt.current = Date.now();
+  }
 
   // Load occupied times whenever the room or date changes (or after a conflict).
   const availabilityKey = room && date ? `${room.id}:${date}:${refreshKey}` : null;
@@ -244,6 +307,15 @@ export function ReservationWizard({
         }}
         className="flex flex-col gap-6"
       >
+        {restored ? (
+          <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/40 p-3 text-sm">
+            <p>We restored what you had entered before the page reloaded. Please accept the Privacy Policy and Terms again before submitting.</p>
+            <Button type="button" size="sm" variant="outline" onClick={startOver}>
+              Start over
+            </Button>
+          </div>
+        ) : null}
+
         <ol className="grid grid-cols-3 gap-2" aria-label="Reservation steps">
           {STEPS.map((s, i) => (
             <li

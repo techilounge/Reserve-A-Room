@@ -17,7 +17,8 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatTime, type LocalTime } from "@/lib/datetime";
-import { browserStorage, clearDraft, emptyDraftValues, loadDraft, saveDraft } from "@/lib/drafts/recurring-request-draft";
+import { clearDraft, emptyDraftValues, loadDraft, saveDraft } from "@/lib/drafts/recurring-request-draft";
+import { browserStorage } from "@/lib/drafts/storage";
 import { TURNSTILE_ACTIONS } from "@/lib/security/turnstile-actions";
 
 const INITIAL: RecurringRequestState = { status: "idle" };

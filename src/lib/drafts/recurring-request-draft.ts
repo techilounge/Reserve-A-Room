@@ -91,15 +91,6 @@ export function sanitizeDraft(raw: unknown, context: DraftContext): Draft | null
   return { values, startedAt };
 }
 
-/** `sessionStorage`, or null where the browser blocks it (the property access itself can throw). */
-export function browserStorage(): Storage | null {
-  try {
-    return window.sessionStorage;
-  } catch {
-    return null;
-  }
-}
-
 export function loadDraft(storage: Pick<Storage, "getItem">, context: DraftContext): Draft | null {
   try {
     const text = storage.getItem(DRAFT_STORAGE_KEY);
