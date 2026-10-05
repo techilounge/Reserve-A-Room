@@ -190,7 +190,7 @@ Verification completed for that fix before commit:
 ### Phase 23 local follow-up status
 
 - **Export limits removed:** reservation CSV/PDF exports no longer require dates, no longer default to the current year, and no longer stop at one year or 1,000 rows. No dates means every matching reservation ("All dates" in the PDF header); `from`/`to` are optional bounds. Details are in ADR-33.
-- Append-only migration `20261004100000_unbounded_reservation_export.sql` replaces `admin_export_reservations` with optional `p_from`/`p_to` and a new `p_offset`. **Not yet applied to the hosted project.** It accepts every call the previous version did, so it is safe to apply before or after the deploy.
+- Append-only migration `20261004100000_unbounded_reservation_export.sql` replaces `admin_export_reservations` with optional `p_from`/`p_to` and a new `p_offset`. **Applied to the hosted project on 2026-10-04** with `supabase db push`, after the code deployed from `1c42b81`. The owner confirmed an undated CSV export includes every reservation. It accepts every call the previous version did, so the order did not matter.
 - The server reads pages of 1,000 until a short page ends the result. A safety ceiling of 20,000 rows fails with HTTP 413 and a clear message rather than returning a truncated file. `database.types.ts` was regenerated.
 - Verification: typecheck and lint passed; 29 unit-test files / 198 tests passed; 12 database-test files / 147 tests passed (including a 1,100-row paging test); the production build passed; the complete Playwright suite passed 99/99.
 
