@@ -2,7 +2,7 @@
 
 import { CalendarCheck, LoaderCircle } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 
 import {
   submitRecurringRequest,
@@ -10,12 +10,14 @@ import {
   type RecurringRequestState,
 } from "@/app/(public)/recurring-request/actions";
 import { Field, fieldProps } from "@/components/forms/field";
+import { CapacityWarning } from "@/components/reservations/capacity-warning";
 import { TurnstileWidget } from "@/components/security/turnstile-widget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatTime, type LocalTime } from "@/lib/datetime";
+import { browserStorage, clearDraft, emptyDraftValues, loadDraft, saveDraft } from "@/lib/drafts/recurring-request-draft";
 import { TURNSTILE_ACTIONS } from "@/lib/security/turnstile-actions";
 
 const INITIAL: RecurringRequestState = { status: "idle" };
@@ -41,7 +43,7 @@ export function RecurringRequestForm({
   timeOptions,
   turnstileSiteKey,
 }: {
-  rooms: { id: string; name: string }[];
+  rooms: { id: string; name: string; capacity: number }[];
   today: string;
   timeOptions: LocalTime[];
   /** Set only when Turnstile is fully configured (site + secret key). */
@@ -49,7 +51,12 @@ export function RecurringRequestForm({
 }) {
   const [state, action, pending] = useActionState(submitRecurringRequest, INITIAL);
   const [, startTransition] = useTransition();
-  const [startedAt] = useState(() => Date.now());
+  const [startedAt, setStartedAt] = useState(() => Date.now());
+  const [restored, setRestored] = useState(false);
+  // Entries are saved only after the visitor types or a draft is restored, never from the
+  // untouched form, so an empty first render can't overwrite a saved draft.
+  const shouldSave = useRef(false);
+  const restoreAttempted = useRef(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileKey, setTurnstileKey] = useState(0);
   const [verificationNotice, setVerificationNotice] = useState<string | null>(null);
@@ -62,8 +69,56 @@ export function RecurringRequestForm({
     name: Name,
     value: RecurringRequestFormValues[Name],
   ) {
+    shouldSave.current = true;
     setValues((current) => ({ ...current, [name]: value }));
   }
+
+  // After a refresh: bring back what the visitor had typed (this tab only; see the draft module).
+  useEffect(() => {
+    if (restoreAttempted.current) return;
+    restoreAttempted.current = true;
+    const storage = browserStorage();
+    if (!storage) return;
+    const draft = loadDraft(storage, {
+      roomIds: rooms.map((room) => room.id),
+      timeOptions,
+      today,
+      now: Date.now(),
+    });
+    if (!draft) return;
+    shouldSave.current = true;
+    /* eslint-disable react-hooks/set-state-in-effect -- one-time restore from sessionStorage, an
+       external system that can only be read in the browser after hydration */
+    setValues(draft.values);
+    setStartedAt(draft.startedAt);
+    setRestored(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [rooms, timeOptions, today]);
+
+  useEffect(() => {
+    if (!shouldSave.current) return;
+    const storage = browserStorage();
+    if (storage) saveDraft(storage, values, startedAt);
+  }, [values, startedAt]);
+
+  // A sent request no longer needs its draft.
+  useEffect(() => {
+    if (state.status !== "success") return;
+    const storage = browserStorage();
+    if (storage) clearDraft(storage);
+  }, [state.status]);
+
+  function startOver() {
+    const storage = browserStorage();
+    if (storage) clearDraft(storage);
+    shouldSave.current = false;
+    setValues(emptyDraftValues());
+    setStartedAt(Date.now());
+    setRestored(false);
+  }
+
+  const selectedRoom = rooms.find((room) => room.id === values.roomId);
+  const attendance = values.estimatedAttendance.trim() === "" ? Number.NaN : Number(values.estimatedAttendance);
 
   if (state.status === "success") {
     return (
@@ -112,6 +167,13 @@ export function RecurringRequestForm({
         <label htmlFor="request-website">Website</label>
         <input id="request-website" name="website" type="text" tabIndex={-1} autoComplete="off" />
       </div>
+
+      {restored ? (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/40 p-3 text-sm">
+          <p>We restored what you had entered before the page reloaded. Please accept the Privacy Policy and Terms again before sending.</p>
+          <Button type="button" size="sm" variant="outline" onClick={startOver}>Start over</Button>
+        </div>
+      ) : null}
 
       {state.status === "error" ? (
         <p role="alert" className="rounded-lg border border-danger-border bg-danger-soft p-3 text-sm text-danger-soft-foreground">{state.message}</p>
@@ -189,9 +251,23 @@ export function RecurringRequestForm({
           <Field id="phone" label="Phone" required error={errors.phone}>
             <Input name="phone" type="tel" autoComplete="tel" value={values.phone} onChange={(event) => setValue("phone", event.target.value)} {...fieldProps("phone", errors.phone)} />
           </Field>
-          <Field id="estimatedAttendance" label="Estimated attendance" required error={errors.estimatedAttendance}>
-            <Input name="estimatedAttendance" type="number" min={1} max={10000} inputMode="numeric" value={values.estimatedAttendance} onChange={(event) => setValue("estimatedAttendance", event.target.value)} {...fieldProps("estimatedAttendance", errors.estimatedAttendance)} />
+          <Field
+            id="estimatedAttendance"
+            label="Estimated attendance"
+            required
+            error={errors.estimatedAttendance}
+            description={selectedRoom ? `${selectedRoom.name} is set up for up to ${selectedRoom.capacity} people.` : undefined}
+          >
+            <Input name="estimatedAttendance" type="number" min={1} max={10000} inputMode="numeric" value={values.estimatedAttendance} onChange={(event) => setValue("estimatedAttendance", event.target.value)} {...fieldProps("estimatedAttendance", errors.estimatedAttendance, Boolean(selectedRoom))} />
           </Field>
+          {selectedRoom ? (
+            <CapacityWarning
+              live
+              estimated={attendance}
+              capacity={selectedRoom.capacity}
+              liveClassName="sm:col-span-2 [&:empty]:-mt-4"
+            />
+          ) : null}
           <Field id="purpose" label="Purpose" required error={errors.purpose} className="sm:col-span-2">
             <Textarea name="purpose" rows={3} maxLength={500} value={values.purpose} onChange={(event) => setValue("purpose", event.target.value)} {...fieldProps("purpose", errors.purpose)} />
           </Field>

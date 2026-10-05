@@ -833,6 +833,14 @@ Current worktree:
 - Verification: typecheck and lint passed; 31 unit-test files / 208 tests passed (new verifier and action tests); 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 99/99. A real-browser check against Cloudflare's test keys showed the widget rendering in the form, a token reaching the server, the server's siteverify rejection of the test token's `example.com` hostname, preserved input and no CSP violations. The accepted path is covered by unit tests, since test tokens can't carry this site's hostname.
 - Status: committed locally; not yet pushed or deployed.
 
+### Phase 25 local follow-up status
+
+- **Draft kept across a refresh:** the recurring-date request form saves what the visitor typed in `sessionStorage` (this browser tab only, discarded when the tab closes) and restores it after a reload, with a "Start over" button. Logic lives in `src/lib/drafts/recurring-request-draft.ts`. The Privacy/Terms acceptance is deliberately never saved, so consent is given again for each submission. Restored values are re-checked against the current rooms, time grid and dates. The draft is cleared when a request is sent. See ADR-44.
+- **Capacity warning:** once a room is chosen, the attendance field shows "<room> is set up for up to N people" and the shared `CapacityWarning` appears live when attendance exceeds the room's capacity. It is a warning only and never blocks sending (ADR-4). The page now passes each room's capacity to the form.
+- No migration or environment change. The one lint exception (`react-hooks/set-state-in-effect`, around the one-time sessionStorage restore) is documented in the code.
+- Verification: typecheck and lint passed; 32 unit-test files / 214 tests passed; 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 101/101. Screenshots at 1000px, 320px and dark mode showed no horizontal overflow.
+- Status: committed locally; not yet pushed or deployed.
+
 When handing off, replace this checkpoint with:
 
 - phase and checklist item completed;

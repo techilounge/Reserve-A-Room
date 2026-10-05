@@ -17,12 +17,15 @@ export function CapacityWarning({
   audience = "requester",
   live = false,
   className,
+  liveClassName,
 }: {
   estimated: number;
   capacity: number;
   audience?: "requester" | "staff";
   live?: boolean;
   className?: string;
+  /** Classes for the always-present live region (e.g. grid placement). */
+  liveClassName?: string;
 }) {
   const check = evaluateCapacity(estimated, capacity);
   const content = check.exceeds ? (
@@ -42,7 +45,7 @@ export function CapacityWarning({
 
   // A persistent live region lets screen readers hear the warning appear and disappear.
   return live ? (
-    <div role="status" aria-live="polite">
+    <div role="status" aria-live="polite" className={liveClassName}>
       {content}
     </div>
   ) : (

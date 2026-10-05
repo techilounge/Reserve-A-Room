@@ -28,7 +28,7 @@ export default async function RecurringRequestPage() {
         <CatalogUnavailable reason={catalog.reason} />
       ) : (
         <RecurringRequestForm
-          rooms={catalog.catalog.rooms.map(({ id, name }) => ({ id, name }))}
+          rooms={catalog.catalog.rooms.map(({ id, name, capacity }) => ({ id, name, capacity }))}
           today={todayInZone(catalog.catalog.settings.timeZone)}
           turnstileSiteKey={isTurnstileEnabled() ? getTurnstileSiteKey() : null}
           timeOptions={timeGrid(

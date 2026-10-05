@@ -973,3 +973,21 @@ provider idempotency keys.
   token's `example.com` hostname, showing the check is live. The accepted path is covered by
   unit tests.
 
+### ADR-44 · Recurring-request drafts and capacity feedback
+- **Draft persistence:** a refresh used to clear the whole recurring-request form. The form now
+  saves its text fields to `sessionStorage` as the visitor types and restores them on load.
+  - **Why `sessionStorage`:** it survives a refresh but is scoped to the tab and discarded when
+    the tab closes. The draft holds a name, email and phone number, so it shouldn't outlive the
+    visit on a shared computer, which `localStorage` would allow.
+  - **Consent is never stored.** The Privacy Policy / Terms checkbox must be ticked again for
+    every submission, so consent stays an explicit, auditable act.
+  - **Restored data is untrusted.** It is length-capped, and the room, date, times and an
+    end-before-start pair are re-validated against what the form currently offers. Damaged or
+    blocked storage simply gives an empty form.
+  - **Other details:** the original form-shown time (`startedAt`) is kept with the draft, so a
+    restored form isn't rejected by the 3-second minimum-fill check. Turnstile tokens are never
+    stored. A sent request clears the draft, and "Start over" clears it on demand.
+- **Capacity feedback:** the form receives each room's capacity and reuses the shared
+  `CapacityWarning`. It is informational only, matching ADR-4: it never blocks sending and
+  never changes the entered number.
+
