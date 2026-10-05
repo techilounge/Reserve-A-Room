@@ -40,7 +40,16 @@ function loadTurnstile(): Promise<TurnstileApi> {
   return scriptPromise;
 }
 
-export function TurnstileWidget({ siteKey, onToken }: { siteKey: string; onToken: (token: string | null) => void }) {
+export function TurnstileWidget({
+  siteKey,
+  onToken,
+  action = "reserve",
+}: {
+  siteKey: string;
+  onToken: (token: string | null) => void;
+  /** Cloudflare "action" label. The server only accepts a token minted for the action it expects. */
+  action?: string;
+}) {
   const container = useRef<HTMLDivElement>(null);
   const callback = useRef(onToken);
   const [attempt, setAttempt] = useState(0);
@@ -60,7 +69,7 @@ export function TurnstileWidget({ siteKey, onToken }: { siteKey: string; onToken
         container.current.replaceChildren();
         widgetId = turnstile.render(container.current, {
           sitekey: siteKey,
-          action: "reserve",
+          action,
           theme: "auto",
           size: "flexible",
           callback: (token: string) => {
@@ -86,7 +95,7 @@ export function TurnstileWidget({ siteKey, onToken }: { siteKey: string; onToken
       cancelled = true;
       if (widgetId && window.turnstile) window.turnstile.remove(widgetId);
     };
-  }, [siteKey, attempt]);
+  }, [siteKey, action, attempt]);
 
   const failureMessage =
     failure?.code === "110200"

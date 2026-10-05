@@ -105,7 +105,7 @@ the same variables in Vercel → Settings → Environment Variables for **Produc
 | `RESEND_FROM_EMAIL` | Yes, e.g. `reservations@reservearoom.stonehillchurch.org` | Sender address (the display name comes from Settings) |
 | `RESEND_REPLY_TO` | Optional | Reply-to for requester emails (defaults to the Settings contact email) |
 | `CRON_SECRET` | Recommended | Protects the scheduled recurrence materializer and email-outbox sweep |
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Optional (both or neither) | Cloudflare Turnstile on the guest form |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Optional (both or neither) | Cloudflare Turnstile on the guest reservation form and the recurring-date request form |
 | `INITIAL_SUPER_ADMIN_EMAIL` / `INITIAL_SUPER_ADMIN_NAME` | Only in `.env.local`, for the one-time bootstrap | `npm run bootstrap:super-admin` |
 
 Generate each secret with:

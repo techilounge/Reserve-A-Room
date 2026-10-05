@@ -10,11 +10,13 @@ import {
   type RecurringRequestState,
 } from "@/app/(public)/recurring-request/actions";
 import { Field, fieldProps } from "@/components/forms/field";
+import { TurnstileWidget } from "@/components/security/turnstile-widget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatTime, type LocalTime } from "@/lib/datetime";
+import { TURNSTILE_ACTIONS } from "@/lib/security/turnstile-actions";
 
 const INITIAL: RecurringRequestState = { status: "idle" };
 const EMPTY_VALUES: RecurringRequestFormValues = {
@@ -37,14 +39,20 @@ export function RecurringRequestForm({
   rooms,
   today,
   timeOptions,
+  turnstileSiteKey,
 }: {
   rooms: { id: string; name: string }[];
   today: string;
   timeOptions: LocalTime[];
+  /** Set only when Turnstile is fully configured (site + secret key). */
+  turnstileSiteKey: string | null;
 }) {
   const [state, action, pending] = useActionState(submitRecurringRequest, INITIAL);
   const [, startTransition] = useTransition();
   const [startedAt] = useState(() => Date.now());
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileKey, setTurnstileKey] = useState(0);
+  const [verificationNotice, setVerificationNotice] = useState<string | null>(null);
   const [values, setValues] = useState<RecurringRequestFormValues>(() => state.values ?? EMPTY_VALUES);
   const errors = state.fieldErrors ?? {};
   const startOptions = timeOptions.slice(0, -1);
@@ -81,13 +89,25 @@ export function RecurringRequestForm({
       action={action}
       onSubmit={(event) => {
         event.preventDefault();
+        if (turnstileSiteKey && !turnstileToken) {
+          setVerificationNotice("Please complete the verification check above the button.");
+          return;
+        }
+        setVerificationNotice(null);
         const formData = new FormData(event.currentTarget);
+        // Turnstile tokens are single-use: the token is already in the form data, so get a
+        // fresh one for any further attempt.
+        if (turnstileSiteKey) {
+          setTurnstileToken(null);
+          setTurnstileKey((key) => key + 1);
+        }
         startTransition(() => action(formData));
       }}
       className="space-y-6"
       noValidate
     >
       <input type="hidden" name="startedAt" value={startedAt} />
+      <input type="hidden" name="turnstileToken" value={turnstileToken ?? ""} />
       <div className="absolute -left-[10000px] top-auto size-px overflow-hidden" aria-hidden>
         <label htmlFor="request-website">Website</label>
         <input id="request-website" name="website" type="text" tabIndex={-1} autoComplete="off" />
@@ -190,6 +210,15 @@ export function RecurringRequestForm({
         </label>
         {errors.legalAccepted ? <p id="legalAccepted-error" className="mt-2 text-sm font-medium text-destructive">{errors.legalAccepted}</p> : null}
       </section>
+
+      {turnstileSiteKey ? (
+        <div className="space-y-2">
+          <TurnstileWidget key={turnstileKey} siteKey={turnstileSiteKey} onToken={setTurnstileToken} action={TURNSTILE_ACTIONS.recurringRequest} />
+          {verificationNotice ? (
+            <p role="alert" className="text-sm font-medium text-destructive">{verificationNotice}</p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
         <Button asChild variant="outline" size="lg"><Link href="/reserve">Back to one-time reservations</Link></Button>

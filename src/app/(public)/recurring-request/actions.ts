@@ -7,6 +7,8 @@ import { scheduleSystemEmailDelivery } from "@/lib/email/schedule";
 import { LEGAL_DOCUMENT_VERSIONS } from "@/lib/legal";
 import { hitRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
 import { clientIp } from "@/lib/security/request";
+import { verifyTurnstile } from "@/lib/security/turnstile";
+import { TURNSTILE_ACTIONS } from "@/lib/security/turnstile-actions";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { fieldErrors } from "@/lib/validation/reservation";
 import { recurringRequestSchema } from "@/lib/validation/recurring-request";
@@ -83,6 +85,12 @@ export async function submitRecurringRequest(
   }
 
   const input = parsed.data;
+  const ip = await clientIp();
+  const token = formData.get("turnstileToken");
+  if (!(await verifyTurnstile(typeof token === "string" && token ? token : undefined, ip, TURNSTILE_ACTIONS.recurringRequest))) {
+    return errorState("Please complete the verification and try again.", values);
+  }
+
   const catalog = await loadCatalog();
   if (!catalog.ok) return errorState("Room information is temporarily unavailable. Please try again shortly.", values);
   const room = catalog.catalog.rooms.find((item) => item.id === input.roomId);
@@ -106,7 +114,6 @@ export async function submitRecurringRequest(
     return errorState("Please choose a start date within the next two years.", values, { preferredStartDate: "Choose a date within the next two years." });
   }
 
-  const ip = await clientIp();
   const [ipAllowed, emailAllowed] = await Promise.all([
     hitRateLimit(RATE_LIMITS.recurringRequestPerIp, ip),
     hitRateLimit(RATE_LIMITS.recurringRequestPerEmail, input.email),

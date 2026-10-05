@@ -485,8 +485,8 @@ Postgres-backed rate limit keyed by an HMAC of IP (and separately of email). Thi
 across stateless Vercel instances with no extra service and stores no raw IPs.
 Optional Cloudflare Turnstile is enabled only when both Turnstile env vars are set. Client
 errors retain Cloudflare's code, show a recoverable retry state, and verification remains
-fail-closed. Siteverify responses must match both the `reserve` action and the configured
-application hostname.
+fail-closed. Siteverify responses must match the form's own action (`reserve` or
+`recurring-request`) and the configured application hostname.
 
 ### ADR-15 · Security headers
 Set in `next.config.ts`: CSP (self + Supabase URL for connect/img, Turnstile when enabled,
@@ -953,3 +953,23 @@ provider idempotency keys.
   - Single reservations are unchanged, and cancellation alerts are unchanged.
   - Unsent per-occurrence staff emails left in the queue are deleted. Already-sent emails stay
     in the log.
+
+### ADR-43 · Turnstile also protects the recurring-date request form
+- **Gap:** the public recurring-date request form had the honeypot, the 3-second fill-time
+  check and rate limits, but no Turnstile, so it was the weaker of the two public forms.
+- **Change:** the form renders `TurnstileWidget` and sends the token as a hidden `turnstileToken`
+  field. The Server Action verifies it after the cheap checks (honeypot, fill time, field
+  validation) and before the rate-limit counters or any database write. A failed
+  verification returns a recoverable message and keeps everything the visitor typed. When
+  Turnstile isn't configured, both the widget and the check are off, as for `/reserve`.
+- **Action binding:** each form's widget uses its own Cloudflare action label
+  (`TURNSTILE_ACTIONS` in `src/lib/security/turnstile-actions.ts`: `reserve`,
+  `recurring-request`), and `verifyTurnstile` accepts a token only for the action it was told
+  to expect. A token minted on one form can't be submitted to the other.
+- **Single use:** the form sends the token it holds, then immediately starts a fresh challenge,
+  and blocks submission with an inline message until the new token arrives.
+- **Verified** against Cloudflare's published test keys in a real browser: the widget renders
+  in the form, a token reaches the server, and the server's siteverify call rejects the test
+  token's `example.com` hostname, showing the check is live. The accepted path is covered by
+  unit tests.
+

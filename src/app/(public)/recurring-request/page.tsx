@@ -6,6 +6,8 @@ import { RecurringRequestForm } from "@/components/reserve/recurring-request-for
 import { timeGrid } from "@/lib/availability-query";
 import { loadCatalog } from "@/lib/data/catalog";
 import { todayInZone } from "@/lib/datetime";
+import { getTurnstileSiteKey } from "@/lib/env/public";
+import { isTurnstileEnabled } from "@/lib/security/turnstile";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +30,7 @@ export default async function RecurringRequestPage() {
         <RecurringRequestForm
           rooms={catalog.catalog.rooms.map(({ id, name }) => ({ id, name }))}
           today={todayInZone(catalog.catalog.settings.timeZone)}
+          turnstileSiteKey={isTurnstileEnabled() ? getTurnstileSiteKey() : null}
           timeOptions={timeGrid(
             catalog.catalog.settings.dayStart,
             catalog.catalog.settings.dayEnd,

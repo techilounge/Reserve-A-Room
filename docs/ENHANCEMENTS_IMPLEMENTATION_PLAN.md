@@ -825,6 +825,14 @@ Current worktree:
 - The server reads pages of 1,000 until a short page ends the result. A safety ceiling of 20,000 rows fails with HTTP 413 and a clear message rather than returning a truncated file. `database.types.ts` was regenerated.
 - Verification: typecheck and lint passed; 29 unit-test files / 198 tests passed; 12 database-test files / 147 tests passed (including a 1,100-row paging test); the production build passed; the complete Playwright suite passed 99/99.
 
+### Phase 24 local follow-up status
+
+- **Turnstile on the recurring-date request form:** the form now renders `TurnstileWidget`, sends a hidden `turnstileToken`, and the Server Action verifies it (after the honeypot, fill-time and field validation, before rate-limit counters or any database write). Rejection is recoverable and keeps the visitor's input. Off when Turnstile isn't configured. See ADR-43.
+- Each form's token is bound to its own Cloudflare action (`reserve`, `recurring-request`) via `src/lib/security/turnstile-actions.ts`, and `verifyTurnstile` takes the expected action, so a token minted on one form can't be used on the other.
+- No migration, environment-variable or Cloudflare-dashboard change is required: the same widget and keys protect both forms.
+- Verification: typecheck and lint passed; 31 unit-test files / 208 tests passed (new verifier and action tests); 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 99/99. A real-browser check against Cloudflare's test keys showed the widget rendering in the form, a token reaching the server, the server's siteverify rejection of the test token's `example.com` hostname, preserved input and no CSP violations. The accepted path is covered by unit tests, since test tokens can't carry this site's hostname.
+- Status: committed locally; not yet pushed or deployed.
+
 When handing off, replace this checkpoint with:
 
 - phase and checklist item completed;

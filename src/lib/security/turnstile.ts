@@ -4,12 +4,18 @@ import { getAppUrl } from "@/lib/app-url";
 import { getTurnstileSiteKey } from "@/lib/env/public";
 import { getServerEnv } from "@/lib/env/server";
 
+import { TURNSTILE_ACTIONS } from "./turnstile-actions";
+
 /** Turnstile is optional: enabled only when both site and secret keys are configured. */
 export function isTurnstileEnabled(): boolean {
   return Boolean(getTurnstileSiteKey() && getServerEnv().TURNSTILE_SECRET_KEY);
 }
 
-export async function verifyTurnstile(token: string | undefined, ip: string): Promise<boolean> {
+export async function verifyTurnstile(
+  token: string | undefined,
+  ip: string,
+  expectedAction: string = TURNSTILE_ACTIONS.reserve,
+): Promise<boolean> {
   if (!isTurnstileEnabled()) return true;
   if (!token) return false;
   try {
@@ -21,7 +27,7 @@ export async function verifyTurnstile(token: string | undefined, ip: string): Pr
     });
     const result = (await response.json()) as { success?: boolean; action?: string; hostname?: string; "error-codes"?: string[] };
     const expectedHostname = new URL(getAppUrl()).hostname;
-    const valid = result.success === true && result.action === "reserve" && result.hostname === expectedHostname;
+    const valid = result.success === true && result.action === expectedAction && result.hostname === expectedHostname;
     if (!valid) {
       console.warn("[turnstile] verification rejected", {
         action: result.action,
