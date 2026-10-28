@@ -210,11 +210,19 @@ function UserRow({ user, isSelf }: { user: ManagedUser; isSelf: boolean }) {
               }}
             />
           ) : (
-            <Button size="sm" variant="secondary" disabled={pending} onClick={() => run(() => setUserActiveAction(user.id, true))}>
-              {pending ? <LoaderCircle className="animate-spin" aria-hidden /> : null}
-              Re-enable
-              <span className="sr-only"> {user.fullName}</span>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" disabled={pending} onClick={() => run(() => setUserActiveAction(user.id, true))}>
+                {pending ? <LoaderCircle className="animate-spin" aria-hidden /> : null}
+                Re-enable
+                <span className="sr-only"> {user.fullName}</span>
+              </Button>
+              {user.role !== "super_admin" ? (
+                <Button size="sm" variant="outline" disabled={pending} onClick={() => run(() => setUserActiveAction(user.id, false))}>
+                  Confirm sign-in blocked
+                  <span className="sr-only"> for {user.fullName}</span>
+                </Button>
+              ) : null}
+            </div>
           )}
           {disableProtected ? (
             <p id={guidanceId} className="max-w-48 text-xs text-muted-foreground">

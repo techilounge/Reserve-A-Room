@@ -29,9 +29,11 @@ export async function loadGuestReservation(rawReference: string): Promise<GuestL
   if (!reference) return { ok: false, reason: "invalid_reference" };
   const token = await tokenFromCookie();
   if (!token) return { ok: false, reason: "no_token" };
-  if (!(await hitRateLimit(RATE_LIMITS.guestLookupPerIp, await clientIp()))) {
+  const lookupLimit = await hitRateLimit(RATE_LIMITS.guestLookupPerIp, await clientIp());
+  if (lookupLimit === "denied") {
     return { ok: false, reason: "rate_limited" };
   }
+  if (lookupLimit === "unavailable") return { ok: false, reason: "unavailable" };
 
   const { data, error } = await createSupabaseServiceClient()
     .rpc("get_guest_reservation", { p_reference: reference, p_token_hash: hashGuestToken(token) })
@@ -48,9 +50,11 @@ export async function cancelGuestReservation(rawReference: string): Promise<{ ok
   const reference = normalizeReference(rawReference);
   const token = await tokenFromCookie();
   if (!reference || !token) return { ok: false, error: toAppError({ code: "RAR08" }) };
-  if (!(await hitRateLimit(RATE_LIMITS.guestCancelPerIp, await clientIp()))) {
+  const cancelLimit = await hitRateLimit(RATE_LIMITS.guestCancelPerIp, await clientIp());
+  if (cancelLimit === "denied") {
     return { ok: false, error: toAppError({ code: "RAR07" }) };
   }
+  if (cancelLimit === "unavailable") return { ok: false, error: toAppError(new Error("Rate limiter unavailable")) };
 
   const { error } = await createSupabaseServiceClient().rpc("cancel_guest_reservation", {
     p_reference: reference,

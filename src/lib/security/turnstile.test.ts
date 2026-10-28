@@ -29,13 +29,28 @@ afterEach(() => {
 });
 
 describe("Turnstile verification", () => {
-  it("is off unless both keys are set, and then never blocks or calls Cloudflare", async () => {
-    for (const env of [{}, { site: "site" }, { secret: "secret" }]) {
-      const { isTurnstileEnabled, verifyTurnstile } = await load(env);
+  it("is explicitly disabled only when both keys are absent", async () => {
+    const { getTurnstileConfiguration, isTurnstileEnabled, verifyTurnstile } = await load({});
+    expect(getTurnstileConfiguration()).toEqual({ status: "disabled", siteKey: null });
+    expect(isTurnstileEnabled()).toBe(false);
+    expect(await verifyTurnstile(undefined, "1.2.3.4")).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("treats either partial-key configuration as invalid and fails closed", async () => {
+    for (const env of [{ site: "site" }, { secret: "secret" }]) {
+      const { getTurnstileConfiguration, isTurnstileEnabled, verifyTurnstile } = await load(env);
+      expect(getTurnstileConfiguration().status).toBe("invalid");
       expect(isTurnstileEnabled()).toBe(false);
-      expect(await verifyTurnstile(undefined, "1.2.3.4")).toBe(true);
+      expect(await verifyTurnstile(undefined, "1.2.3.4")).toBe(false);
     }
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reports enabled only when both keys are present", async () => {
+    const { getTurnstileConfiguration, isTurnstileEnabled } = await load({ site: "site", secret: "secret" });
+    expect(getTurnstileConfiguration()).toEqual({ status: "enabled", siteKey: "site" });
+    expect(isTurnstileEnabled()).toBe(true);
   });
 
   it("rejects a missing token without calling Cloudflare", async () => {

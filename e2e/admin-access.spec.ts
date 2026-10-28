@@ -139,6 +139,14 @@ test("Super Admin accounts must be demoted before the Disable control is availab
   await page.getByRole("button", { name: "Keep enabled" }).click();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
 
+  await page.getByRole("button", { name: `Disable ${TEST_ACCOUNTS.admin.name}` }).click();
+  await page.getByRole("button", { name: "Disable account", exact: true }).click();
+  await expect(page.getByRole("button", { name: `Confirm sign-in blocked for ${TEST_ACCOUNTS.admin.name}` })).toBeVisible();
+  await page.getByRole("button", { name: `Confirm sign-in blocked for ${TEST_ACCOUNTS.admin.name}` }).click();
+  await expect(page.getByRole("button", { name: `Re-enable ${TEST_ACCOUNTS.admin.name}` })).toBeVisible();
+  await page.getByRole("button", { name: `Re-enable ${TEST_ACCOUNTS.admin.name}` }).click();
+  await expect(page.getByRole("button", { name: `Disable ${TEST_ACCOUNTS.admin.name}` })).toBeEnabled();
+
   await context.close();
 });
 
@@ -193,13 +201,28 @@ test("Audit Log search and date filters update live and reset pagination", async
   await context.close();
 });
 
-test("the email cron endpoint requires its secret", async ({ request }) => {
-  expect((await request.get("/api/cron/email-outbox")).status()).toBe(401);
-  expect((await request.get("/api/cron/email-outbox", { headers: { authorization: "Bearer wrong" } })).status()).toBe(401);
-  const ok = await request.get("/api/cron/email-outbox", { headers: { authorization: "Bearer e2e-cron-secret" } });
-  expect(ok.status()).toBe(200);
-  expect(await ok.json()).toMatchObject({
+test("both cron endpoints require the shared secret and report bounded work", async ({ request }) => {
+  for (const path of ["/api/cron/email-outbox", "/api/cron/recurrence-materializer"]) {
+    expect((await request.get(path)).status()).toBe(401);
+    expect((await request.get(path, { headers: { authorization: "Bearer wrong" } })).status()).toBe(401);
+  }
+
+  const email = await request.get("/api/cron/email-outbox", { headers: { authorization: "Bearer e2e-cron-secret" } });
+  expect(email.status()).toBe(200);
+  expect(await email.json()).toMatchObject({
     ok: true,
+    durationMs: expect.any(Number),
+    reservations: { claimed: expect.any(Number), sent: expect.any(Number), failed: expect.any(Number) },
+    system: { claimed: expect.any(Number), sent: expect.any(Number), failed: expect.any(Number) },
+  });
+
+  const recurrence = await request.get("/api/cron/recurrence-materializer", {
+    headers: { authorization: "Bearer e2e-cron-secret" },
+  });
+  expect(recurrence.status()).toBe(200);
+  expect(await recurrence.json()).toMatchObject({
+    ok: true,
+    durationMs: expect.any(Number),
     series: { claimed: expect.any(Number), created: expect.any(Number), exceptions: expect.any(Number), failed: 0 },
   });
 });

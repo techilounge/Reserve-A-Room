@@ -87,11 +87,16 @@ export async function createGuestReservation(raw: unknown, meta: SubmissionMeta)
   if (!(await verifyTurnstile(meta.turnstileToken, ip))) {
     return fail("validation", "Please complete the verification and try again.", "review");
   }
-  const [ipOk, emailOk] = await Promise.all([
+  const [ipLimit, emailLimit] = await Promise.all([
     hitRateLimit(RATE_LIMITS.reservationPerIp, ip),
     hitRateLimit(RATE_LIMITS.reservationPerEmail, input.email),
   ]);
-  if (!ipOk || !emailOk) return fail("rate_limited", friendlyMessage("rate_limited"), "review");
+  if (ipLimit === "unavailable" || emailLimit === "unavailable") {
+    return fail("unexpected", "Request protection is temporarily unavailable. Please try again shortly.", "review");
+  }
+  if (ipLimit === "denied" || emailLimit === "denied") {
+    return fail("rate_limited", friendlyMessage("rate_limited"), "review");
+  }
 
   // 4. Room + policy pre-checks for precise, friendly messages.
   const catalog = await loadCatalog();

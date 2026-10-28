@@ -49,6 +49,7 @@ export function ReservationWizard({
   today,
   prefill,
   turnstileSiteKey,
+  verificationUnavailable = false,
 }: {
   rooms: ReserveRoom[];
   ministries: { id: string; name: string }[];
@@ -57,6 +58,7 @@ export function ReservationWizard({
   prefill: ReservePrefill;
   /** Set only when Turnstile is fully configured (site + secret key). */
   turnstileSiteKey: string | null;
+  verificationUnavailable?: boolean;
 }) {
   // What the untouched form holds, and which link it was opened from (see the draft module).
   const [initialValues] = useState(() => initialReservationValues(prefill, rooms));
@@ -266,6 +268,10 @@ export function ReservationWizard({
       setSubmitError("Please complete the verification check above the button.");
       return;
     }
+    if (verificationUnavailable) {
+      setSubmitError("Verification is temporarily unavailable. Please try again shortly.");
+      return;
+    }
     setSubmitError(null);
     startTransition(async () => {
       const result = await submitReservation(getValues(), {
@@ -377,6 +383,11 @@ export function ReservationWizard({
               {turnstileSiteKey ? (
                 <TurnstileWidget key={turnstileKey} siteKey={turnstileSiteKey} onToken={setTurnstileToken} />
               ) : null}
+              {verificationUnavailable ? (
+                <p role="alert" className="rounded-lg border border-warning-border bg-warning-soft p-3 text-sm text-warning-soft-foreground">
+                  Verification is temporarily unavailable. Your entries are saved in this tab; please try again shortly.
+                </p>
+              ) : null}
             </>
           ) : null}
 
@@ -404,7 +415,12 @@ export function ReservationWizard({
             <span />
           )}
           {step === "review" ? (
-            <Button type="submit" size="lg" disabled={pending || !online} aria-disabled={pending || !online}>
+            <Button
+              type="submit"
+              size="lg"
+              disabled={pending || !online || verificationUnavailable}
+              aria-disabled={pending || !online || verificationUnavailable}
+            >
               {pending ? <LoaderCircle className="animate-spin" aria-hidden /> : null}
               {pending ? pendingLabel : submitLabel}
             </Button>

@@ -6,14 +6,14 @@ vi.mock("server-only", () => ({}));
 
 const verifyTurnstile = vi.fn<(token: string | undefined, ip: string, action?: string) => Promise<boolean>>();
 const rpc = vi.fn();
-const hitRateLimit = vi.fn(async () => true);
+const hitRateLimit = vi.fn<(...args: unknown[]) => Promise<"allowed" | "denied" | "unavailable">>(async () => "allowed");
 
 vi.mock("@/lib/security/turnstile", () => ({
   verifyTurnstile: (...args: [string | undefined, string, string?]) => verifyTurnstile(...args),
 }));
 vi.mock("@/lib/security/request", () => ({ clientIp: async () => "203.0.113.9" }));
 vi.mock("@/lib/security/rate-limit", () => ({
-  hitRateLimit: (...args: unknown[]) => (hitRateLimit as (...a: unknown[]) => Promise<boolean>)(...args),
+  hitRateLimit: (...args: unknown[]) => hitRateLimit(...args),
   RATE_LIMITS: { recurringRequestPerIp: {}, recurringRequestPerEmail: {} },
 }));
 vi.mock("@/lib/email/schedule", () => ({ scheduleSystemEmailDelivery: vi.fn() }));
@@ -66,6 +66,7 @@ beforeEach(() => {
   verifyTurnstile.mockReset();
   rpc.mockReset();
   hitRateLimit.mockClear();
+  hitRateLimit.mockResolvedValue("allowed");
   rpc.mockResolvedValue({ data: { id: "req-1", reference_code: "RRR-20261004-ABCD" }, error: null });
 });
 
@@ -102,6 +103,20 @@ describe("recurring request Turnstile verification", () => {
     await submitRecurringRequest(IDLE, form({ startedAt: String(Date.now()) }));
     await submitRecurringRequest(IDLE, form({ email: "not-an-email" }));
     expect(verifyTurnstile).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("distinguishes limiter denial from limiter unavailability and retains input", async () => {
+    verifyTurnstile.mockResolvedValue(true);
+    hitRateLimit.mockResolvedValueOnce("denied").mockResolvedValueOnce("allowed");
+    const denied = await submitRecurringRequest(IDLE, form({ firstName: "Denied" }));
+    expect(denied).toMatchObject({ status: "error", values: { firstName: "Denied" } });
+    expect(denied.message).toMatch(/too many/i);
+
+    hitRateLimit.mockResolvedValueOnce("unavailable").mockResolvedValueOnce("allowed");
+    const unavailable = await submitRecurringRequest(IDLE, form({ firstName: "Retry" }));
+    expect(unavailable).toMatchObject({ status: "error", values: { firstName: "Retry" } });
+    expect(unavailable.message).toMatch(/temporarily unavailable/i);
     expect(rpc).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHmac } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 
 import { getServerEnv, isProductionDeployment } from "@/lib/env/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -11,6 +11,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  */
 
 export type RateLimitRule = { bucket: string; limit: number; windowSeconds: number };
+export type RateLimitResult = "allowed" | "denied" | "unavailable";
 
 export const RATE_LIMITS = {
   reservationPerIp: { bucket: "reserve:ip", limit: 10, windowSeconds: 60 * 60 },
@@ -38,11 +39,10 @@ export function rateLimitKey(value: string): string {
 }
 
 /**
- * Records a hit and returns whether it is within the limit. Fails open (allows) if the
- * limiter itself is unavailable, so an outage never blocks legitimate reservations —
- * the other defenses (validation, honeypot, DB constraints) still apply.
+ * Records a hit and distinguishes policy denial from infrastructure failure. Callers
+ * choose a workflow-appropriate, fail-closed user response.
  */
-export async function hitRateLimit(rule: RateLimitRule, value: string): Promise<boolean> {
+export async function hitRateLimit(rule: RateLimitRule, value: string): Promise<RateLimitResult> {
   try {
     const { data, error } = await createSupabaseServiceClient().rpc("hit_rate_limit", {
       p_bucket: rule.bucket,
@@ -51,9 +51,15 @@ export async function hitRateLimit(rule: RateLimitRule, value: string): Promise<
       p_window_seconds: rule.windowSeconds,
     });
     if (error) throw error;
-    return data !== false;
+    if (data === true) return "allowed";
+    if (data === false) return "denied";
+    throw new Error("Rate limiter returned no decision.");
   } catch (error) {
-    console.error("[rate-limit] check failed; allowing request", error);
-    return true;
+    console.error("[rate-limit] check unavailable", {
+      bucket: rule.bucket,
+      correlationId: randomUUID(),
+      error: error instanceof Error ? error.message : "Unknown limiter error",
+    });
+    return "unavailable";
   }
 }

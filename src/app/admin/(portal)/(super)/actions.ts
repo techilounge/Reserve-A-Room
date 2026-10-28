@@ -3,6 +3,7 @@
 import { revalidatePath, updateTag } from "next/cache";
 
 import { assertPermission } from "@/lib/auth/guards";
+import { synchronizeAccountState } from "@/lib/auth/account-state";
 import { authSetupUrl } from "@/lib/auth/setup-link";
 import { getAppUrl } from "@/lib/app-url";
 import { CATALOG_TAG } from "@/lib/data/catalog";
@@ -269,15 +270,34 @@ export async function setUserActiveAction(userId: string, active: boolean): Prom
   }
   if (!UUID.test(userId)) return { ok: false, message: "Invalid request." };
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.rpc("set_user_active", { p_user_id: userId, p_active: active });
-  if (error) return fail(error);
+  const service = createSupabaseServiceClient();
+  const { data: profile, error: profileError } = await service.from("profiles").select("active").eq("id", userId).maybeSingle();
+  if (profileError) return fail(profileError);
+  if (!profile) return { ok: false, message: "Administrator account not found." };
 
-  // Access is already revoked by the profile flag (checked on every request and by RLS).
-  // Banning the auth user also stops them from signing in or refreshing a session.
-  const { error: banError } = await createSupabaseServiceClient().auth.admin.updateUserById(userId, {
-    ban_duration: active ? "none" : "876000h",
+  const result = await synchronizeAccountState({
+    active,
+    profileAlreadyActive: profile.active,
+    updateProfile: async () => {
+      const { error } = await supabase.rpc("set_user_active", { p_user_id: userId, p_active: active });
+      return { error };
+    },
+    updateAuth: async () => {
+      const { error } = await service.auth.admin.updateUserById(userId, {
+        ban_duration: active ? "none" : "876000h",
+      });
+      return { error };
+    },
   });
-  if (banError) console.error("[super-admin] auth ban update failed", banError.message);
+  if (!result.ok) {
+    console.error("[super-admin] account state synchronization failed", {
+      userId,
+      requestedState: active ? "active" : "disabled",
+      partial: result.partial,
+    });
+    revalidatePath("/admin/users");
+    return { ok: false, message: result.message };
+  }
 
   revalidatePath("/admin/users");
   return { ok: true, message: active ? "Account re-enabled." : "Account disabled." };

@@ -28,7 +28,7 @@ files (other than `.env.example`), no keys, no real member data in seeds or fixt
 
 | Concern | Choice | Notes |
 | --- | --- | --- |
-| Framework | Next.js **16.3.6** (App Router, Turbopack), React 19.2 | Stable `latest` tag only; no canary. Next 16 uses `proxy.ts` (formerly `middleware.ts`). |
+| Framework | Next.js **16.4.3** (App Router, Turbopack), React 19.2 | Patched stable release; no canary. Next 16 uses `proxy.ts` (formerly `middleware.ts`). |
 | Language | TypeScript **5.x**, `strict` | Pinned by `create-next-app@16.3.6` (the combination Next 16.3 is tested with). TS 7 is not adopted yet. |
 | Styling | Tailwind CSS 4 + CSS-variable design tokens | Tokens in `globals.css`; no hard-coded colors in components. |
 | Components | shadcn/ui 4 (`radix-nova` style, Radix primitives), Lucide icons | Copied into `src/components/ui`, owned by the project. Button sizes raised to 40–44px for touch. |
@@ -40,7 +40,7 @@ files (other than `.env.example`), no keys, no real member data in seeds or fixt
 | Backend | Supabase (Postgres 17, Auth, Storage) | Migrations in `supabase/migrations`. |
 | Email | Resend + React Email | Server-only. |
 | PWA | Hand-written service worker (`public/sw.js`) + `app/manifest.ts` | See ADR-12. No PWA plugin. |
-| Unit tests | Vitest 5 | Co-located `*.test.ts`. Component-test libraries are added when a phase needs them. |
+| Unit tests | Vitest 5.0.5 | Co-located `*.test.ts`. Component-test libraries are added when a phase needs them. |
 | DB tests | Vitest + PGlite (in-process Postgres) running the real migrations | RLS, constraints, triggers, grants (ADR-22). |
 | E2E | Playwright | Against local Supabase + `next start`. |
 | Hosting | Vercel (Fluid compute / Node runtime) | Node 24 locally; `engines.node >= 22`. |
@@ -438,8 +438,9 @@ reservation page with a **Retry** button (staff), and an in-app notification fla
 failures. Retries re-render from current reservation data.
 Admin recipients = active staff with `email_notifications = true` +
 `app_settings.extra_admin_notification_emails`.
-Without `RESEND_API_KEY` in development, emails are logged to the console and marked
-`skipped`. In production a missing key fails the environment validation.
+Without `RESEND_API_KEY` in development, delivery is marked `skipped` and only a safe
+event identifier is logged; message bodies and private links are not logged. In production
+a missing key is recorded as a delivery failure.
 
 ### ADR-11 · Notifications
 Created in SQL alongside the event (new pending request, requester cancellation,
@@ -468,8 +469,11 @@ Supabase Auth email + password for staff only. Public signup is disabled in the
 dashboard. Invitations and resets use `auth.admin.generateLink` (server, service role)
 to create one-time tokens without asking Supabase to send mail. The app renders branded
 React Email templates and delivers them directly through Resend. Profile creation and the
-role are set in the same server action. Disabling a user sets
-`profiles.active = false` **and** bans the auth user so refresh tokens stop working.
+role are set in the same server action. Account-state changes use an ordered two-system
+workflow: enabling removes the Auth ban before restoring `profiles.active`; disabling
+revokes `profiles.active` before applying the Auth ban. The action reloads current state,
+skips redundant profile writes, and reports partial completion instead of returning a
+false success when the second provider operation fails.
 The last active Super Admin is protected by a trigger that takes an advisory lock and
 refuses any change that leaves zero, so two Super Admins demoting each other
 concurrently cannot both succeed.
@@ -483,10 +487,13 @@ it refuses. There is no web route for this.
 Honeypot field, a minimum fill time, Zod payload limits, a 16 KB action body cap, and a
 Postgres-backed rate limit keyed by an HMAC of IP (and separately of email). This works
 across stateless Vercel instances with no extra service and stores no raw IPs.
-Optional Cloudflare Turnstile is enabled only when both Turnstile env vars are set. Client
-errors retain Cloudflare's code, show a recoverable retry state, and verification remains
-fail-closed. Siteverify responses must match the form's own action (`reserve` or
-`recurring-request`) and the configured application hostname.
+Cloudflare Turnstile is required in production and optional only for local development or
+previews when both keys are absent. A partial key configuration fails the pre-build check,
+renders a branded temporary-unavailable state, and verification remains fail-closed.
+Client errors retain Cloudflare's code and show a recoverable retry state. Siteverify
+responses must match the form's own action (`reserve` or `recurring-request`) and the
+configured application hostname. The Postgres limiter returns `allowed`, `denied`, or
+`unavailable`; no infrastructure failure is interpreted as permission to continue.
 
 ### ADR-15 · Security headers
 Set in `next.config.ts`: CSP (self + Supabase URL for connect/img, Turnstile when enabled,
@@ -693,12 +700,23 @@ browser is redirected to `/reservation/<REF>?submitted=1`.
 - **Triggers:** `scheduleEmailDelivery(reservationId)` wraps the worker in `after()`. Every
   action that can queue email calls it: guest submit and cancel, staff approve, decline,
   cancel, edit and create, and retry.
-- **Safety net:** `/api/cron/email-outbox` runs daily. It requires `Bearer $CRON_SECRET`,
-  compared in constant time.
+- **Safety net:** `/api/cron/email-outbox` runs daily and drains at most six rows from each
+  outbox with concurrency two. Provider waits are capped at 12 seconds, keeping worst-case
+  provider wait below the 60-second function budget. It requires `Bearer $CRON_SECRET`,
+  compared in constant time by the shared cron guard.
 - **Links:** the requester's link is rebuilt from the stored seed (ADR-9). Staff emails link
   to `/admin/reservations/<id>` and never contain the requester's token.
-- **Idempotency:** the key is `email-log-<id>-<attempt>`, so a network retry within one
-  claim can't send a second copy.
+- **Idempotency:** both outboxes derive a versioned, namespaced Resend key from the
+  immutable outbox row ID. Lease recovery and a failed completion RPC therefore reuse
+  the same provider request identity; `attempt_count` only limits and diagnoses retries.
+  Resend retains keys for 24 hours, while stale claims are recovered after 10 minutes.
+  `20261027100000_email_delivery_retry_guard.sql` stores only a payload fingerprint and
+  first provider-attempt timestamp. A changed payload or retry after 23 hours is parked
+  for manual review rather than risking a second delivery; legacy in-flight/failed rows
+  are also parked on migration. Apply that migration before the corresponding code.
+- **Completion diagnostics:** if Resend returns a provider message ID but the completion
+  RPC fails, the worker emits a structured record containing only the outbox ID, provider
+  ID, status, and database error. Recipient content and guest tokens are never logged.
 - **Failures:** a failure is stored on the row, truncated to 500 characters. Failed
   requester emails raise an `email_failed` notification to staff. `retry_email()`
   (staff, audited) re-queues failed or skipped rows.
@@ -761,8 +779,28 @@ browser is redirected to `/reservation/<REF>?submitted=1`.
 - Persistence is added by `20260925100000_recurring_reservations.sql`. PostgreSQL
   remains the final authority for room policy and overlap rules: initial batches are
   atomic, while service-role rolling materialization uses claim leases, idempotent
-  occurrence keys, and per-date exceptions. The protected cron route materializes due
-  occurrences before processing email queues.
+  occurrence keys, and per-date exceptions. `/api/cron/recurrence-materializer` advances
+  at most ten series in its own protected daily invocation, isolated from the later email
+  sweep. On Hobby, the jobs use separate UTC hours because execution is hourly-granularity.
+
+### Proposed ADR · Church Calendar planning (Phase 0, awaiting owner review)
+
+The proposed Church Calendar is a higher-level event planning system, separate from
+operational room reservations. An approved event would atomically create linked room
+holds and shared-resource allocations while preserving the existing exclusion constraint.
+Ministry access would be a scoped, revocable invitation capability, not a new staff role.
+Only approved public events would appear in the public calendar and feeds. Existing
+`/admin/calendar` remains the room schedule; a separate Church Calendar would display
+planning events. The existing recurrence, authentication, audit, notification and
+outbox infrastructure should be reused where its current boundaries fit.
+
+This is a proposal only: no calendar schema or routes have been implemented. See
+`docs/CHURCH_CALENDAR_IMPLEMENTATION_PLAN.md` for the proposed tables, lifecycle,
+transactional approval and conflict model, calendar-only horizon exception, security,
+website discovery, open policy choices and required review gates. The owner must review
+Phase 0 before Phase 1 begins. In particular, overnight/setup occupancy requires an
+explicit decision because the current reservation trigger enforces one local day and
+booking-grid alignment in addition to the normal horizon.
 
 ### ADR-31 · Staff lifecycle and Super Admin invariants
 

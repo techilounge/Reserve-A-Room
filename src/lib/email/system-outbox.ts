@@ -26,6 +26,9 @@ import type { MonthlyOrdinal, Weekday } from "@/lib/recurrence/types";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 import { formatFrom } from "./address";
+import { prepareProviderDelivery } from "./delivery-guard";
+import { emailProviderIdempotencyKey } from "./idempotency";
+import { withEmailProviderTimeout } from "./provider-timeout";
 
 type Outcome = "sent" | "failed" | "skipped";
 type Service = ReturnType<typeof createSupabaseServiceClient>;
@@ -87,7 +90,7 @@ type SystemEmailContext = {
   occurrences: { occurrence_date: LocalDate }[];
 };
 
-export async function deliverQueuedSystemEmails(options: { entityId?: string; limit?: number } = {}) {
+export async function deliverQueuedSystemEmails(options: { entityId?: string; limit?: number; concurrency?: number } = {}) {
   const supabase = createSupabaseServiceClient();
   const { data: ids, error } = await supabase.rpc("claim_system_emails", {
     p_limit: options.limit ?? 20,
@@ -95,8 +98,23 @@ export async function deliverQueuedSystemEmails(options: { entityId?: string; li
   });
   if (error) throw error;
 
-  const totals: Record<Outcome, number> = { sent: 0, failed: 0, skipped: 0 };
-  for (const id of ids ?? []) totals[await deliverOne(supabase, id)] += 1;
+  const totals: Record<Outcome, number> & { claimed: number } = {
+    claimed: ids?.length ?? 0,
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+  };
+  const queue = [...(ids ?? [])];
+  const workerCount = Math.min(Math.max(1, options.concurrency ?? 1), queue.length);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      for (;;) {
+        const id = queue.shift();
+        if (!id) return;
+        totals[await deliverOne(supabase, id)] += 1;
+      }
+    }),
+  );
   return totals;
 }
 
@@ -115,7 +133,14 @@ async function deliverOne(supabase: Service, id: string): Promise<Outcome> {
     p_provider_message_id: outcome.providerId,
     p_error: outcome.error,
   });
-  if (error) console.error("[system-email] could not record result", id, error);
+  if (error) {
+    console.error("[system-email] could not record result", {
+      outboxId: id,
+      providerMessageId: outcome.providerId,
+      status: outcome.status,
+      error: error.message,
+    });
+  }
   return outcome.status;
 }
 
@@ -219,20 +244,26 @@ async function send(supabase: Service, id: string): Promise<{ status: Outcome; p
   if (!env.RESEND_API_KEY || !from) {
     const problem = "Email delivery is not configured (RESEND_API_KEY and RESEND_FROM_EMAIL).";
     if (isProductionDeployment()) return { status: "failed", error: problem };
-    console.info(`[system-email] skipped (${problem})\n  to: ${ctx.recipient}\n  subject: ${built.subject}\n${text}`);
+    console.info("[system-email] skipped", { outboxId: id, eventType: ctx.event_type });
     return { status: "skipped" };
   }
 
-  const { data: sent, error: sendError } = await new Resend(env.RESEND_API_KEY).emails.send(
-    {
-      from,
-      to: [ctx.recipient],
-      subject: built.subject,
-      html,
-      text,
-      replyTo: env.RESEND_REPLY_TO ?? ctx.settings.contact_email ?? undefined,
+  const payload = {
+    from,
+    to: [ctx.recipient],
+    subject: built.subject,
+    html,
+    text,
+    replyTo: env.RESEND_REPLY_TO ?? ctx.settings.contact_email ?? undefined,
+  };
+  if (!(await prepareProviderDelivery(supabase, id, true, payload))) {
+    return { status: "failed", error: "Delivery outcome requires manual review before retrying." };
+  }
+  const { data: sent, error: sendError } = await withEmailProviderTimeout(
+    (signal) => {
+      const options = { idempotencyKey: emailProviderIdempotencyKey("system", id), signal };
+      return new Resend(env.RESEND_API_KEY!).emails.send(payload, options);
     },
-    { idempotencyKey: `system-email-log-${id}-${ctx.attempt_count}` },
   );
   if (sendError || !sent) return { status: "failed", error: sendError?.message ?? "Resend returned no message id." };
   return { status: "sent", providerId: sent.id };

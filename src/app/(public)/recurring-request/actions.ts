@@ -114,11 +114,14 @@ export async function submitRecurringRequest(
     return errorState("Please choose a start date within the next two years.", values, { preferredStartDate: "Choose a date within the next two years." });
   }
 
-  const [ipAllowed, emailAllowed] = await Promise.all([
+  const [ipLimit, emailLimit] = await Promise.all([
     hitRateLimit(RATE_LIMITS.recurringRequestPerIp, ip),
     hitRateLimit(RATE_LIMITS.recurringRequestPerEmail, input.email),
   ]);
-  if (!ipAllowed || !emailAllowed) {
+  if (ipLimit === "unavailable" || emailLimit === "unavailable") {
+    return errorState("Request protection is temporarily unavailable. Please try again shortly.", values);
+  }
+  if (ipLimit === "denied" || emailLimit === "denied") {
     return errorState("Too many requests were submitted. Please wait and try again later.", values);
   }
 

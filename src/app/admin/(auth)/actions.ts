@@ -32,11 +32,16 @@ export async function signIn(_prev: AuthFormState, form: FormData): Promise<Auth
   if (!parsed.success) return { status: "error", message: "Please enter your email and password.", email };
 
   const ip = await clientIp();
-  const [ipOk, emailOk] = await Promise.all([
+  const [ipLimit, emailLimit] = await Promise.all([
     hitRateLimit(RATE_LIMITS.loginPerIp, ip),
     hitRateLimit(RATE_LIMITS.loginPerEmail, parsed.data.email),
   ]);
-  if (!ipOk || !emailOk) return { status: "error", message: "Too many sign-in attempts. Please wait a few minutes.", email };
+  if (ipLimit === "unavailable" || emailLimit === "unavailable") {
+    return { status: "error", message: "Sign-in is temporarily unavailable. Please try again shortly.", email };
+  }
+  if (ipLimit === "denied" || emailLimit === "denied") {
+    return { status: "error", message: "Too many sign-in attempts. Please wait a few minutes.", email };
+  }
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
@@ -66,7 +71,7 @@ export async function requestPasswordReset(_prev: AuthFormState, form: FormData)
     status: "success",
     message: "If that email belongs to an administrator, a password reset link is on its way.",
   };
-  if (!(await hitRateLimit(RATE_LIMITS.passwordResetPerIp, await clientIp()))) return success;
+  if ((await hitRateLimit(RATE_LIMITS.passwordResetPerIp, await clientIp())) !== "allowed") return success;
 
   const supabase = createSupabaseServiceClient();
   const redirectTo = new URL("/admin/auth/confirm?next=/admin/set-password", getAppUrl()).toString();

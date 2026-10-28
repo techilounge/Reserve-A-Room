@@ -5,8 +5,10 @@ Room reservations for **Stonehill Seventh-day Adventist Church**
 
 Production: https://reservearoom.stonehillchurch.org
 
-> **Status:** the production application and all migrations through the Phase 18 rollout
-> are live from `main`. Subsequent enhancements are validated locally before their own release.
+> **Status:** the production application, Phases 0–26, and all migrations through
+> `20261004100000_unbounded_reservation_export.sql` are live from `main` at baseline
+> commit `1f287ee`. Security and reliability remediation is tracked in
+> `docs/REVIEW_REMEDIATION_IMPLEMENTATION_PLAN.md`.
 
 ## What it does
 
@@ -105,7 +107,7 @@ the same variables in Vercel → Settings → Environment Variables for **Produc
 | `RESEND_FROM_EMAIL` | Yes, e.g. `reservations@reservearoom.stonehillchurch.org` | Sender address (the display name comes from Settings) |
 | `RESEND_REPLY_TO` | Optional | Reply-to for requester emails (defaults to the Settings contact email) |
 | `CRON_SECRET` | Recommended | Protects the scheduled recurrence materializer and email-outbox sweep |
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Optional (both or neither) | Cloudflare Turnstile on the guest reservation form and the recurring-date request form |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Required in Production; both or neither elsewhere | Cloudflare Turnstile on the guest reservation form and the recurring-date request form. A partial configuration fails the build and submissions fail closed. |
 | `INITIAL_SUPER_ADMIN_EMAIL` / `INITIAL_SUPER_ADMIN_NAME` | Only in `.env.local`, for the one-time bootstrap | `npm run bootstrap:super-admin` |
 
 Generate each secret with:
@@ -231,8 +233,9 @@ Reservation emails are sent through [Resend](https://resend.com) from the verifi
    sender, React Email branding and app-owned confirmation route as the rest of the app.
    Supabase SMTP is not used.
 6. **Cron:** set `CRON_SECRET` in Vercel (any long random string). `vercel.json` schedules
-   `/api/cron/email-outbox`; each authenticated run first materializes due recurring
-   occurrences, then drains both reservation and system-email outboxes.
+   two independently protected daily jobs: `/api/cron/recurrence-materializer` advances
+   due series, and `/api/cron/email-outbox` drains bounded reservation/system-email
+   batches. The routes use the same bearer secret but isolate failure and duration budgets.
 
 **How sending works.** A reservation change queues its emails in `email_logs` in the same
 database transaction. Right after the response is sent, the server renders the React Email
@@ -240,7 +243,10 @@ template (`src/emails/`) and sends it. Every email is recorded on the reservatio
 Sent, Sending…, Not delivered (with the provider's error) or Not sent (email not
 configured). Staff can press **Send again** on any email that wasn't delivered. A failed
 requester email also creates an in-app notification. Anything left queued is picked up by
-the daily sweep.
+the bounded daily sweep; provider calls time out after 12 seconds and recovered rows
+reuse the same provider idempotency key. Emails flagged for manual review must be checked
+against Resend before further delivery. See the remediation plan for migration ordering,
+legacy in-flight email and backlog handling before production rollout.
 
 Emails sent:
 
@@ -260,8 +266,7 @@ Emails sent:
 | Invited administrator accepts and enters the portal for the first time | Active Super Admins |
 
 **Without a key.** In local development and previews without `RESEND_API_KEY`, emails are
-marked "Not sent" and their subject is logged (locally, the whole plain-text body
-including the private link is printed to the terminal). In production a missing key is
+marked "Not sent" without logging the message body or private links. In production a missing key is
 recorded as a delivery failure, so staff are alerted.
 
 **Previewing templates:**

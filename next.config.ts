@@ -58,6 +58,11 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "16kb",
+    },
+  },
   // The E2E suite builds into its own folder (it bakes in the mock Supabase URL).
   distDir: process.env.NEXT_DIST_DIR || ".next",
   outputFileTracingIncludes: {

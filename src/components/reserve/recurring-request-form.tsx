@@ -43,12 +43,14 @@ export function RecurringRequestForm({
   today,
   timeOptions,
   turnstileSiteKey,
+  verificationUnavailable = false,
 }: {
   rooms: { id: string; name: string; capacity: number }[];
   today: string;
   timeOptions: LocalTime[];
   /** Set only when Turnstile is fully configured (site + secret key). */
   turnstileSiteKey: string | null;
+  verificationUnavailable?: boolean;
 }) {
   const [state, action, pending] = useActionState(submitRecurringRequest, INITIAL);
   const [, startTransition] = useTransition();
@@ -145,6 +147,10 @@ export function RecurringRequestForm({
       action={action}
       onSubmit={(event) => {
         event.preventDefault();
+        if (verificationUnavailable) {
+          setVerificationNotice("Verification is temporarily unavailable. Please try again shortly.");
+          return;
+        }
         if (turnstileSiteKey && !turnstileToken) {
           setVerificationNotice("Please complete the verification check above the button.");
           return;
@@ -296,10 +302,15 @@ export function RecurringRequestForm({
           ) : null}
         </div>
       ) : null}
+      {verificationUnavailable ? (
+        <p role="alert" className="rounded-lg border border-warning-border bg-warning-soft p-3 text-sm text-warning-soft-foreground">
+          Verification is temporarily unavailable. Your entries are saved in this tab; please try again shortly.
+        </p>
+      ) : null}
 
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
         <Button asChild variant="outline" size="lg"><Link href="/reserve">Back to one-time reservations</Link></Button>
-        <Button type="submit" size="lg" disabled={pending}>
+        <Button type="submit" size="lg" disabled={pending || verificationUnavailable}>
           {pending ? <LoaderCircle className="animate-spin" aria-hidden /> : null}
           {pending ? "Sending…" : "Send recurring request"}
         </Button>

@@ -6,9 +6,22 @@ import { getServerEnv } from "@/lib/env/server";
 
 import { TURNSTILE_ACTIONS } from "./turnstile-actions";
 
-/** Turnstile is optional: enabled only when both site and secret keys are configured. */
+export type TurnstileConfiguration =
+  | { status: "disabled"; siteKey: null }
+  | { status: "enabled"; siteKey: string }
+  | { status: "invalid"; siteKey: string | null };
+
+/** Partial configuration is an operator error, never an implicit opt-out. */
+export function getTurnstileConfiguration(): TurnstileConfiguration {
+  const siteKey = getTurnstileSiteKey();
+  const secretKey = getServerEnv().TURNSTILE_SECRET_KEY;
+  if (siteKey && secretKey) return { status: "enabled", siteKey };
+  if (!siteKey && !secretKey) return { status: "disabled", siteKey: null };
+  return { status: "invalid", siteKey };
+}
+
 export function isTurnstileEnabled(): boolean {
-  return Boolean(getTurnstileSiteKey() && getServerEnv().TURNSTILE_SECRET_KEY);
+  return getTurnstileConfiguration().status === "enabled";
 }
 
 export async function verifyTurnstile(
@@ -16,7 +29,12 @@ export async function verifyTurnstile(
   ip: string,
   expectedAction: string = TURNSTILE_ACTIONS.reserve,
 ): Promise<boolean> {
-  if (!isTurnstileEnabled()) return true;
+  const configuration = getTurnstileConfiguration();
+  if (configuration.status === "disabled") return true;
+  if (configuration.status === "invalid") {
+    console.error("[turnstile] incomplete configuration");
+    return false;
+  }
   if (!token) return false;
   try {
     const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {

@@ -10,6 +10,9 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 import { formatFrom } from "./address";
 import { toEmailData, type EmailContextRow } from "./data";
+import { prepareProviderDelivery } from "./delivery-guard";
+import { emailProviderIdempotencyKey } from "./idempotency";
+import { withEmailProviderTimeout } from "./provider-timeout";
 import { renderEmail } from "./render";
 
 /**
@@ -24,7 +27,7 @@ type Service = ReturnType<typeof createSupabaseServiceClient>;
 
 const STAFF_EVENTS = new Set(["admin_new_request", "admin_reservation_created", "admin_reservation_cancelled"]);
 
-export async function deliverQueuedEmails(options: { reservationId?: string; limit?: number } = {}) {
+export async function deliverQueuedEmails(options: { reservationId?: string; limit?: number; concurrency?: number } = {}) {
   const supabase = createSupabaseServiceClient();
   const { data: ids, error } = await supabase.rpc("claim_emails", {
     p_limit: options.limit ?? 20,
@@ -32,10 +35,23 @@ export async function deliverQueuedEmails(options: { reservationId?: string; lim
   });
   if (error) throw error;
 
-  const totals: Record<Outcome, number> = { sent: 0, failed: 0, skipped: 0 };
-  for (const id of ids ?? []) {
-    totals[await deliverOne(supabase, id)] += 1;
-  }
+  const totals: Record<Outcome, number> & { claimed: number } = {
+    claimed: ids?.length ?? 0,
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+  };
+  const queue = [...(ids ?? [])];
+  const workerCount = Math.min(Math.max(1, options.concurrency ?? 1), queue.length);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      for (;;) {
+        const id = queue.shift();
+        if (!id) return;
+        totals[await deliverOne(supabase, id)] += 1;
+      }
+    }),
+  );
   return totals;
 }
 
@@ -54,7 +70,14 @@ async function deliverOne(supabase: Service, id: string): Promise<Outcome> {
     p_provider_message_id: outcome.providerId,
     p_error: outcome.error,
   });
-  if (error) console.error("[email] could not record result", id, error);
+  if (error) {
+    console.error("[email] could not record result", {
+      outboxId: id,
+      providerMessageId: outcome.providerId,
+      status: outcome.status,
+      error: error.message,
+    });
+  }
   return outcome.status;
 }
 
@@ -79,16 +102,22 @@ async function send(supabase: Service, id: string): Promise<{ status: Outcome; p
   if (!env.RESEND_API_KEY || !from) {
     const problem = "Email delivery is not configured (RESEND_API_KEY and RESEND_FROM_EMAIL).";
     if (isProductionDeployment()) return { status: "failed", error: problem };
-    // Development / previews without a key: show what would have been sent.
-    console.info(`[email] skipped (${problem})\n  to: ${ctx.recipient}\n  subject: ${email.subject}\n${email.text}`);
+    // Do not log rendered bodies: they may contain private guest links.
+    console.info("[email] skipped", { outboxId: id, eventType: ctx.event_type });
     return { status: "skipped" };
   }
 
   const replyTo = isStaffEmail ? ctx.requester_email : (env.RESEND_REPLY_TO ?? ctx.contact_email ?? undefined);
-  const { data, error: sendError } = await new Resend(env.RESEND_API_KEY).emails.send(
-    { from, to: [ctx.recipient], subject: email.subject, html: email.html, text: email.text, replyTo },
-    // Same key for the same claim: a network retry can't produce a second copy.
-    { idempotencyKey: `email-log-${id}-${ctx.attempt_count}` },
+  const payload = { from, to: [ctx.recipient], subject: email.subject, html: email.html, text: email.text, replyTo };
+  if (!(await prepareProviderDelivery(supabase, id, false, payload))) {
+    return { status: "failed", error: "Delivery outcome requires manual review before retrying." };
+  }
+  const { data, error: sendError } = await withEmailProviderTimeout(
+    (signal) => {
+      // Resend forwards request options to fetch; retain the signal to abort on timeout.
+      const options = { idempotencyKey: emailProviderIdempotencyKey("reservation", id), signal };
+      return new Resend(env.RESEND_API_KEY!).emails.send(payload, options);
+    },
   );
   if (sendError || !data) return { status: "failed", error: sendError?.message ?? "Resend returned no message id." };
   return { status: "sent", providerId: data.id };

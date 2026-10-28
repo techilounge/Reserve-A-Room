@@ -200,7 +200,8 @@ Verification completed for that fix before commit:
 - Each form's token is bound to its own Cloudflare action (`reserve`, `recurring-request`) via `src/lib/security/turnstile-actions.ts`, and `verifyTurnstile` takes the expected action, so a token minted on one form can't be used on the other.
 - No migration, environment-variable or Cloudflare-dashboard change is required: the same widget and keys protect both forms.
 - Verification: typecheck and lint passed; 31 unit-test files / 208 tests passed (new verifier and action tests); 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 99/99. A real-browser check against Cloudflare's test keys showed the widget rendering in the form, a token reaching the server, the server's siteverify rejection of the test token's `example.com` hostname, preserved input and no CSP violations. The accepted path is covered by unit tests, since test tokens can't carry this site's hostname.
-- Status: committed locally; not yet pushed or deployed.
+- Status: committed as `9d52e6f`, pushed to `origin/main`, and included in the successful
+  Vercel production deployment for cumulative commit `1f287ee`.
 
 ### Phase 25 local follow-up status
 
@@ -208,7 +209,8 @@ Verification completed for that fix before commit:
 - **Capacity warning:** once a room is chosen, the attendance field shows "<room> is set up for up to N people" and the shared `CapacityWarning` appears live when attendance exceeds the room's capacity. It is a warning only and never blocks sending (ADR-4). The page now passes each room's capacity to the form.
 - No migration or environment change. The one lint exception (`react-hooks/set-state-in-effect`, around the one-time sessionStorage restore) is documented in the code.
 - Verification: typecheck and lint passed; 32 unit-test files / 214 tests passed; 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 101/101. Screenshots at 1000px, 320px and dark mode showed no horizontal overflow.
-- Status: committed locally; not yet pushed or deployed.
+- Status: committed as `a8480e8`, pushed to `origin/main`, and included in the successful
+  Vercel production deployment for cumulative commit `1f287ee`.
 
 ### Phase 26 local follow-up status
 
@@ -216,7 +218,46 @@ Verification completed for that fix before commit:
 - The Privacy/Terms acceptance is never saved. Restored data is re-validated: a room that is gone, a past or beyond-horizon date, a removed ministry, or answers that no longer pass validation send the visitor back to the first step that needs attention. A draft belongs to the link it was started from: a different pre-filled URL ignores and clears it. The original form-shown time is saved too, so the 3-second minimum-fill check still counts from when the form was first shown (a refresh cannot restart or skip it). The confirmation page clears the draft.
 - No migration or environment change. The one lint exception (`react-hooks/set-state-in-effect`, around the one-time restore) is documented in the code.
 - Verification: typecheck and lint passed with no warnings; 33 unit-test files / 227 tests passed; 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 103/103. A restored-state check at 1000px, 320px and in dark mode showed no axe violations and no horizontal overflow.
-- Status: committed locally; not yet pushed or deployed.
+- Status: committed as `1f287ee`, pushed to `origin/main`, and deployed successfully by
+  Vercel on 2026-10-05.
+
+## Post-review remediation checkpoint — 2026-10-27
+
+- The 2026-10-27 read-only review identified dependency, email-idempotency,
+  cross-system user-state, abuse-control, cron-budget, and documentation issues.
+- The durable remediation sequence and acceptance criteria are recorded in
+  `docs/REVIEW_REMEDIATION_IMPLEMENTATION_PLAN.md`.
+- Phase R0 reconciled the deployed Phase 24–26 and export documentation against baseline
+  `1f287ee`; no application, schema, environment, or production change was required.
+- Phase R1 upgraded Next.js/ESLint to 16.4.3, Zod to 4.6.7, Sharp to 0.35.5, and
+  Vitest to 5.0.5; retained patched shadcn 4.22.2 as a build-only dependency; and pinned
+  `source-map-js` 1.2.2. Both full and production-only npm audits report zero findings.
+- Phase R1 verification: typecheck and lint passed; 33 unit-test files / 227 tests passed;
+  12 database-test files / 147 tests passed; the production build passed; and the complete
+  Playwright suite passed 103/103.
+- Follow-up work has since implemented a local retry guard and other remediations; consult
+  the 2026-10-27 reconciliation checkpoint in the remediation plan for their status.
+
+### Church Calendar Phase 0 and remediation checkpoint — 2026-10-27
+
+- Owner supplied a Church Calendar master prompt requiring **Phase 0 only**, then a
+  mandatory owner review before Phase 1. The Phase 0 architecture proposal and full
+  phased plan are in `docs/CHURCH_CALENDAR_IMPLEMENTATION_PLAN.md`; no Church Calendar
+  schema or application feature has been implemented. Do not proceed past this gate
+  until the owner explicitly instructs continuation.
+- GitHub `main` was checked read-only at `1f287eecb0979f40339011a49ab3b99508ec6514`,
+  matching local `origin/main` at the review. Branch `codex/church-calendar-management`
+  starts there. Independent security-remediation changes are recorded locally with this
+  handoff; they have not been deployed.
+- Latest local check passed typecheck, lint, 40 unit files / 250 tests, 13 database
+  files / 152 tests and the production build. Full Playwright passed 103/103 before the
+  final small changes; focused browser checks passed 21/21 afterward. See the remediation
+  plan for remaining preview and operational tests and migration-first rollout.
+- `20261027100000_email_delivery_retry_guard.sql` is local only and must be applied before
+  deploying the matching code after an owner-authorized, email-queue-aware rollout.
+- Website discovery found a public Tribe Events calendar and a separate Events page;
+  site API access, plugin configuration and actual authoritative source are unverified.
+  No website writes or production mutations were made.
 
 ## Required quality gates
 

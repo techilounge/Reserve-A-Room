@@ -160,6 +160,9 @@ export type Database = {
           last_attempt_at: string | null;
           sent_at: string | null;
           created_at: string;
+          provider_first_attempt_at: string | null;
+          provider_payload_hash: string | null;
+          provider_review_required: boolean;
         };
         Insert: {
           id?: string;
@@ -173,6 +176,9 @@ export type Database = {
           last_attempt_at?: string | null;
           sent_at?: string | null;
           created_at?: string;
+          provider_first_attempt_at?: string | null;
+          provider_payload_hash?: string | null;
+          provider_review_required?: boolean;
         };
         Update: {
           id?: string;
@@ -186,6 +192,9 @@ export type Database = {
           last_attempt_at?: string | null;
           sent_at?: string | null;
           created_at?: string;
+          provider_first_attempt_at?: string | null;
+          provider_payload_hash?: string | null;
+          provider_review_required?: boolean;
         };
         Relationships: [
           {
@@ -909,6 +918,9 @@ export type Database = {
           last_attempt_at: string | null;
           sent_at: string | null;
           created_at: string;
+          provider_first_attempt_at: string | null;
+          provider_payload_hash: string | null;
+          provider_review_required: boolean;
         };
         Insert: {
           id?: string;
@@ -924,6 +936,9 @@ export type Database = {
           last_attempt_at?: string | null;
           sent_at?: string | null;
           created_at?: string;
+          provider_first_attempt_at?: string | null;
+          provider_payload_hash?: string | null;
+          provider_review_required?: boolean;
         };
         Update: {
           id?: string;
@@ -939,6 +954,9 @@ export type Database = {
           last_attempt_at?: string | null;
           sent_at?: string | null;
           created_at?: string;
+          provider_first_attempt_at?: string | null;
+          provider_payload_hash?: string | null;
+          provider_review_required?: boolean;
         };
         Relationships: [
         ];
@@ -1109,6 +1127,10 @@ export type Database = {
       my_notifications: {
         Args: { p_unread_only?: boolean; p_limit?: number; p_offset?: number };
         Returns: { id: string; type: string; title: string; message: string; reservation_id: string; recurring_request_id: string; read_at: string; created_at: string; total_count: number }[];
+      };
+      prepare_email_delivery: {
+        Args: { p_id: string; p_payload_hash: string; p_system: boolean };
+        Returns: string;
       };
       record_staff_login: {
         Args: { p_method?: string };

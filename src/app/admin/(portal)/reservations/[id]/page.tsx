@@ -198,7 +198,11 @@ export default async function AdminReservationPage({ params, searchParams }: Pag
                       <p className={e.status === "failed" ? "font-medium text-destructive" : "text-muted-foreground"}>
                         {emailStatusText(e, timeZone)}
                       </p>
-                      {e.status === "failed" || e.status === "skipped" ? (
+                      {e.error_message === "Delivery outcome requires manual review before retrying." ? (
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Ask an administrator to check Resend before any further delivery attempt.
+                        </p>
+                      ) : e.status === "failed" || e.status === "skipped" ? (
                         <div className="mt-2">
                           <RetryEmailButton reservationId={r.id} emailId={e.id} label={label} />
                         </div>

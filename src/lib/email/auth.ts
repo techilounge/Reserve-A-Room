@@ -59,7 +59,7 @@ export async function sendAuthEmail(options: {
   if (!env.RESEND_API_KEY || !from) {
     const error = "Email delivery is not configured (RESEND_API_KEY and RESEND_FROM_EMAIL).";
     if (!isProductionDeployment()) {
-      console.info(`[auth-email] skipped (${error})\n  to: ${options.to}\n  subject: ${subject}\n${text}`);
+      console.info("[auth-email] skipped", { kind: options.kind });
     }
     return { ok: false, error };
   }

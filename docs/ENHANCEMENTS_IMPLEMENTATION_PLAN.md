@@ -1,8 +1,8 @@
 # Reserve-A-Room enhancements implementation plan
 
-Last updated: 2026-09-27
-Plan status: **Phases 0–21 complete and deployed**
-Implementation status: **Invitation resend, recurring-request requester acknowledgement, and recurring-request form reliability are live in production; the Phase 20 migration is applied**
+Last updated: 2026-10-27
+Plan status: **Phases 0–26 complete and deployed**
+Implementation status: **All enhancements in this plan are live from `main`; security and reliability follow-up is tracked in `docs/REVIEW_REMEDIATION_IMPLEMENTATION_PLAN.md`**
 
 This is the execution and handoff document for the enhancements requested after the initial production launch. It is intentionally specific enough for a new agent to continue without reconstructing the architecture or making silent product decisions.
 
@@ -101,7 +101,9 @@ These decisions remove ambiguity for implementation. Change them only if the use
 ### 3.10 Reservation exports
 
 - Both staff roles may export the same reservation result set they can view in the portal; Super Admin-only access is not required.
-- Export respects validated list filters (status, room, date range, and search where supported) and applies a bounded date range/row cap to prevent expensive unbounded reports.
+- Export respects validated list filters (status, room, optional date bounds, and search
+  where supported). The server pages through all matching rows and fails clearly above the
+  20,000-row safety ceiling instead of silently truncating the report.
 - CSV is UTF-8 with a BOM for Excel compatibility and protects formula-like cell values from spreadsheet injection.
 - PDF uses a readable branded tabular layout, repeats headers across pages, shows active filters/generated time, and avoids exposing private tokens or internal-only secrets.
 - Export generation occurs server-side after fresh staff authorization. Use route handlers for downloadable responses and never trust client-supplied rows.
@@ -766,9 +768,9 @@ Rollback principles:
 
 ## 10. Live implementation checkpoint
 
-Current phase: **Phases 0–21 are complete and deployed.**
-Last completed task: **Committed and deployed Phases 19–21 after the requester-acknowledgement migration was applied, then verified Vercel and public production health.**
-Next exact task: **Monitor normal staff use of invitation resend and recurring-request requester delivery; begin the next user-prioritized change when requested.**
+Current phase: **Phases 0–26 are complete and deployed.**
+Last completed task: **Deployed the Phase 24–26 Turnstile and form-draft reliability work in cumulative commit `1f287ee`; the 2026-10-27 documentation reconciliation records that state.**
+Next exact task: **Follow `docs/REVIEW_REMEDIATION_IMPLEMENTATION_PLAN.md`, beginning with its critical dependency remediation phase.**
 
 Current worktree:
 
@@ -831,7 +833,8 @@ Current worktree:
 - Each form's token is bound to its own Cloudflare action (`reserve`, `recurring-request`) via `src/lib/security/turnstile-actions.ts`, and `verifyTurnstile` takes the expected action, so a token minted on one form can't be used on the other.
 - No migration, environment-variable or Cloudflare-dashboard change is required: the same widget and keys protect both forms.
 - Verification: typecheck and lint passed; 31 unit-test files / 208 tests passed (new verifier and action tests); 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 99/99. A real-browser check against Cloudflare's test keys showed the widget rendering in the form, a token reaching the server, the server's siteverify rejection of the test token's `example.com` hostname, preserved input and no CSP violations. The accepted path is covered by unit tests, since test tokens can't carry this site's hostname.
-- Status: committed locally; not yet pushed or deployed.
+- Status: committed as `9d52e6f`, pushed to `origin/main`, and included in the successful
+  Vercel production deployment for cumulative commit `1f287ee`.
 
 ### Phase 25 local follow-up status
 
@@ -839,7 +842,8 @@ Current worktree:
 - **Capacity warning:** once a room is chosen, the attendance field shows "<room> is set up for up to N people" and the shared `CapacityWarning` appears live when attendance exceeds the room's capacity. It is a warning only and never blocks sending (ADR-4). The page now passes each room's capacity to the form.
 - No migration or environment change. The one lint exception (`react-hooks/set-state-in-effect`, around the one-time sessionStorage restore) is documented in the code.
 - Verification: typecheck and lint passed; 32 unit-test files / 214 tests passed; 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 101/101. Screenshots at 1000px, 320px and dark mode showed no horizontal overflow.
-- Status: committed locally; not yet pushed or deployed.
+- Status: committed as `a8480e8`, pushed to `origin/main`, and included in the successful
+  Vercel production deployment for cumulative commit `1f287ee`.
 
 ### Phase 26 local follow-up status
 
@@ -847,7 +851,8 @@ Current worktree:
 - The Privacy/Terms acceptance is never saved. Restored data is re-validated: a room that is gone, a past or beyond-horizon date, a removed ministry, or answers that no longer pass validation send the visitor back to the first step that needs attention. A draft belongs to the link it was started from: a different pre-filled URL ignores and clears it. The original form-shown time is saved too, so the 3-second minimum-fill check still counts from when the form was first shown (a refresh cannot restart or skip it). The confirmation page clears the draft.
 - No migration or environment change. The one lint exception (`react-hooks/set-state-in-effect`, around the one-time restore) is documented in the code.
 - Verification: typecheck and lint passed with no warnings; 33 unit-test files / 227 tests passed; 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 103/103. A restored-state check at 1000px, 320px and in dark mode showed no axe violations and no horizontal overflow.
-- Status: committed locally; not yet pushed or deployed.
+- Status: committed as `1f287ee`, pushed to `origin/main`, and deployed successfully by
+  Vercel on 2026-10-05.
 
 When handing off, replace this checkpoint with:
 

@@ -10,8 +10,7 @@ import type { ReservePrefill } from "@/components/reserve/types";
 import { Button } from "@/components/ui/button";
 import { compareLocalDates, isLocalDate, isLocalTime } from "@/lib/datetime";
 import { loadCatalog } from "@/lib/data/catalog";
-import { getTurnstileSiteKey } from "@/lib/env/public";
-import { isTurnstileEnabled } from "@/lib/security/turnstile";
+import { getTurnstileConfiguration } from "@/lib/security/turnstile";
 import { reserveContext } from "@/lib/reservations/reserve-context";
 
 // "Today" and each room's horizon must be computed per request.
@@ -25,6 +24,7 @@ export const metadata: Metadata = {
 export default async function ReservePage({ searchParams }: PageProps<"/reserve">) {
   const raw = await searchParams;
   const catalog = await loadCatalog();
+  const turnstile = getTurnstileConfiguration();
 
   const header = (
     <PageHeader
@@ -95,7 +95,8 @@ export default async function ReservePage({ searchParams }: PageProps<"/reserve"
         settings={settings}
         today={today}
         prefill={prefill}
-        turnstileSiteKey={isTurnstileEnabled() ? getTurnstileSiteKey() : null}
+        turnstileSiteKey={turnstile.status === "enabled" ? turnstile.siteKey : null}
+        verificationUnavailable={turnstile.status === "invalid"}
       />
     </div>
   );

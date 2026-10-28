@@ -6,8 +6,7 @@ import { RecurringRequestForm } from "@/components/reserve/recurring-request-for
 import { timeGrid } from "@/lib/availability-query";
 import { loadCatalog } from "@/lib/data/catalog";
 import { todayInZone } from "@/lib/datetime";
-import { getTurnstileSiteKey } from "@/lib/env/public";
-import { isTurnstileEnabled } from "@/lib/security/turnstile";
+import { getTurnstileConfiguration } from "@/lib/security/turnstile";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +17,7 @@ export const metadata: Metadata = {
 
 export default async function RecurringRequestPage() {
   const catalog = await loadCatalog();
+  const turnstile = getTurnstileConfiguration();
   return (
     <div className="page-container flex max-w-3xl flex-col gap-8 py-10 sm:py-14">
       <PageHeader
@@ -30,7 +30,8 @@ export default async function RecurringRequestPage() {
         <RecurringRequestForm
           rooms={catalog.catalog.rooms.map(({ id, name, capacity }) => ({ id, name, capacity }))}
           today={todayInZone(catalog.catalog.settings.timeZone)}
-          turnstileSiteKey={isTurnstileEnabled() ? getTurnstileSiteKey() : null}
+          turnstileSiteKey={turnstile.status === "enabled" ? turnstile.siteKey : null}
+          verificationUnavailable={turnstile.status === "invalid"}
           timeOptions={timeGrid(
             catalog.catalog.settings.dayStart,
             catalog.catalog.settings.dayEnd,

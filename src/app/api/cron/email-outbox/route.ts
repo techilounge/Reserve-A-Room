@@ -1,9 +1,7 @@
-import { createHash, timingSafeEqual } from "node:crypto";
-
+import { isCronAuthorized } from "@/lib/cron/auth";
 import { deliverQueuedEmails } from "@/lib/email/outbox";
 import { deliverQueuedSystemEmails } from "@/lib/email/system-outbox";
 import { getServerEnv } from "@/lib/env/server";
-import { materializeDueReservationSeries } from "@/lib/recurrence/materialize";
 
 /**
  * Safety-net sweep for the email outbox. Emails are normally sent right after the action
@@ -12,25 +10,31 @@ import { materializeDueReservationSeries } from "@/lib/recurrence/materialize";
  */
 export const maxDuration = 60;
 
-function authorized(header: string | null, secret: string): boolean {
-  const digest = (value: string) => createHash("sha256").update(value).digest();
-  return timingSafeEqual(digest(header ?? ""), digest(`Bearer ${secret}`));
-}
-
 export async function GET(request: Request) {
   const secret = getServerEnv().CRON_SECRET;
-  if (!secret || !authorized(request.headers.get("authorization"), secret)) {
+  if (!isCronAuthorized(request.headers.get("authorization"), secret)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const startedAt = Date.now();
   try {
-    const series = await materializeDueReservationSeries(20);
     const [reservations, system] = await Promise.all([
-      deliverQueuedEmails({ limit: 50 }),
-      deliverQueuedSystemEmails({ limit: 50 }),
+      deliverQueuedEmails({ limit: 6, concurrency: 2 }),
+      deliverQueuedSystemEmails({ limit: 6, concurrency: 2 }),
     ]);
-    return Response.json({ ok: true, series, reservations, system });
+    const summary = {
+      ok: true,
+      durationMs: Date.now() - startedAt,
+      reservations,
+      system,
+      moreMayRemain: reservations.claimed === 6 || system.claimed === 6,
+    };
+    console.info("[cron] email outbox sweep complete", summary);
+    return Response.json(summary);
   } catch (error) {
-    console.error("[cron] email outbox sweep failed", error);
+    console.error("[cron] email outbox sweep failed", {
+      durationMs: Date.now() - startedAt,
+      error: error instanceof Error ? error.message : "Unknown cron error",
+    });
     return Response.json({ ok: false }, { status: 500 });
   }
 }
