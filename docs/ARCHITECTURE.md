@@ -764,6 +764,16 @@ browser is redirected to `/reservation/<REF>?submitted=1`.
   occurrence keys, and per-date exceptions. The protected cron route materializes due
   occurrences before processing email queues.
 
+### Proposed ADR · Church Calendar planning (owner approved Phase 0)
+
+Church Calendar events are separate from operational reservations. Planning uses
+independently revocable per-person grants and sessions, event-level room/resource
+templates, and distinct planning versus operational conflicts. Event ownership derives
+from the ministry plan, and public occurrence identities survive ordinary edits. Only
+Phase 1 cycles, invitations, sessions and a minimal resource catalog are authorized now;
+the remaining architecture and policy gates are documented in
+`docs/CHURCH_CALENDAR_IMPLEMENTATION_PLAN.md`. The calendar design is not deployed.
+
 ### ADR-31 · Staff lifecycle and Super Admin invariants
 
 Successful application logins write immutable `user.logged_in` entries. Invitation

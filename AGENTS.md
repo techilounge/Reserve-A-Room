@@ -218,6 +218,19 @@ Verification completed for that fix before commit:
 - Verification: typecheck and lint passed with no warnings; 33 unit-test files / 227 tests passed; 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 103/103. A restored-state check at 1000px, 320px and in dark mode showed no axe violations and no horizontal overflow.
 - Status: committed locally; not yet pushed or deployed.
 
+## Church Calendar Phase 1 checkpoint — 2026-10-29
+
+- The owner approved corrected Phase 0 and authorized Phase 1 only. The detailed
+  specification is `docs/CHURCH_CALENDAR_IMPLEMENTATION_PLAN.md`.
+- Work on `codex/church-calendar-phase1`, based on verified main `1f287ee`; keep the
+  unrelated `03b721c` security remediation on its separate branch. No production writes.
+- A cycle spans at most three years. Each ministry plan supports at most five active,
+  unexpired planner grants; revocations and rotations affect only that planner. Only a
+  Super Admin may reopen a cycle, with an audited reason.
+- Phase 1 covers cycles, plans, independent grants/sessions, minimal resource catalog,
+  safe RLS/RPCs, branded invitations, audit and tests. Stop before Phase 2 after reporting
+  the implementation and exact checks. Update this checkpoint before ending the session.
+
 ## Required quality gates
 
 Run checks proportionate to each phase and run the complete relevant suite before production handoff:
