@@ -7,11 +7,13 @@ import {
   buildSystemEmail,
   isSystemEmailEvent,
   type AdminFirstLoginEmailData,
+  type CalendarPlannerEmailData,
   type RecurringRequestEmailData,
   type RecurringSeriesEmailData,
   type RecurringSeriesStaffEmailData,
 } from "@/emails/system-templates";
 import { getAppUrl } from "@/lib/app-url";
+import { derivePlannerToken } from "@/lib/calendar-planning/token";
 import { formatPhone } from "@/lib/format";
 import {
   formatLongDate,
@@ -102,11 +104,21 @@ export async function deliverQueuedSystemEmails(options: { entityId?: string; li
 
 async function deliverOne(supabase: Service, id: string): Promise<Outcome> {
   let outcome: { status: Outcome; providerId?: string; error?: string };
+  let context: SystemEmailContext | null = null;
   try {
-    outcome = await send(supabase, id);
+    const { data, error } = await supabase.rpc("system_email_context", { p_email_id: id });
+    if (error) throw error;
+    context = data as SystemEmailContext | null;
+    outcome = await send(supabase, id, context);
   } catch (error) {
-    console.error("[system-email] delivery failed", id, error);
-    outcome = { status: "failed", error: error instanceof Error ? error.message : "Unexpected error while sending." };
+    if (context?.event_type === "calendar_planner_invited") {
+      // Provider/rendering errors may contain the private invitation URL.
+      console.error("[system-email] calendar invitation delivery failed", id);
+      outcome = { status: "failed", error: "Unexpected error while sending. Check server configuration." };
+    } else {
+      console.error("[system-email] delivery failed", id, error);
+      outcome = { status: "failed", error: error instanceof Error ? error.message : "Unexpected error while sending." };
+    }
   }
 
   const { error } = await supabase.rpc("complete_system_email", {
@@ -119,10 +131,7 @@ async function deliverOne(supabase: Service, id: string): Promise<Outcome> {
   return outcome.status;
 }
 
-async function send(supabase: Service, id: string): Promise<{ status: Outcome; providerId?: string; error?: string }> {
-  const { data, error } = await supabase.rpc("system_email_context", { p_email_id: id });
-  if (error) throw error;
-  const ctx = data as SystemEmailContext | null;
+async function send(supabase: Service, id: string, ctx: SystemEmailContext | null): Promise<{ status: Outcome; providerId?: string; error?: string }> {
   if (!ctx) return { status: "failed", error: "The email context no longer exists." };
   if (!isSystemEmailEvent(ctx.event_type)) return { status: "failed", error: `Unknown system email type: ${ctx.event_type}` };
 
@@ -138,8 +147,29 @@ async function send(supabase: Service, id: string): Promise<{ status: Outcome; p
     | RecurringSeriesEmailData
     | RecurringSeriesStaffEmailData
     | RecurringRequestEmailData
-    | AdminFirstLoginEmailData;
-  if (ctx.event_type === "admin_first_login") {
+    | AdminFirstLoginEmailData
+    | CalendarPlannerEmailData;
+  if (ctx.event_type === "calendar_planner_invited") {
+    const { data: invitation, error: invitationError } = await supabase.rpc("calendar_invitation_context", { p_email_id: id });
+    if (invitationError) throw invitationError;
+    if (!invitation) return { status: "skipped", error: "This invitation is no longer active." };
+    const details = invitation as {
+      grant_id: string; plan_reference: string; version: number; seed: string; contact_name: string;
+      ministry_name: string; cycle_name: string; opens_at: string; deadline: string; created_at: string;
+    };
+    // Resend deduplicates for a limited time. Never retry an uncertain old
+    // delivery beyond that window; the administrator can issue a fresh link.
+    if (ctx.attempt_count > 1 && Date.now() - new Date(details.created_at).getTime() >= 23 * 60 * 60 * 1000) {
+      return { status: "failed", error: "Delivery is too old to retry safely. Replace and resend the invitation." };
+    }
+    const token = derivePlannerToken(details.grant_id, details.version, details.seed);
+    const url = new URL(`/calendar-plan/${details.plan_reference}`, appUrl);
+    url.searchParams.set("grant", details.grant_id);
+    url.searchParams.set("token", token);
+    emailData = { ...brand, contactName: details.contact_name, ministryName: details.ministry_name,
+      cycleName: details.cycle_name, opensAt: formatInstant(details.opens_at, ctx.settings.timezone),
+      deadline: formatInstant(details.deadline, ctx.settings.timezone), invitationUrl: url.toString() };
+  } else if (ctx.event_type === "admin_first_login") {
     if (!ctx.user) return { status: "failed", error: "The administrator email context no longer exists." };
     emailData = {
       ...brand,
@@ -219,7 +249,11 @@ async function send(supabase: Service, id: string): Promise<{ status: Outcome; p
   if (!env.RESEND_API_KEY || !from) {
     const problem = "Email delivery is not configured (RESEND_API_KEY and RESEND_FROM_EMAIL).";
     if (isProductionDeployment()) return { status: "failed", error: problem };
-    console.info(`[system-email] skipped (${problem})\n  to: ${ctx.recipient}\n  subject: ${built.subject}\n${text}`);
+    if (ctx.event_type === "calendar_planner_invited") {
+      console.info(`[system-email] skipped (${problem}); invitation link withheld from logs.`);
+    } else {
+      console.info(`[system-email] skipped (${problem})\n  to: ${ctx.recipient}\n  subject: ${built.subject}\n${text}`);
+    }
     return { status: "skipped" };
   }
 
@@ -232,8 +266,10 @@ async function send(supabase: Service, id: string): Promise<{ status: Outcome; p
       text,
       replyTo: env.RESEND_REPLY_TO ?? ctx.settings.contact_email ?? undefined,
     },
-    { idempotencyKey: `system-email-log-${id}-${ctx.attempt_count}` },
+    { idempotencyKey: ctx.event_type === "calendar_planner_invited" ? `calendar-invitation-${id}` : `system-email-log-${id}-${ctx.attempt_count}` },
   );
-  if (sendError || !sent) return { status: "failed", error: sendError?.message ?? "Resend returned no message id." };
+  if (sendError || !sent) return { status: "failed", error: ctx.event_type === "calendar_planner_invited"
+    ? "The invitation could not be delivered. Check the email provider and replace the invitation if needed."
+    : sendError?.message ?? "Resend returned no message id." };
   return { status: "sent", providerId: sent.id };
 }

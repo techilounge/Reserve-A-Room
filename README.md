@@ -100,6 +100,7 @@ the same variables in Vercel → Settings → Environment Variables for **Produc
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes | Supabase publishable/anon key (browser-safe) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | **Server only.** Guest reservations, invitations, email outbox |
 | `GUEST_LINK_SECRET` | Yes (the app refuses to run without it in production) | Derives guest management links. Changing it invalidates every emailed link. |
+| `CALENDAR_PLAN_LINK_SECRET` | Required when Church Calendar Phase 1 is enabled | Server-only independent secret, at least 32 characters, used for planner invitation links. Changing it requires replacing and resending outstanding invitations. |
 | `RATE_LIMIT_SECRET` | Yes (the app refuses to run without it in production) | HMAC for rate-limit keys, so no raw IPs or emails are stored |
 | `RESEND_API_KEY` | Yes | Sending email |
 | `RESEND_FROM_EMAIL` | Yes, e.g. `reservations@reservearoom.stonehillchurch.org` | Sender address (the display name comes from Settings) |
@@ -113,6 +114,32 @@ Generate each secret with:
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
+
+### Church Calendar Phase 1 (review branch)
+
+Phase 1 adds `/admin/church-calendar` for Super Admins to create cycles, add
+ministries, invite up to five active planners per ministry, replace or revoke
+individual invitations, and configure a minimal resource catalog. Calendar cycles
+are at most three years. Planning dates and deadlines use Central time. Review and
+finalized cycles can be reopened only by a Super Admin who supplies an audited reason;
+archived cycles remain closed. Resource quantities are configuration only: there is
+no allocation, availability, or conflict checking in Phase 1.
+
+Invitations use the existing branded Resend sender and system email outbox. Each
+replacement invalidates that person's previous link and sessions, without affecting
+other planners. Delivery status appears next to the planner. If delivery is skipped or
+fails, check the sender and provider configuration, then use **Replace and resend**;
+old uncertain deliveries are not retried after the safe provider idempotency window.
+The email link first shows a confirmation page, so an email scanner's GET does not
+open a session. The planner's temporary access page shows the cycle details; the
+planning form is a later phase. Private invitation links must not be forwarded or
+captured in analytics or server request logs.
+
+For an isolated local or preview environment, configure a separate Supabase project,
+apply `20261029100000_church_calendar_phase1.sql` after all preceding migrations, and
+set a distinct `CALENDAR_PLAN_LINK_SECRET`, Resend sender, and existing service/cron
+secrets in that environment. Do not point a preview at production data. Do not deploy
+or apply the migration to production before owner review and an authorized rollout.
 
 ## Deployments
 
@@ -260,9 +287,9 @@ Emails sent:
 | Invited administrator accepts and enters the portal for the first time | Active Super Admins |
 
 **Without a key.** In local development and previews without `RESEND_API_KEY`, emails are
-marked "Not sent" and their subject is logged (locally, the whole plain-text body
-including the private link is printed to the terminal). In production a missing key is
-recorded as a delivery failure, so staff are alerted.
+marked "Not sent". Existing reservation and staff-auth email bodies may be logged locally;
+Church Calendar invitation bodies and links are withheld from logs. In production a missing
+key is recorded as a delivery failure, so staff are alerted.
 
 **Previewing templates:**
 

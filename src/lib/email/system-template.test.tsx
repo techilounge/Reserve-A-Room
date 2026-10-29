@@ -37,6 +37,24 @@ describe("recurring-series summary email", () => {
   });
 });
 
+describe("church calendar planner invitation", () => {
+  it("shows the ministry, opening and deadline in branded HTML and text", async () => {
+    const built = buildSystemEmail("calendar_planner_invited", {
+      appUrl: data.appUrl, appName: data.appName, churchName: data.churchName,
+      contactEmail: data.contactEmail, contactPhone: data.contactPhone,
+      contactName: "Ada <Planner>", ministryName: "Music Ministry", cycleName: "2027 Planning",
+      opensAt: "Oct 30, 2026, 9:00 AM", deadline: "Dec 1, 2026, 5:00 PM",
+      invitationUrl: "https://reservearoom.example.org/calendar-plan/test?token=example",
+    });
+    const [html, text] = await Promise.all([render(built.element), render(built.element, { plainText: true })]);
+    expect(html).toContain("Ada &lt;Planner&gt;");
+    expect(html).toContain("Music Ministry");
+    expect(text).toContain("Planning opens");
+    expect(text).toContain("Dec 1, 2026, 5:00 PM");
+    expect(text).toContain("do not forward");
+  });
+});
+
 describe("recurring-request acknowledgement email", () => {
   it("makes the request status explicit and includes the submitted schedule", async () => {
     const request: RecurringRequestEmailData = {

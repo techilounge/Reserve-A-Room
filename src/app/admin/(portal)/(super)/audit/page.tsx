@@ -26,6 +26,10 @@ const ENTITIES = [
   ["amenity", "Amenities"],
   ["user", "Users & authentication"],
   ["settings", "Settings"],
+  ["calendar_cycle", "Church calendar cycles"],
+  ["calendar_plan", "Church calendar ministries"],
+  ["calendar_access", "Church calendar planner access"],
+  ["calendar_resource", "Church calendar resources"],
 ] as const;
 const PAGE_SIZE = 25;
 
@@ -134,7 +138,7 @@ export default async function AdminAuditPage({ searchParams }: PageProps<"/admin
                 <p className="text-sm text-muted-foreground">
                   By{" "}
                   {entry.actor_name ??
-                    (entry.actor_kind === "guest" ? "a guest (online form)" : entry.actor_kind === "system" ? "the system" : "a former administrator")}
+                    (entry.actor_kind === "guest" ? entry.entity_type === "calendar_access" ? "an invited planner" : "a guest (online form)" : entry.actor_kind === "system" ? "the system" : "a former administrator")}
                 </p>
                 {changes.length > 0 ? (
                   <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">

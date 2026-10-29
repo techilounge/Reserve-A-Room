@@ -56,6 +56,7 @@ export default defineConfig({
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: TEST_ANON_KEY,
         SUPABASE_SERVICE_ROLE_KEY: TEST_SERVICE_KEY,
         GUEST_LINK_SECRET: "e2e-guest-link-secret",
+        CALENDAR_PLAN_LINK_SECRET: "e2e-calendar-plan-link-secret-only-for-tests",
         RATE_LIMIT_SECRET: "e2e-rate-limit-secret",
         CRON_SECRET: "e2e-cron-secret",
         // Never send real email or use real bot checks from tests.

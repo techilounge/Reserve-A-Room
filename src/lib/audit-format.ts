@@ -24,6 +24,17 @@ const ACTION_LABELS: Record<string, string> = {
   "user.bootstrapped": "First Super Admin created",
   "user.invitation_accepted": "Administrator invitation accepted",
   "user.logged_in": "Administrator signed in",
+  "calendar_cycle.created": "Church calendar cycle created",
+  "calendar_cycle.updated": "Church calendar cycle updated",
+  "calendar_cycle.transitioned": "Church calendar cycle status changed",
+  "calendar_plan.created": "Ministry added to church calendar",
+  "calendar_access.invited": "Planner invited",
+  "calendar_access.opened": "Planner opened invitation",
+  "calendar_access.expired": "Expired planner invitation replaced",
+  "calendar_access.rotated": "Planner invitation replaced",
+  "calendar_access.revoked": "Planner access revoked",
+  "calendar_resource.created": "Calendar resource created",
+  "calendar_resource.updated": "Calendar resource updated",
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -98,6 +109,7 @@ export function auditSubject(metadata: unknown): string | null {
   const m = metadata as Record<string, unknown>;
   if (typeof m.reference_code === "string") return m.reference_code;
   if (typeof m.full_name === "string") return m.full_name;
+  if (typeof m.name === "string") return m.name;
   if (typeof m.email === "string") return m.email;
   const changes = m.changes as Record<string, { to?: unknown; from?: unknown }> | undefined;
   const name = changes?.name?.to ?? changes?.name?.from ?? changes?.full_name?.to ?? changes?.email?.to;

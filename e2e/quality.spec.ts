@@ -35,6 +35,7 @@ const ADMIN_PAGES = [
   `/admin/rooms/${ROOMS.conference.id}`,
   "/admin/rooms/new",
   "/admin/ministries",
+  "/admin/church-calendar",
   "/admin/users",
   "/admin/settings",
   "/admin/audit",

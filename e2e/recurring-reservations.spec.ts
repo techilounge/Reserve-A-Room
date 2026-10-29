@@ -45,13 +45,15 @@ test("staff creates and ends a weekly recurring reservation series", async ({ br
   await fillStaffReservation(page, {
     roomId: ROOMS.conference.id,
     date: startDate,
-    start: "14:00",
-    end: "15:00",
+    // Keep this separate from the earlier same-room double-booking fixture, whose
+    // relative date can also fall on this Saturday depending on the day of week.
+    start: "18:00",
+    end: "19:00",
   });
   await page.locator("#repeat").selectOption("weekly");
   await page.getByRole("button", { name: "Preview schedule" }).click();
 
-  await expect(page.getByText(/Every week on Saturday, 2:00 PM/)).toBeVisible();
+  await expect(page.getByText(/Every week on Saturday, 6:00 PM/)).toBeVisible();
   await expect(page.getByText(`${formatCompactDate(startDate)} · Available`, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Create recurring series" }).click();
 

@@ -147,6 +147,206 @@ export type Database = {
           },
         ];
       };
+      calendar_cycles: {
+        Row: {
+          id: string;
+          name: string;
+          start_date: string;
+          end_date: string;
+          submission_opens_at: string;
+          submission_deadline: string;
+          status: string;
+          instructions: string | null;
+          created_by: string | null;
+          finalized_by: string | null;
+          finalized_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          start_date: string;
+          end_date: string;
+          submission_opens_at: string;
+          submission_deadline: string;
+          status?: string;
+          instructions?: string | null;
+          created_by?: string | null;
+          finalized_by?: string | null;
+          finalized_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          start_date?: string;
+          end_date?: string;
+          submission_opens_at?: string;
+          submission_deadline?: string;
+          status?: string;
+          instructions?: string | null;
+          created_by?: string | null;
+          finalized_by?: string | null;
+          finalized_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_cycles_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_cycles_finalized_by_fkey";
+            columns: ["finalized_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_plan_access: {
+        Row: {
+          id: string;
+          plan_id: string;
+          contact_name: string;
+          contact_email: string;
+          contact_phone: string | null;
+          label: string;
+          token_hash: string;
+          token_seed: string;
+          version: number;
+          expires_at: string;
+          revoked_at: string | null;
+          last_used_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          plan_id: string;
+          contact_name: string;
+          contact_email: string;
+          contact_phone?: string | null;
+          label: string;
+          token_hash: string;
+          token_seed: string;
+          version?: number;
+          expires_at: string;
+          revoked_at?: string | null;
+          last_used_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          plan_id?: string;
+          contact_name?: string;
+          contact_email?: string;
+          contact_phone?: string | null;
+          label?: string;
+          token_hash?: string;
+          token_seed?: string;
+          version?: number;
+          expires_at?: string;
+          revoked_at?: string | null;
+          last_used_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_plan_access_plan_id_fkey";
+            columns: ["plan_id"];
+            isOneToOne: false;
+            referencedRelation: "ministry_calendar_plans";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_plan_sessions: {
+        Row: {
+          id: string;
+          grant_id: string;
+          grant_version: number;
+          session_hash: string;
+          expires_at: string;
+          revoked_at: string | null;
+          created_at: string;
+          last_used_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          grant_id: string;
+          grant_version: number;
+          session_hash: string;
+          expires_at: string;
+          revoked_at?: string | null;
+          created_at?: string;
+          last_used_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          grant_id?: string;
+          grant_version?: number;
+          session_hash?: string;
+          expires_at?: string;
+          revoked_at?: string | null;
+          created_at?: string;
+          last_used_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_plan_sessions_grant_id_fkey";
+            columns: ["grant_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_plan_access";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_resources: {
+        Row: {
+          id: string;
+          name: string;
+          category: string;
+          description: string | null;
+          available_quantity: number;
+          active: boolean;
+          private_notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          category: string;
+          description?: string | null;
+          available_quantity: number;
+          active?: boolean;
+          private_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          category?: string;
+          description?: string | null;
+          available_quantity?: number;
+          active?: boolean;
+          private_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+        ];
+      };
       email_logs: {
         Row: {
           id: string;
@@ -223,6 +423,45 @@ export type Database = {
           updated_at?: string;
         };
         Relationships: [
+        ];
+      };
+      ministry_calendar_plans: {
+        Row: {
+          id: string;
+          cycle_id: string;
+          ministry_id: string;
+          reference_code: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          cycle_id: string;
+          ministry_id: string;
+          reference_code?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          cycle_id?: string;
+          ministry_id?: string;
+          reference_code?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ministry_calendar_plans_cycle_id_fkey";
+            columns: ["cycle_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_cycles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ministry_calendar_plans_ministry_id_fkey";
+            columns: ["ministry_id"];
+            isOneToOne: false;
+            referencedRelation: "ministries";
+            referencedColumns: ["id"];
+          },
         ];
       };
       notifications: {
@@ -946,6 +1185,10 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
+      add_calendar_ministry: {
+        Args: { p_cycle_id: string; p_ministry_id: string };
+        Returns: string;
+      };
       admin_audit_log: {
         Args: { p_search?: string; p_entity_type?: string; p_from?: string; p_to?: string; p_limit?: number; p_offset?: number };
         Returns: { id: number; created_at: string; actor_kind: Database["public"]["Enums"]["actor_kind"]; actor_name: string; action: string; entity_type: string; entity_id: string; metadata: Json; total_count: number }[];
@@ -1018,6 +1261,26 @@ export type Database = {
         Args: { p_user_id: string; p_full_name: string };
         Returns: undefined;
       };
+      calendar_active_resources: {
+        Args: never;
+        Returns: { id: string; name: string; category: string; description: string; available_quantity: number }[];
+      };
+      calendar_invitation_context: {
+        Args: { p_email_id: string };
+        Returns: Json;
+      };
+      calendar_invitation_delivery_status: {
+        Args: never;
+        Returns: { grant_id: string; status: Database["public"]["Enums"]["email_status"]; error_message: string; attempted_at: string }[];
+      };
+      calendar_planner_resources: {
+        Args: { p_plan_id: string; p_session_hash: string };
+        Returns: { id: string; name: string; category: string; description: string; available_quantity: number }[];
+      };
+      calendar_planner_session_context: {
+        Args: { p_plan_id: string; p_session_hash: string };
+        Returns: Json;
+      };
       cancel_guest_reservation: {
         Args: { p_reference: string; p_token_hash: string };
         Returns: Database["public"]["Enums"]["reservation_status"];
@@ -1082,6 +1345,10 @@ export type Database = {
         Args: { p_email_id: string };
         Returns: { email_id: string; recipient: string; event_type: string; attempt_count: number; reservation_id: string; reference_code: string; status: Database["public"]["Enums"]["reservation_status"]; room_name: string; room_capacity: number; start_at: string; end_at: string; requester_first_name: string; requester_last_name: string; requester_email: string; requester_phone: string; ministry_name: string; purpose: string; estimated_attendance: number; setup_requirements: string; requester_notes: string; requester_message: string; food_drinks_allowed: boolean; approval_required: boolean; cancelled_by_requester: boolean; guest_token_seed: string; church_name: string; app_name: string; timezone: string; contact_email: string; contact_phone: string; email_sender_name: string }[];
       };
+      exchange_calendar_planner_session: {
+        Args: { p_plan_id: string; p_grant_id: string; p_token_hash: string; p_session_hash: string };
+        Returns: boolean;
+      };
       get_admin_settings: {
         Args: never;
         Returns: Database["public"]["Tables"]["app_settings"]["Row"];
@@ -1097,6 +1364,10 @@ export type Database = {
       hit_rate_limit: {
         Args: { p_bucket: string; p_key_hash: string; p_limit: number; p_window_seconds: number };
         Returns: boolean;
+      };
+      invite_calendar_planner: {
+        Args: { p_plan_id: string; p_grant_id: string; p_name: string; p_email: string; p_phone: string; p_label: string; p_token_hash: string; p_token_seed: string };
+        Returns: string;
       };
       mark_notifications_read: {
         Args: { p_ids?: string[] };
@@ -1118,8 +1389,24 @@ export type Database = {
         Args: { p_id: string };
         Returns: undefined;
       };
+      revoke_calendar_planner: {
+        Args: { p_grant_id: string };
+        Returns: undefined;
+      };
+      rotate_calendar_invitation: {
+        Args: { p_grant_id: string; p_expected_version: number; p_token_hash: string; p_token_seed: string };
+        Returns: string;
+      };
       save_amenity: {
         Args: { p_name: string; p_icon: string; p_active?: boolean; p_id?: string };
+        Returns: string;
+      };
+      save_calendar_cycle: {
+        Args: { p_id: string; p_name: string; p_start_date: string; p_end_date: string; p_opens_at: string; p_deadline: string; p_instructions: string };
+        Returns: string;
+      };
+      save_calendar_resource: {
+        Args: { p_id: string; p_name: string; p_category: string; p_quantity: number; p_active: boolean; p_description: string; p_private_notes: string };
         Returns: string;
       };
       save_ministry: {
@@ -1149,6 +1436,10 @@ export type Database = {
       system_email_context: {
         Args: { p_email_id: string };
         Returns: Json;
+      };
+      transition_calendar_cycle: {
+        Args: { p_id: string; p_status: string; p_reason?: string };
+        Returns: undefined;
       };
       unread_notification_count: {
         Args: never;

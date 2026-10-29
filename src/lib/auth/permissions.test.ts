@@ -26,6 +26,7 @@ const MATRIX: [Permission, boolean, boolean, boolean][] = [
   ["roles.assign", false, false, true],
   ["settings.manage", false, false, true],
   ["audit.view", false, false, true],
+  ["churchCalendar.manage", false, false, true],
 ];
 
 describe("permission matrix", () => {
@@ -40,7 +41,7 @@ describe("permission matrix", () => {
       (p) => can(superAdmin, p) && !can(admin, p) && !can(GUEST, p),
     );
     expect(superOnly.sort()).toEqual(
-      ["audit.view", "ministries.manage", "roles.assign", "rooms.manage", "settings.manage", "users.manage"].sort(),
+      ["audit.view", "churchCalendar.manage", "ministries.manage", "roles.assign", "rooms.manage", "settings.manage", "users.manage"].sort(),
     );
   });
 

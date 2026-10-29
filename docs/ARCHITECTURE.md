@@ -774,6 +774,32 @@ Phase 1 cycles, invitations, sessions and a minimal resource catalog are authori
 the remaining architecture and policy gates are documented in
 `docs/CHURCH_CALENDAR_IMPLEMENTATION_PLAN.md`. The calendar design is not deployed.
 
+The Phase 1 review implementation adds five RLS-enabled public tables and a private
+invitation-delivery table in `20261029100000_church_calendar_phase1.sql`. Authenticated
+table reads are limited to Super Admins and safe columns; planner credentials and
+session hashes have no browser-role read grant. Staff and authenticated planner sessions
+can read the active resource catalog without private notes through separately authorized RPCs. Every management
+RPC checks the caller, and mutations serialize against the cycle before checking state;
+invites additionally lock the plan before counting unexpired, unrevoked grants.
+
+Per-person invitation tokens are HMAC-derived from a random seed using a dedicated
+server secret; only the seed and token hash are stored. A non-consuming GET is followed
+by a same-origin Server Action, a fail-closed IP/reference rate limit and a service-only
+transaction that checks the exact plan and grant and stores only a new session hash.
+The public plan reference is a separate random UUID, distinct from the internal plan ID.
+The per-plan HttpOnly, SameSite=Lax cookie is Secure in production. Every session read
+checks the session and grant versions, expiries and revocations plus the cycle state and
+deadline. Replacing or revoking one grant invalidates that grant's sessions only.
+Reopening requires an audited Super Admin reason; archiving is terminal in Phase 1.
+
+Each invitation version has a distinct outbox delivery identity. The worker derives the
+link only on the server, never prints the calendar email body, uses one provider
+idempotency key per delivery, and stops uncertain retries after 23 hours so an operator
+can replace and resend. Existing provider idempotency is time-limited; payload changes
+between retries can cause a provider rejection, which is reported as a failed delivery.
+The planner route sends no-store/no-referrer headers and bypasses the service worker.
+Request-log/analytics query-string redaction must also be verified at deployment.
+
 ### ADR-31 · Staff lifecycle and Super Admin invariants
 
 Successful application logins write immutable `user.logged_in` entries. Invitation

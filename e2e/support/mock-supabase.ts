@@ -156,6 +156,18 @@ const server = http.createServer(async (req, res) => {
         ),
       );
     }
+    // Test-only helper. Never available in the application or a deployed environment.
+    if (url.pathname === "/qa/calendar-invitation") {
+      const email = url.searchParams.get("email");
+      const { rows } = await db.query<{ id: string; plan_id: string; version: number; seed: string }>(
+        "select a.id, p.reference_code as plan_id, a.version, encode(a.token_seed, 'hex') as seed from public.calendar_plan_access a join public.ministry_calendar_plans p on p.id = a.plan_id where a.contact_email = $1 and a.revoked_at is null order by a.created_at desc limit 1", [email],
+      );
+      if (!rows[0]) return send(404, { error: "No invitation" });
+      const a = rows[0];
+      const token = createHmac("sha256", "e2e-calendar-plan-link-secret-only-for-tests")
+        .update(`church-calendar-planner-v1:${a.id}:${a.version}:${a.seed}`).digest("base64url");
+      return send(200, { plan: a.plan_id, grant: a.id, token });
+    }
     // --- auth ---
     if (url.pathname === "/auth/v1/token" && req.method === "POST") {
       const body = await readBody(req);
@@ -258,6 +270,16 @@ const server = http.createServer(async (req, res) => {
         "content-range": rows.length ? `0-${rows.length - 1}/${rows.length}` : "*/0",
       });
       return res.end(JSON.stringify(rows));
+    }
+    if (req.method === "GET" && url.pathname === "/rest/v1/calendar_plan_access") {
+      return send(200, await jsonAs(req, `select coalesce(jsonb_agg(jsonb_build_object(
+        'id', id, 'plan_id', plan_id, 'contact_name', contact_name, 'contact_email', contact_email,
+        'contact_phone', contact_phone, 'label', label, 'version', version, 'expires_at', expires_at,
+        'revoked_at', revoked_at, 'created_at', created_at)), '[]') as j from public.calendar_plan_access`));
+    }
+    const calendarTable = url.pathname.match(/^\/rest\/v1\/(calendar_cycles|ministry_calendar_plans|calendar_resources)$/);
+    if (req.method === "GET" && calendarTable) {
+      return send(200, await jsonAs(req, `select coalesce(jsonb_agg(to_jsonb(t)), '[]') as j from public.${calendarTable[1]} t`));
     }
     const rpc = url.pathname.match(/^\/rest\/v1\/rpc\/([a-z_]+)$/);
     if (req.method === "POST" && rpc) {

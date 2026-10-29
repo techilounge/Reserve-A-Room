@@ -8,6 +8,7 @@ export const SYSTEM_EMAIL_EVENTS = [
   "recurring_series_staff_created",
   "recurring_request_received",
   "admin_first_login",
+  "calendar_planner_invited",
 ] as const;
 export type SystemEmailEvent = (typeof SYSTEM_EMAIL_EVENTS)[number];
 
@@ -62,13 +63,37 @@ export type RecurringRequestEmailData = EmailBrandData & {
   estimatedAttendance: number;
 };
 
+export type CalendarPlannerEmailData = EmailBrandData & {
+  contactName: string;
+  ministryName: string;
+  cycleName: string;
+  opensAt: string;
+  deadline: string;
+  invitationUrl: string;
+};
+
 type Built = { subject: string; element: ReactElement };
 
 export function buildSystemEmail(
   event: SystemEmailEvent,
-  data: RecurringSeriesEmailData | RecurringSeriesStaffEmailData | RecurringRequestEmailData | AdminFirstLoginEmailData,
+  data: RecurringSeriesEmailData | RecurringSeriesStaffEmailData | RecurringRequestEmailData | AdminFirstLoginEmailData | CalendarPlannerEmailData,
 ): Built {
   switch (event) {
+    case "calendar_planner_invited": {
+      const planner = data as CalendarPlannerEmailData;
+      return {
+        subject: `Church calendar invitation: ${planner.ministryName}`,
+        element: (
+          <EmailLayout data={planner} preview={`You are invited to plan for ${planner.ministryName}.`} heading="Church calendar planning invitation">
+            <Paragraph>Hi {planner.contactName},</Paragraph>
+            <Paragraph>You have been invited to access the {planner.cycleName} planning cycle for {planner.ministryName}.</Paragraph>
+            <DetailsTable rows={[["Planning opens", planner.opensAt], ["Planning deadline", planner.deadline]]} />
+            <Paragraph>Your invitation is personal. Please do not forward this email.</Paragraph>
+            <PrimaryButton href={planner.invitationUrl}>Open your invitation</PrimaryButton>
+          </EmailLayout>
+        ),
+      };
+    }
     case "recurring_series_staff_created": {
       const series = data as RecurringSeriesStaffEmailData;
       return {

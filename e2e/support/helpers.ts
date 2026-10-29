@@ -57,9 +57,12 @@ export function guest(overrides: Partial<Guest> = {}): Guest {
  */
 export async function goToReview(page: Page, opts: { room: string; date: LocalDate; start: string; end: string; guest: Guest }) {
   await page.goto(`/reserve?room=${opts.room}&date=${opts.date}`);
-  const startedAt = Date.now();
   const start = page.locator("#reserve-start");
   await expect(start).toBeEnabled();
+  // The wizard starts its bot-defense timer after hydration. Wait from the
+  // first hydrated availability control rather than from navigation, which
+  // can finish before the component's effect has run under load.
+  const startedAt = Date.now();
   await start.selectOption(opts.start);
   await page.locator("#reserve-end").selectOption(opts.end);
   await page.getByRole("button", { name: "Continue" }).click();

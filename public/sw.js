@@ -58,6 +58,7 @@ self.addEventListener("activate", (event) => {
 function isBypassed(url) {
   return (
     url.pathname.startsWith("/reservation/") ||
+    url.pathname.startsWith("/calendar-plan/") ||
     url.pathname.startsWith("/admin/auth/") ||
     url.pathname.startsWith("/api/")
   );

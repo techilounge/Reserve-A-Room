@@ -230,6 +230,21 @@ Verification completed for that fix before commit:
 - Phase 1 covers cycles, plans, independent grants/sessions, minimal resource catalog,
   safe RLS/RPCs, branded invitations, audit and tests. Stop before Phase 2 after reporting
   the implementation and exact checks. Update this checkpoint before ending the session.
+- Phase 1 is implemented locally for owner review. Migration
+  `20261029100000_church_calendar_phase1.sql` is not applied to a hosted project.
+  `/admin/church-calendar` manages cycles, ministries, invitations and resources;
+  `/calendar-plan/[reference]` is the scoped invitation/access page. The full security,
+  limitations and isolated rollout/rollback notes are in `docs/CHURCH_CALENDAR_PHASE1_REVIEW.md`.
+- Verification on this worktree: typecheck and lint passed; unit tests 34 files / 231
+  tests; database tests 13 files / 155 tests; isolated `npm run build` passed; full
+  Playwright 107/107, plus the final focused calendar file 2/2. No tests skipped. The
+  first browser run found two unrelated test-fixture timing/date collisions that were
+  fixed before the successful rerun. Real Resend delivery, real multi-connection
+  PostgreSQL concurrency, and hosting-log redaction still need isolated release checks.
+- Required server-only `CALENDAR_PLAN_LINK_SECRET` must be generated independently per
+  environment; changing it requires replacing and resending outstanding invitations.
+  Next: stop for owner review. Do not start Phase 2, push a migration to production,
+  deploy, merge, or publish legal updates without the owner's subsequent authorization.
 
 ## Required quality gates
 

@@ -47,6 +47,7 @@ export const PERMISSIONS = {
   "roles.assign": SUPER_ADMIN,
   "settings.manage": SUPER_ADMIN,
   "audit.view": SUPER_ADMIN,
+  "churchCalendar.manage": SUPER_ADMIN,
 } as const satisfies Record<string, readonly ActorRole[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

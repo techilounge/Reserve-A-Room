@@ -82,6 +82,11 @@ const nextConfig: NextConfig = {
       { source: "/:path*", headers: securityHeaders },
       // Guest reservation links carry a secret token; never leak it via the Referer header.
       { source: "/reservation/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
+      { source: "/calendar-plan/:path*", headers: [
+        { key: "Referrer-Policy", value: "no-referrer" },
+        { key: "Cache-Control", value: "no-store, private" },
+        { key: "X-Robots-Tag", value: "noindex, nofollow" },
+      ] },
       { source: "/admin/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
       {
         // The service worker must always be revalidated, and may only load itself.

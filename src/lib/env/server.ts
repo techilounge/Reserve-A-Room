@@ -22,6 +22,7 @@ const serverSchema = z.object({
   RESEND_REPLY_TO: optionalString,
   RATE_LIMIT_SECRET: optionalString,
   GUEST_LINK_SECRET: optionalString,
+  CALENDAR_PLAN_LINK_SECRET: optionalString,
   TURNSTILE_SECRET_KEY: optionalString,
   CRON_SECRET: optionalString,
   VERCEL_ENV: optionalString,
