@@ -400,6 +400,8 @@ describe("function privileges (catalog-wide allowlist)", () => {
       "public.booking_horizon_date",
       "public.calendar_active_resources",
       "public.calendar_invitation_delivery_status",
+      "public.calendar_request_plan_changes",
+      "public.calendar_staff_plan_list",
       "public.cancel_reservation",
       "public.complete_staff_password_setup",
       "public.create_recurring_reservation_series",

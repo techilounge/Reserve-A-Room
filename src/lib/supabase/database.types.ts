@@ -210,6 +210,391 @@ export type Database = {
           },
         ];
       };
+      calendar_event_ministries: {
+        Row: {
+          event_id: string;
+          ministry_id: string;
+        };
+        Insert: {
+          event_id: string;
+          ministry_id: string;
+        };
+        Update: {
+          event_id?: string;
+          ministry_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_ministries_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_event_ministries_ministry_id_fkey";
+            columns: ["ministry_id"];
+            isOneToOne: false;
+            referencedRelation: "ministries";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_event_resource_templates: {
+        Row: {
+          event_id: string;
+          resource_id: string;
+          quantity_requested: number;
+          notes: string | null;
+        };
+        Insert: {
+          event_id: string;
+          resource_id: string;
+          quantity_requested: number;
+          notes?: string | null;
+        };
+        Update: {
+          event_id?: string;
+          resource_id?: string;
+          quantity_requested?: number;
+          notes?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_resource_templates_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_event_resource_templates_resource_id_fkey";
+            columns: ["resource_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_resources";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_event_room_templates: {
+        Row: {
+          event_id: string;
+          room_id: string;
+        };
+        Insert: {
+          event_id: string;
+          room_id: string;
+        };
+        Update: {
+          event_id?: string;
+          room_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_room_templates_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_event_room_templates_room_id_fkey";
+            columns: ["room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_event_schedules: {
+        Row: {
+          event_id: string;
+          kind: string;
+          timezone: string;
+          start_date: string | null;
+          end_date: string | null;
+          start_time: string | null;
+          end_time: string | null;
+          frequency: string | null;
+          interval_count: number | null;
+          weekdays: number[] | null;
+          weekday: number | null;
+          month_ordinals: number[] | null;
+          month_ordinal: number | null;
+          day_of_month: number | null;
+          month_of_year: number | null;
+        };
+        Insert: {
+          event_id: string;
+          kind: string;
+          timezone: string;
+          start_date?: string | null;
+          end_date?: string | null;
+          start_time?: string | null;
+          end_time?: string | null;
+          frequency?: string | null;
+          interval_count?: number | null;
+          weekdays?: number[] | null;
+          weekday?: number | null;
+          month_ordinals?: number[] | null;
+          month_ordinal?: number | null;
+          day_of_month?: number | null;
+          month_of_year?: number | null;
+        };
+        Update: {
+          event_id?: string;
+          kind?: string;
+          timezone?: string;
+          start_date?: string | null;
+          end_date?: string | null;
+          start_time?: string | null;
+          end_time?: string | null;
+          frequency?: string | null;
+          interval_count?: number | null;
+          weekdays?: number[] | null;
+          weekday?: number | null;
+          month_ordinals?: number[] | null;
+          month_ordinal?: number | null;
+          day_of_month?: number | null;
+          month_of_year?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_schedules_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: true;
+            referencedRelation: "calendar_events";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_event_submissions: {
+        Row: {
+          id: string;
+          event_id: string;
+          plan_revision: number;
+          submitted_by_grant: string;
+          submitted_at: string;
+          title: string;
+          description: string | null;
+          public_description: string | null;
+          category: string;
+          scope: string;
+          protection: string;
+          visibility: string;
+          location_type: string;
+          offsite_location: string | null;
+          virtual_url: string | null;
+          estimated_attendance: number;
+          food_drinks_planned: boolean;
+          setup_minutes: number;
+          cleanup_minutes: number;
+          public_contact_name: string | null;
+          public_contact_email: string | null;
+          requester_notes: string | null;
+          schedule_kind: string;
+          timezone: string;
+          start_date: string;
+          end_date: string;
+          start_time: string;
+          end_time: string;
+          frequency: string | null;
+          interval_count: number | null;
+          weekdays: number[] | null;
+          weekday: number | null;
+          month_ordinals: number[] | null;
+          month_ordinal: number | null;
+          day_of_month: number | null;
+          month_of_year: number | null;
+        };
+        Insert: {
+          id?: string;
+          event_id: string;
+          plan_revision: number;
+          submitted_by_grant: string;
+          submitted_at?: string;
+          title: string;
+          description?: string | null;
+          public_description?: string | null;
+          category: string;
+          scope: string;
+          protection: string;
+          visibility: string;
+          location_type: string;
+          offsite_location?: string | null;
+          virtual_url?: string | null;
+          estimated_attendance: number;
+          food_drinks_planned: boolean;
+          setup_minutes: number;
+          cleanup_minutes: number;
+          public_contact_name?: string | null;
+          public_contact_email?: string | null;
+          requester_notes?: string | null;
+          schedule_kind: string;
+          timezone: string;
+          start_date: string;
+          end_date: string;
+          start_time: string;
+          end_time: string;
+          frequency?: string | null;
+          interval_count?: number | null;
+          weekdays?: number[] | null;
+          weekday?: number | null;
+          month_ordinals?: number[] | null;
+          month_ordinal?: number | null;
+          day_of_month?: number | null;
+          month_of_year?: number | null;
+        };
+        Update: {
+          id?: string;
+          event_id?: string;
+          plan_revision?: number;
+          submitted_by_grant?: string;
+          submitted_at?: string;
+          title?: string;
+          description?: string | null;
+          public_description?: string | null;
+          category?: string;
+          scope?: string;
+          protection?: string;
+          visibility?: string;
+          location_type?: string;
+          offsite_location?: string | null;
+          virtual_url?: string | null;
+          estimated_attendance?: number;
+          food_drinks_planned?: boolean;
+          setup_minutes?: number;
+          cleanup_minutes?: number;
+          public_contact_name?: string | null;
+          public_contact_email?: string | null;
+          requester_notes?: string | null;
+          schedule_kind?: string;
+          timezone?: string;
+          start_date?: string;
+          end_date?: string;
+          start_time?: string;
+          end_time?: string;
+          frequency?: string | null;
+          interval_count?: number | null;
+          weekdays?: number[] | null;
+          weekday?: number | null;
+          month_ordinals?: number[] | null;
+          month_ordinal?: number | null;
+          day_of_month?: number | null;
+          month_of_year?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_submissions_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_event_submissions_submitted_by_grant_fkey";
+            columns: ["submitted_by_grant"];
+            isOneToOne: false;
+            referencedRelation: "calendar_plan_access";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_events: {
+        Row: {
+          id: string;
+          plan_id: string;
+          reference_code: string;
+          title: string;
+          description: string | null;
+          public_description: string | null;
+          category: string;
+          scope: string;
+          protection: string;
+          visibility: string;
+          location_type: string;
+          offsite_location: string | null;
+          virtual_url: string | null;
+          estimated_attendance: number;
+          food_drinks_planned: boolean;
+          setup_minutes: number;
+          cleanup_minutes: number;
+          public_contact_name: string | null;
+          public_contact_email: string | null;
+          requester_notes: string | null;
+          status: string;
+          revision: number;
+          draft_version: number;
+          deleted_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          plan_id: string;
+          reference_code?: string;
+          title: string;
+          description?: string | null;
+          public_description?: string | null;
+          category?: string;
+          scope: string;
+          protection?: string;
+          visibility: string;
+          location_type: string;
+          offsite_location?: string | null;
+          virtual_url?: string | null;
+          estimated_attendance: number;
+          food_drinks_planned?: boolean;
+          setup_minutes?: number;
+          cleanup_minutes?: number;
+          public_contact_name?: string | null;
+          public_contact_email?: string | null;
+          requester_notes?: string | null;
+          status?: string;
+          revision?: number;
+          draft_version?: number;
+          deleted_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          plan_id?: string;
+          reference_code?: string;
+          title?: string;
+          description?: string | null;
+          public_description?: string | null;
+          category?: string;
+          scope?: string;
+          protection?: string;
+          visibility?: string;
+          location_type?: string;
+          offsite_location?: string | null;
+          virtual_url?: string | null;
+          estimated_attendance?: number;
+          food_drinks_planned?: boolean;
+          setup_minutes?: number;
+          cleanup_minutes?: number;
+          public_contact_name?: string | null;
+          public_contact_email?: string | null;
+          requester_notes?: string | null;
+          status?: string;
+          revision?: number;
+          draft_version?: number;
+          deleted_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_plan_id_fkey";
+            columns: ["plan_id"];
+            isOneToOne: false;
+            referencedRelation: "ministry_calendar_plans";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       calendar_plan_access: {
         Row: {
           id: string;
@@ -310,6 +695,74 @@ export type Database = {
           },
         ];
       };
+      calendar_plan_submissions: {
+        Row: {
+          plan_id: string;
+          revision: number;
+          submitted_by_grant: string;
+          submitted_at: string;
+          message: string | null;
+        };
+        Insert: {
+          plan_id: string;
+          revision: number;
+          submitted_by_grant: string;
+          submitted_at?: string;
+          message?: string | null;
+        };
+        Update: {
+          plan_id?: string;
+          revision?: number;
+          submitted_by_grant?: string;
+          submitted_at?: string;
+          message?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_plan_submissions_plan_id_fkey";
+            columns: ["plan_id"];
+            isOneToOne: false;
+            referencedRelation: "ministry_calendar_plans";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_plan_submissions_submitted_by_grant_fkey";
+            columns: ["submitted_by_grant"];
+            isOneToOne: false;
+            referencedRelation: "calendar_plan_access";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_planner_acceptances: {
+        Row: {
+          grant_id: string;
+          privacy_version: string;
+          terms_version: string;
+          accepted_at: string;
+        };
+        Insert: {
+          grant_id: string;
+          privacy_version: string;
+          terms_version: string;
+          accepted_at?: string;
+        };
+        Update: {
+          grant_id?: string;
+          privacy_version?: string;
+          terms_version?: string;
+          accepted_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_planner_acceptances_grant_id_fkey";
+            columns: ["grant_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_plan_access";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       calendar_resources: {
         Row: {
           id: string;
@@ -345,6 +798,151 @@ export type Database = {
           updated_at?: string;
         };
         Relationships: [
+        ];
+      };
+      calendar_schedule_dates: {
+        Row: {
+          id: string;
+          event_id: string;
+          local_date: string;
+        };
+        Insert: {
+          id?: string;
+          event_id: string;
+          local_date: string;
+        };
+        Update: {
+          id?: string;
+          event_id?: string;
+          local_date?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_schedule_dates_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_events";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_submission_dates: {
+        Row: {
+          submission_id: string;
+          local_date: string;
+        };
+        Insert: {
+          submission_id: string;
+          local_date: string;
+        };
+        Update: {
+          submission_id?: string;
+          local_date?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_submission_dates_submission_id_fkey";
+            columns: ["submission_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_event_submissions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_submission_ministries: {
+        Row: {
+          submission_id: string;
+          ministry_id: string;
+        };
+        Insert: {
+          submission_id: string;
+          ministry_id: string;
+        };
+        Update: {
+          submission_id?: string;
+          ministry_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_submission_ministries_ministry_id_fkey";
+            columns: ["ministry_id"];
+            isOneToOne: false;
+            referencedRelation: "ministries";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_submission_ministries_submission_id_fkey";
+            columns: ["submission_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_event_submissions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_submission_resource_templates: {
+        Row: {
+          submission_id: string;
+          resource_id: string;
+          quantity_requested: number;
+          notes: string | null;
+        };
+        Insert: {
+          submission_id: string;
+          resource_id: string;
+          quantity_requested: number;
+          notes?: string | null;
+        };
+        Update: {
+          submission_id?: string;
+          resource_id?: string;
+          quantity_requested?: number;
+          notes?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_submission_resource_templates_resource_id_fkey";
+            columns: ["resource_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_resources";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_submission_resource_templates_submission_id_fkey";
+            columns: ["submission_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_event_submissions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_submission_room_templates: {
+        Row: {
+          submission_id: string;
+          room_id: string;
+        };
+        Insert: {
+          submission_id: string;
+          room_id: string;
+        };
+        Update: {
+          submission_id?: string;
+          room_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_submission_room_templates_room_id_fkey";
+            columns: ["room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_submission_room_templates_submission_id_fkey";
+            columns: ["submission_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_event_submissions";
+            referencedColumns: ["id"];
+          },
         ];
       };
       email_logs: {
@@ -435,6 +1033,11 @@ export type Database = {
           removed_at: string | null;
           removed_by: string | null;
           created_at: string;
+          submission_status: string;
+          submission_revision: number;
+          submitted_at: string | null;
+          requester_message: string | null;
+          changes_requested_reason: string | null;
         };
         Insert: {
           id?: string;
@@ -445,6 +1048,11 @@ export type Database = {
           removed_at?: string | null;
           removed_by?: string | null;
           created_at?: string;
+          submission_status?: string;
+          submission_revision?: number;
+          submitted_at?: string | null;
+          requester_message?: string | null;
+          changes_requested_reason?: string | null;
         };
         Update: {
           id?: string;
@@ -455,6 +1063,11 @@ export type Database = {
           removed_at?: string | null;
           removed_by?: string | null;
           created_at?: string;
+          submission_status?: string;
+          submission_revision?: number;
+          submitted_at?: string | null;
+          requester_message?: string | null;
+          changes_requested_reason?: string | null;
         };
         Relationships: [
           {
@@ -1277,9 +1890,21 @@ export type Database = {
         Args: { p_user_id: string; p_full_name: string };
         Returns: undefined;
       };
+      calendar_accept_planner_policies: {
+        Args: { p_plan_id: string; p_session_hash: string; p_privacy_version: string; p_terms_version: string };
+        Returns: undefined;
+      };
       calendar_active_resources: {
         Args: never;
         Returns: { id: string; name: string; category: string; description: string; available_quantity: number }[];
+      };
+      calendar_duplicate_event_draft: {
+        Args: { p_plan_id: string; p_session_hash: string; p_event_id: string };
+        Returns: string;
+      };
+      calendar_end_planner_session: {
+        Args: { p_plan_id: string; p_session_hash: string };
+        Returns: undefined;
       };
       calendar_invitation_context: {
         Args: { p_email_id: string };
@@ -1289,6 +1914,14 @@ export type Database = {
         Args: never;
         Returns: { grant_id: string; status: Database["public"]["Enums"]["email_status"]; error_message: string; attempted_at: string }[];
       };
+      calendar_planner_policy_status: {
+        Args: { p_plan_id: string; p_session_hash: string };
+        Returns: Json;
+      };
+      calendar_planner_portal: {
+        Args: { p_plan_id: string; p_session_hash: string };
+        Returns: Json;
+      };
       calendar_planner_resources: {
         Args: { p_plan_id: string; p_session_hash: string };
         Returns: { id: string; name: string; category: string; description: string; available_quantity: number }[];
@@ -1296,6 +1929,26 @@ export type Database = {
       calendar_planner_session_context: {
         Args: { p_plan_id: string; p_session_hash: string };
         Returns: Json;
+      };
+      calendar_remove_event_draft: {
+        Args: { p_plan_id: string; p_session_hash: string; p_event_id: string };
+        Returns: undefined;
+      };
+      calendar_request_plan_changes: {
+        Args: { p_plan_id: string; p_reason: string };
+        Returns: undefined;
+      };
+      calendar_save_event_draft: {
+        Args: { p_plan_id: string; p_session_hash: string; p_event_id: string; p_data: Json };
+        Returns: string;
+      };
+      calendar_staff_plan_list: {
+        Args: never;
+        Returns: Json;
+      };
+      calendar_submit_plan: {
+        Args: { p_plan_id: string; p_session_hash: string; p_message: string; p_confirm_empty: boolean };
+        Returns: number;
       };
       cancel_guest_reservation: {
         Args: { p_reference: string; p_token_hash: string };

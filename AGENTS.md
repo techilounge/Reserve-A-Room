@@ -218,9 +218,9 @@ Verification completed for that fix before commit:
 - Verification: typecheck and lint passed with no warnings; 33 unit-test files / 227 tests passed; 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 103/103. A restored-state check at 1000px, 320px and in dark mode showed no axe violations and no horizontal overflow.
 - Status: committed locally; not yet pushed or deployed.
 
-## Church Calendar Phase 1 checkpoint — 2026-10-29
+## Church Calendar Phase 2 checkpoint — 2026-10-30
 
-- The owner approved corrected Phase 0 and authorized Phase 1 only. The detailed
+- The owner approved corrected Phase 0 and Phase 1 and authorized Phase 2. The detailed
   specification is `docs/CHURCH_CALENDAR_IMPLEMENTATION_PLAN.md`.
 - Work on `codex/church-calendar-phase1`, based on verified main `1f287ee`; keep the
   unrelated `03b721c` security remediation on its separate branch. No production writes.
@@ -228,14 +228,14 @@ Verification completed for that fix before commit:
   unexpired planner grants; revocations and rotations affect only that planner. Only a
   Super Admin may reopen a cycle, with an audited reason.
 - Phase 1 covers cycles, plans, independent grants/sessions, minimal resource catalog,
-  safe RLS/RPCs, branded invitations, audit and tests. Stop before Phase 2 after reporting
-  the implementation and exact checks. Update this checkpoint before ending the session.
+  safe RLS/RPCs, branded invitations, audit and tests. Phase 2 work is on the same review
+  branch. Stop for review before Phase 3 and update this checkpoint before ending.
 - Phase 1 is implemented on the review branch for owner review. Migration
   `20261029100000_church_calendar_phase1.sql` is not applied to a hosted project.
   `/admin/church-calendar` manages cycles, ministries, invitations and resources;
   `/calendar-plan/[reference]` is the scoped invitation/access page. The full security,
   limitations and isolated rollout/rollback notes are in `docs/CHURCH_CALENDAR_PHASE1_REVIEW.md`.
-- Verification on this worktree: typecheck and lint passed; unit tests 34 files / 231
+- Historical Phase 1 verification at that checkpoint: typecheck and lint passed; unit tests 34 files / 231
   tests; database tests 13 files / 155 tests; isolated `npm run build` passed; full
   Playwright 107/107, plus the final focused calendar file 2/2. No tests skipped. The
   first browser run found two unrelated test-fixture timing/date collisions that were
@@ -243,8 +243,23 @@ Verification completed for that fix before commit:
   PostgreSQL concurrency, and hosting-log redaction still need isolated release checks.
 - Required server-only `CALENDAR_PLAN_LINK_SECRET` must be generated independently per
   environment; changing it requires replacing and resending outstanding invitations.
-  Next: stop for owner review. Do not start Phase 2, push a migration to production,
-  deploy, merge, or publish legal updates without the owner's subsequent authorization.
+  Next: finish and verify Phase 2 locally, then request owner/reviewer review. Do not
+  start Phase 3, push a migration to production, deploy, merge, enable planner policies,
+  or publish legal updates without the owner's subsequent authorization. Proposed legal
+  wording is in `docs/CHURCH_CALENDAR_LEGAL_DRAFT.md`; Primary/Secondary uniqueness is
+  undecided and labels retain their existing descriptive behavior.
+- Phase 2 adds local migration `20261030100000_calendar_planning_portal.sql`, the
+  planner form and `/admin/calendar-submissions`, and a policy gate that starts disabled.
+  Drafts can be incomplete; submission snapshots are immutable and create no operational
+  reservations. Staff may request changes while the cycle is open. The branch must stop
+  for review; no hosted migration or production deployment has been performed.
+- Phase 2 verification: `npm run check` passed typecheck, lint, 35 unit files / 233
+  tests and 14 database files / 167 tests. The isolated production build passed with
+  hosted Supabase and Resend credentials disabled; the focused database file passed
+  8/8 after the build. The full Playwright suite passed 108/108 on the preceding
+  iteration, and the final mobile planner and light/dark submissions accessibility
+  checks passed 3/3 after the targeted changes. The next step is branch review and
+  owner/legal decisions, not Phase 3 or production rollout.
 
 ### Phase 1 review fixes — 2026-10-30
 
@@ -263,10 +278,11 @@ Verification completed for that fix before commit:
   the final audit/error-message refinements separately passing the focused 3/3 browser tests.
   No tests were skipped. Real provider delivery, real multi-connection PostgreSQL
   contention, and hosting-log redaction remain pre-release checks.
-- Phase 1 is still awaiting the reviewer's final approval. Do not start Phase 2 until it
-  is authorized. Phase 2 follow-ups: owner decision on uniqueness of Primary/Secondary
-  labels and a planner Sign Out action. For PR work, the owner wants review branches
-  pushed and left unmerged for reviewer feedback; do not merge without authorization.
+- Phase 1 was approved at `dbee565098f583d5462ed6edfe99f6460aae17ce`; Phase 2 is now
+  authorized on this branch. Stop for owner review before Phase 3. Phase 2 follow-ups:
+  owner decision on uniqueness of Primary/Secondary labels and a planner Sign Out action.
+  Draft planner legal updates for owner/legal review; do not publish or release the
+  Phase 2 portal without that approval. Push review branches and leave them unmerged.
 
 ## Required quality gates
 

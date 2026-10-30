@@ -28,6 +28,7 @@ const ADMIN_PAGES = [
   "/admin/reservations",
   "/admin/reservations/new",
   "/admin/calendar",
+  "/admin/calendar-submissions",
   "/admin/notifications",
   "/admin/recurring-requests",
   "/admin/recurring-guide",

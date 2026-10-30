@@ -1,6 +1,41 @@
 # Church Calendar — Phase 0 architecture and implementation plan
 
-**Checkpoint — 2026-10-30:** The owner approved the corrected Phase 0 architecture and authorized **Phase 1 only**. The reviewer withheld final Phase 1 approval pending two fixes; those fixes are implemented and await follow-up review. Phase 2 remains gated on approval. The implementation branch is `codex/church-calendar-phase1`, based on verified `main` commit `1f287eecb0979f40339011a49ab3b99508ec6514`; the mixed security remediation in `03b721c` is not part of this branch. See `docs/CHURCH_CALENDAR_PHASE1_REVIEW.md` and the handoff below.
+**Checkpoint — 2026-10-30:** The reviewer approved Phase 1 at `dbee565098f583d5462ed6edfe99f6460aae17ce` and authorized **Phase 2** on the existing `codex/church-calendar-phase1` branch. Phase 2 must stop for owner review before Phase 3. No merge to `main` or production deployment is authorized. The branch is based on `main` commit `1f287eecb0979f40339011a49ab3b99508ec6514`; the mixed security remediation in `03b721c` remains separate. See `docs/CHURCH_CALENDAR_PHASE1_REVIEW.md` and the handoff below.
+
+### Phase 2 implementation handoff
+
+- `20261030100000_calendar_planning_portal.sql` appends private planning events,
+  typed schedules and request templates plus immutable per-submission snapshots;
+  all public tables have RLS and no direct browser/service-role table grants.
+  Drafts may have incomplete schedules, but a submission requires complete dates,
+  times and recurrence fields. Inactive selections stay visible and must be removed
+  before submission. Room/resource requests are not reservations or allocations.
+- `/calendar-plan/[reference]` includes an individual/versioned policy gate, draft
+  create/edit/delete/duplicate, selected dates and recurrence inputs, requested rooms,
+  co-sponsors and resources, submission and session-specific Sign Out. Staff can view
+  submitted snapshots and request changes in `/admin/calendar-submissions`. Earlier
+  submitted revisions remain immutable while changes are made.
+- The policy configuration starts disabled and is not enabled in this branch. The
+  proposed wording in `docs/CHURCH_CALENDAR_LEGAL_DRAFT.md` is explicitly for
+  owner/legal review, not publication; approved version identifiers and approved public
+  terms require a separate reviewed configuration change before a release. Primary and
+  Secondary labels remain descriptive until the owner decides whether they are unique.
+- This phase creates no persistent occurrences, conflict engine, allocations, or live
+  WordPress synchronization. Phase 3 and production rollout are not authorized. PGlite
+  serializes test connections; real multi-connection race verification and preview
+  hosting-log redaction remain pre-release checks. The planner proposal workflow does
+  not send submission or change-request emails in this phase; notification automation
+  remains later work.
+- Verification: `npm run check` passed typecheck, lint, 35 unit files / 233 tests,
+  and 14 database files / 167 tests. The production build passed with hosted Supabase
+  and Resend credentials disabled; the focused database file passed 8/8 after that
+  build. The existing complete Playwright suite passed 108/108 on the preceding
+  iteration; after the final targeted changes, the mobile planner workflow and the new
+  staff page's light/dark accessibility tests passed 3/3. No tests were skipped.
+- **Next:** push the review branch, stop for Phase 2 review, and obtain the owner/legal
+  decision on the draft wording and the owner's Primary/Secondary uniqueness choice.
+  No production merge, deployment, hosted migration, policy activation, or Phase 3 work
+  is authorized by the Phase 2 approval alone.
 
 ### Phase 1 implementation handoff
 
@@ -188,4 +223,4 @@ These are recommendations and phase-specific decisions, not newly approved polic
 11. **Website sources:** determine whether the public website calendars share a source and verify plugin/API permissions before Phase 10.
 12. **Security workstream sequencing:** review its independent branch and preview/migration requirements before adopting it as a deployed calendar dependency; no production deploy is implied by this proposal.
 
-**Next action:** the reviewer re-reviews the latest pushed Phase 1 commit. Await final Phase 1 approval; do not begin Phase 2, merge to `main`, deploy production, apply a hosted migration or enable WordPress synchronization without separate instruction.
+**Next action:** submit the Phase 2 branch for owner/reviewer review. Do not begin Phase 3, merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.

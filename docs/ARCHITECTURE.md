@@ -770,7 +770,7 @@ Church Calendar events are separate from operational reservations. Planning uses
 independently revocable per-person grants and sessions, event-level room/resource
 templates, and distinct planning versus operational conflicts. Event ownership derives
 from the ministry plan, and public occurrence identities survive ordinary edits. Only
-Phase 1 cycles, invitations, sessions and a minimal resource catalog are authorized now;
+Phase 2 planning portal and event submission are authorized following Phase 1 approval;
 the remaining architecture and policy gates are documented in
 `docs/CHURCH_CALENDAR_IMPLEMENTATION_PLAN.md`. The calendar design is not deployed.
 
@@ -781,6 +781,17 @@ session hashes have no browser-role read grant. Staff and authenticated planner 
 can read the active resource catalog without private notes through separately authorized RPCs. Every management
 RPC checks the caller, and mutations serialize against the cycle before checking state;
 invites additionally lock the plan before counting unexpired, unrevoked grants.
+
+Phase 2 appends `20261030100000_calendar_planning_portal.sql`. Planning events,
+schedules and requested room/resource templates remain separate from reservations.
+Each submission copies typed facts and normalized templates into immutable revision
+records, including an explicit empty-plan submission; change requests preserve earlier
+snapshots. Planner RPCs recheck the scoped session, grant, plan, cycle and current
+per-grant policy acknowledgment under locks. The policy gate starts disabled pending
+owner/legal approval of the draft; no unapproved legal language is published. Staff
+submission reads and change requests require an active staff profile. A planner sign-out
+revokes only its current session. No conflict engine, occurrence materialization or
+allocation is implemented in this phase.
 
 Per-person invitation tokens are HMAC-derived from a random seed using a dedicated
 server secret; only the seed and token hash are stored. A non-consuming GET is followed

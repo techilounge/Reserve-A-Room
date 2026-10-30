@@ -177,6 +177,11 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/qa/calendar-cycle") {
       return send(200, await json("select to_jsonb(c) as j from public.calendar_cycles c where c.name = $1", [url.searchParams.get("name")]));
     }
+    if (url.pathname === "/qa/calendar-legal" && req.method === "POST") {
+      const { enabled } = await readBody(req) as { enabled?: boolean };
+      await db.query("update private.calendar_planner_policies set enabled = $1, privacy_version = 'test-privacy', terms_version = 'test-terms'", [enabled === true]);
+      return send(200, { ok: true });
+    }
     // --- auth ---
     if (url.pathname === "/auth/v1/token" && req.method === "POST") {
       const body = await readBody(req);

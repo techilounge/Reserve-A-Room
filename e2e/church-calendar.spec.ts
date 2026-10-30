@@ -32,7 +32,7 @@ test("a Super Admin configures a cycle and independently rotates one planner's a
   await expect(cycle.getByText("Alice Example")).toBeVisible();
   const mockUrl = `http://127.0.0.1:${process.env.MOCK_SUPABASE_PORT ?? 54400}`;
   const details = await (await fetch(`${mockUrl}/qa/calendar-invitation?email=calendar-alice%40example.org`)).json() as { plan: string; grant: string; token: string };
-  const visitor = await browser.newContext();
+  const visitor = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const planner = await visitor.newPage();
   const invitationUrl = `/calendar-plan/${details.plan}?grant=${details.grant}&token=${details.token}`;
   const response = await planner.goto(invitationUrl);
@@ -57,6 +57,45 @@ test("a Super Admin configures a cycle and independently rotates one planner's a
   await expect(planner.getByRole("heading", { name: "Planning access unavailable" })).toBeVisible();
   const replacement = await (await fetch(`${mockUrl}/qa/calendar-invitation?email=calendar-alice%40example.org`)).json() as { plan: string; grant: string; token: string };
   const replacementUrl = `/calendar-plan/${replacement.plan}?grant=${replacement.grant}&token=${replacement.token}`;
+  await planner.goto(replacementUrl);
+  await planner.getByRole("button", { name: "Continue" }).click();
+  await expect(planner.getByText(/Welcome, Alice Example/)).toBeVisible();
+  try {
+    expect((await fetch(`${mockUrl}/qa/calendar-legal`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled: true }) })).ok).toBe(true);
+    await planner.reload();
+    await planner.getByRole("checkbox", { name: /I agree to the Privacy Policy/ }).check();
+    await planner.getByRole("button", { name: "Continue to planning" }).click();
+    await planner.getByText("Add an event").click();
+    const editor = planner.locator("details").filter({ hasText: "Add an event" });
+    const date = new Date(now + 86400000).toISOString().slice(0, 10);
+    await editor.getByLabel("Event title").fill("Planning browser test");
+    await editor.getByLabel("Start date").fill(date);
+    await editor.getByLabel("End date (same as start for one day)").fill(date);
+    await editor.getByLabel("Start time").fill("14:00");
+    await editor.getByLabel("End time").fill("13:00");
+    await editor.getByRole("checkbox", { name: "Conference Room" }).check();
+    expect(await planner.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    expect((await new AxeBuilder({ page: planner }).analyze()).violations).toEqual([]);
+    await editor.getByRole("button", { name: "Save event" }).click();
+    await expect(editor.getByRole("alert")).toBeVisible();
+    await expect(editor.getByLabel("Event title")).toHaveValue("Planning browser test");
+    await expect(editor.getByRole("checkbox", { name: "Conference Room" })).toBeChecked();
+    await editor.getByLabel("End time").fill("15:00");
+    await editor.getByRole("button", { name: "Save event" }).click();
+    await expect(planner.getByText(/Planning browser test · CAL-/)).toBeVisible();
+    await planner.getByRole("button", { name: "Submit plan" }).click();
+    await expect(planner.getByRole("status")).toContainText("submitted");
+    const submissions = await staff.newPage();
+    await submissions.goto("/admin/calendar-submissions");
+    const submitted = submissions.locator("li").filter({ hasText: "Planning browser test" }).first();
+    await expect(submitted).toBeVisible();
+    await submissions.close();
+  } finally {
+    await fetch(`${mockUrl}/qa/calendar-legal`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled: false }) });
+  }
+  await planner.getByRole("button", { name: "Sign out" }).click();
+  await expect(planner.getByRole("heading", { name: "You are signed out" })).toBeVisible();
+  expect((await visitor.cookies()).some((cookie) => cookie.name === "calendar_planner")).toBe(false);
   await planner.goto(replacementUrl);
   await planner.getByRole("button", { name: "Continue" }).click();
   await expect(planner.getByText(/Welcome, Alice Example/)).toBeVisible();

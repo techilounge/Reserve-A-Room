@@ -115,7 +115,7 @@ Generate each secret with:
 node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
-### Church Calendar Phase 1 (review branch)
+### Church Calendar Phases 1–2 (review branch)
 
 Phase 1 adds `/admin/church-calendar` for Super Admins to create cycles, add
 ministries, invite up to five active planners per ministry, replace or revoke
@@ -132,12 +132,20 @@ other planners. Delivery status appears next to the planner. If delivery is skip
 fails, check the sender and provider configuration, then use **Replace and resend**;
 old uncertain deliveries are not retried after the safe provider idempotency window.
 The email link first shows a confirmation page, so an email scanner's GET does not
-open a session. The planner's temporary access page shows the cycle details; the
-planning form is a later phase. To remove a participating ministry, use **Remove ministry
+open a session. To remove a participating ministry, use **Remove ministry
 from cycle** and confirm; the plan and its history are retained, and all of its planner
 invitations and sessions are revoked. Adding the ministry again does not restore old
 credentials; invite its planners again. Private invitation links must not be forwarded or
 captured in analytics or server request logs.
+
+Phase 2 adds the invitation-scoped planning portal, draft events and schedules,
+requested rooms and resources, immutable submission revisions, and the staff
+`/admin/calendar-submissions` list. Requests are proposals: they do not create
+reservations or allocate resources. Planners can sign out on shared computers.
+The planner policy gate defaults to disabled; the proposed text in
+`docs/CHURCH_CALENDAR_LEGAL_DRAFT.md` is for owner/legal review only. Do not
+enable the gate or publish revised terms until they have been approved. Phase 2
+is for branch review and must not be deployed to production yet.
 
 For an isolated local or preview environment, configure a separate Supabase project,
 apply `20261029100000_church_calendar_phase1.sql` after all preceding migrations, and
