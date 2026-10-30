@@ -413,6 +413,7 @@ describe("function privileges (catalog-wide allowlist)", () => {
       "public.mark_notifications_read",
       "public.my_notifications",
       "public.record_staff_login",
+      "public.remove_calendar_ministry",
       "public.retry_email",
       "public.revoke_calendar_planner",
       "public.rotate_calendar_invitation",

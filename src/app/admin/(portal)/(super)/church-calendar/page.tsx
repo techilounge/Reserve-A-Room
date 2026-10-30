@@ -5,31 +5,28 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { hasPermission } from "@/lib/auth/guards";
-import { formatInstant, toLocalParts } from "@/lib/datetime";
+import { calendarInstantToLocal } from "@/lib/calendar-planning/datetime";
+import { formatInstant } from "@/lib/datetime";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-import { addMinistry, invitePlanner, revokePlanner, rotatePlanner, saveCycle, saveResource, transitionCycle } from "./actions";
+import { addMinistry, invitePlanner, removeMinistry, revokePlanner, rotatePlanner, saveCycle, saveResource, transitionCycle } from "./actions";
 
 export const metadata: Metadata = { title: "Church Calendar" };
 const selectStyle = "min-h-10 w-full rounded-lg border border-input bg-background px-3 text-sm";
 const field = "flex flex-col gap-1 text-sm font-medium";
 const card = "space-y-4 rounded-xl border bg-card p-4 sm:p-5";
-const localInstant = (value: string) => {
-  const parts = toLocalParts(value, "America/Chicago");
-  return `${parts.date}T${parts.time}`;
-};
-
-function CycleForm({ cycle }: { cycle?: {
+function CycleForm({ cycle, timezone }: { timezone: string; cycle?: {
   id: string; name: string; start_date: string; end_date: string; submission_opens_at: string;
   submission_deadline: string; instructions: string | null;
 } }) {
   return <form action={saveCycle} className="grid gap-3 sm:grid-cols-2">
     {cycle ? <input type="hidden" name="id" value={cycle.id} /> : null}
+    <input type="hidden" name="timezone" value={timezone} />
     <label className={field}>Cycle name<Input name="name" defaultValue={cycle?.name} required maxLength={150} /></label>
     <label className={field}>Calendar start<Input name="start" type="date" defaultValue={cycle?.start_date} required /></label>
     <label className={field}>Calendar end<Input name="end" type="date" defaultValue={cycle?.end_date} required /></label>
-    <label className={field}>Planning opens (Central time)<Input name="opens" type="datetime-local" defaultValue={cycle ? localInstant(cycle.submission_opens_at) : undefined} required /></label>
-    <label className={field}>Planning deadline (Central time)<Input name="deadline" type="datetime-local" defaultValue={cycle ? localInstant(cycle.submission_deadline) : undefined} required /></label>
+    <label className={field}>Planning opens ({timezone})<Input name="opens" type="datetime-local" defaultValue={cycle ? calendarInstantToLocal(cycle.submission_opens_at, timezone) : undefined} required /></label>
+    <label className={field}>Planning deadline ({timezone})<Input name="deadline" type="datetime-local" defaultValue={cycle ? calendarInstantToLocal(cycle.submission_deadline, timezone) : undefined} required /></label>
     <label className={`${field} sm:col-span-2`}>Instructions<textarea name="instructions" defaultValue={cycle?.instructions ?? ""} maxLength={5000} rows={3} className={selectStyle} /></label>
     <div className="sm:col-span-2"><Button type="submit">{cycle ? "Save cycle" : "Create draft cycle"}</Button></div>
   </form>;
@@ -57,34 +54,36 @@ export default async function ChurchCalendarPage({ searchParams }: { searchParam
   if (!(await hasPermission("churchCalendar.manage"))) return null;
   const query = await searchParams;
   const supabase = await createSupabaseServerClient();
-  const [cyclesResult, plansResult, grantsResult, resourcesResult, ministriesResult, deliveriesResult] = await Promise.all([
+  const [cyclesResult, plansResult, grantsResult, resourcesResult, ministriesResult, deliveriesResult, settingsResult] = await Promise.all([
     supabase.from("calendar_cycles").select("*").order("created_at", { ascending: false }),
     supabase.from("ministry_calendar_plans").select("*").order("created_at"),
     supabase.from("calendar_plan_access").select("id, plan_id, contact_name, contact_email, contact_phone, label, version, expires_at, revoked_at, created_at"),
     supabase.from("calendar_resources").select("*").order("name"),
     supabase.rpc("admin_list_ministries"),
     supabase.rpc("calendar_invitation_delivery_status"),
+    supabase.rpc("get_admin_settings"),
   ]);
-  if (cyclesResult.error || plansResult.error || grantsResult.error || resourcesResult.error || ministriesResult.error || deliveriesResult.error) {
+  if (cyclesResult.error || plansResult.error || grantsResult.error || resourcesResult.error || ministriesResult.error || deliveriesResult.error || settingsResult.error || !settingsResult.data?.timezone) {
     return <div className="space-y-4"><PageHeader title="Church Calendar" />
       <p role="alert">Calendar configuration is unavailable. Confirm the Phase 1 database migration has been applied to this environment.</p></div>;
   }
   const cycles = cyclesResult.data; const plans = plansResult.data; const grants = grantsResult.data;
   const resources = resourcesResult.data; const ministries = ministriesResult.data;
+  const timezone = settingsResult.data.timezone;
   return <div className="space-y-6">
     <PageHeader title="Church Calendar" description="Manage planning cycles, ministry invitations, and the resource catalog." />
     {query.message ? <p role="status" className="rounded-lg border border-green-600 p-3">{query.message}</p> : null}
     {query.error ? <p role="alert" className="rounded-lg border border-destructive p-3">{query.error}</p> : null}
     <section className={card} aria-labelledby="new-cycle"><h2 id="new-cycle" className="text-xl font-semibold">Create a planning cycle</h2>
-      <p className="text-sm text-muted-foreground">A cycle can span up to three years. Dates and deadlines use Central time.</p><CycleForm /></section>
+      <p className="text-sm text-muted-foreground">A cycle can span up to three years. Times use the configured church timezone: {timezone}.</p><CycleForm timezone={timezone} /></section>
     <section className="space-y-4" aria-labelledby="cycles"><h2 id="cycles" className="text-xl font-semibold">Planning cycles</h2>
       {cycles.length === 0 ? <p>No planning cycles yet.</p> : null}
       {cycles.map((cycle) => {
         const editable = cycle.status === "draft" || cycle.status === "open";
-        const cyclePlans = plans.filter((plan) => plan.cycle_id === cycle.id);
+        const cyclePlans = plans.filter((plan) => plan.cycle_id === cycle.id && plan.active);
         return <article key={cycle.id} className={card}>
-          <div><h3 className="text-lg font-semibold">{cycle.name}</h3><p className="text-sm text-muted-foreground">Status: {cycle.status} · Deadline: {formatInstant(cycle.submission_deadline, "America/Chicago")}</p></div>
-          {editable ? <details><summary className="cursor-pointer font-medium">Edit cycle</summary><div className="pt-4"><CycleForm cycle={cycle} /></div></details> : null}
+          <div><h3 className="text-lg font-semibold">{cycle.name}</h3><p className="text-sm text-muted-foreground">Status: {cycle.status} · Opens: {formatInstant(cycle.submission_opens_at, timezone)} · Deadline: {formatInstant(cycle.submission_deadline, timezone)} ({timezone})</p></div>
+          {editable ? <details><summary className="cursor-pointer font-medium">Edit cycle</summary><div className="pt-4"><CycleForm cycle={cycle} timezone={timezone} /></div></details> : null}
           <div className="flex flex-wrap gap-3">
             {cycle.status === "draft" ? <form action={transitionCycle}><input type="hidden" name="id" value={cycle.id} /><input type="hidden" name="status" value="open" /><Button type="submit">Open cycle</Button></form> : null}
             {cycle.status === "open" ? <form id={`review-${cycle.id}`} action={transitionCycle}><input type="hidden" name="id" value={cycle.id} /><input type="hidden" name="status" value="review" /><CalendarConfirmButton formId={`review-${cycle.id}`} label="Move to review" description="Planners will no longer be able to open this cycle until it is reopened." /></form> : null}
@@ -105,6 +104,11 @@ export default async function ChurchCalendarPage({ searchParams }: { searchParam
             const ministry = ministries.find((m) => m.id === plan.ministry_id);
             return <div key={plan.id} className="space-y-3 rounded-lg border p-4">
               <h4 className="font-semibold">{ministry?.name ?? "Ministry"}</h4>
+              {editable ? <form id={`remove-${plan.id}`} action={removeMinistry}>
+                <input type="hidden" name="plan" value={plan.id} />
+                <CalendarConfirmButton formId={`remove-${plan.id}`} label="Remove ministry from cycle"
+                  description="This revokes this ministry's planner invitations and sessions. Its history is kept, and you can add it again later." small />
+              </form> : null}
               {grants.filter((grant) => grant.plan_id === plan.id).map((grant) => {
                 const active = !grant.revoked_at && new Date(grant.expires_at).getTime() > Date.now();
                 const delivery = deliveriesResult.data.find((item) => item.grant_id === grant.id);

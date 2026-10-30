@@ -120,7 +120,8 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 Phase 1 adds `/admin/church-calendar` for Super Admins to create cycles, add
 ministries, invite up to five active planners per ministry, replace or revoke
 individual invitations, and configure a minimal resource catalog. Calendar cycles
-are at most three years. Planning dates and deadlines use Central time. Review and
+are at most three years. Planning times and deadlines use the timezone configured in
+Settings. Review and
 finalized cycles can be reopened only by a Super Admin who supplies an audited reason;
 archived cycles remain closed. Resource quantities are configuration only: there is
 no allocation, availability, or conflict checking in Phase 1.
@@ -132,7 +133,10 @@ fails, check the sender and provider configuration, then use **Replace and resen
 old uncertain deliveries are not retried after the safe provider idempotency window.
 The email link first shows a confirmation page, so an email scanner's GET does not
 open a session. The planner's temporary access page shows the cycle details; the
-planning form is a later phase. Private invitation links must not be forwarded or
+planning form is a later phase. To remove a participating ministry, use **Remove ministry
+from cycle** and confirm; the plan and its history are retained, and all of its planner
+invitations and sessions are revoked. Adding the ministry again does not restore old
+credentials; invite its planners again. Private invitation links must not be forwarded or
 captured in analytics or server request logs.
 
 For an isolated local or preview environment, configure a separate Supabase project,

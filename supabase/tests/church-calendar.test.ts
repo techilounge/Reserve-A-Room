@@ -207,4 +207,120 @@ describe("Church Calendar Phase 1 authorization", () => {
     );
     expect(audit.rows[0].metadata.reason).toBe("Correction requested");
   });
+
+  it("uses the current application timezone and rejects stale timezone saves", async () => {
+    await expect(asRole(db, "authenticated", (tx) => tx.query(
+      `select public.save_calendar_cycle(id, name, start_date, end_date, submission_opens_at,
+       submission_deadline, instructions, 'America/New_York') from public.calendar_cycles where id = $1`, [cycle],
+    ), owner)).rejects.toMatchObject({ code: "RAR09" });
+    await db.query("update public.app_settings set timezone = 'America/New_York'");
+    try {
+      expect(await context(plan, "ef".repeat(32))).toMatchObject({ timezone: "America/New_York" });
+      await asRole(db, "authenticated", (tx) => tx.query(
+        `select public.save_calendar_cycle(id, name, start_date, end_date, submission_opens_at,
+         submission_deadline, instructions, 'America/New_York') from public.calendar_cycles where id = $1`, [cycle],
+      ), owner);
+    } finally {
+      await db.query("update public.app_settings set timezone = 'America/Chicago'");
+    }
+  });
+
+  it("removes and restores ministry participation without restoring grants or affecting another plan", async () => {
+    await expect(asRole(db, "authenticated", (tx) => tx.query("select public.remove_calendar_ministry($1)", [plan]), admin))
+      .rejects.toMatchObject({ code: "RAR09" });
+    await expect(asRole(db, "anon", (tx) => tx.query("select public.remove_calendar_ministry($1)", [plan])))
+      .rejects.toMatchObject({ code: "42501" });
+    await expect(asRole(db, "service_role", (tx) => tx.query("select public.remove_calendar_ministry($1)", [plan])))
+      .rejects.toMatchObject({ code: "42501" });
+
+    const existing = await db.query<{ id: string; hash: string; email: string; ministry_id: string }>(
+      `select a.id, encode(a.token_hash, 'hex') as hash, a.contact_email as email, p.ministry_id
+       from public.calendar_plan_access a join public.ministry_calendar_plans p on p.id = a.plan_id
+       where p.id = $1 and a.revoked_at is null and a.expires_at > now() limit 1`, [plan],
+    );
+    const active = existing.rows[0];
+    expect(await exchange(plan, active.id, active.hash, "c3".repeat(32))).toBe(true);
+    const otherGrant = crypto.randomUUID();
+    await asRole(db, "authenticated", (tx) => tx.query(
+      "select public.invite_calendar_planner($1, $2, 'Other planner', 'other-plan@example.org', null, 'primary', $3, $4)",
+      [otherPlan, otherGrant, "f1".repeat(32), "f2".repeat(16)],
+    ), owner);
+    expect(await exchange(otherPlan, otherGrant, "f1".repeat(32), "f3".repeat(32))).toBe(true);
+
+    await asRole(db, "authenticated", (tx) => tx.query("select public.transition_calendar_cycle($1, 'review', null)", [cycle]), owner);
+    await expect(asRole(db, "authenticated", (tx) => tx.query("select public.remove_calendar_ministry($1)", [plan]), owner))
+      .rejects.toMatchObject({ code: "RAR09" });
+    await asRole(db, "authenticated", (tx) => tx.query("select public.transition_calendar_cycle($1, 'open', 'Continue planning')", [cycle]), owner);
+
+    await asRole(db, "authenticated", (tx) => tx.query("select public.remove_calendar_ministry($1)", [plan]), owner);
+    expect(await context(plan, "c3".repeat(32))).toBeNull();
+    expect(await context(otherPlan, "f3".repeat(32))).toMatchObject({ grant_id: otherGrant });
+    expect(await exchange(plan, active.id, active.hash, "c4".repeat(32))).toBe(false);
+    await expect(invite(crypto.randomUUID(), "removed@example.org", "f4".repeat(32))).rejects.toMatchObject({ code: "RAR09" });
+    const sessions = await db.query<{ remaining: number }>(
+      `select count(*)::int as remaining from public.calendar_plan_sessions s
+       join public.calendar_plan_access a on a.id = s.grant_id where a.plan_id = $1 and s.revoked_at is null`, [plan],
+    );
+    expect(sessions.rows[0].remaining).toBe(0);
+    const email = await db.query<{ id: string }>(
+      `select e.id from public.system_email_logs e join private.calendar_invitation_deliveries d
+       on d.id = e.entity_id where d.grant_id = $1 limit 1`, [active.id],
+    );
+    const oldMail = await asRole(db, "service_role", (tx) => tx.query<{ value: unknown }>(
+      "select public.calendar_invitation_context($1) as value", [email.rows[0].id],
+    ));
+    expect(oldMail.rows[0].value).toBeNull();
+    const stored = await db.query<{ active: boolean; removed_by: string; total: number; unrevoked: number }>(
+      `select p.active, p.removed_by, count(a.id)::int as total,
+       count(a.id) filter (where a.revoked_at is null)::int as unrevoked
+       from public.ministry_calendar_plans p join public.calendar_plan_access a on a.plan_id = p.id
+       where p.id = $1 group by p.id`, [plan],
+    );
+    expect(stored.rows[0]).toMatchObject({ active: false, removed_by: owner, unrevoked: 0 });
+    expect(stored.rows[0].total).toBeGreaterThan(0);
+    const audit = await db.query<{ actor_user_id: string; created_at: string; metadata: { name: string } }>(
+      "select actor_user_id, created_at, metadata from public.audit_logs where action = 'calendar_plan.removed' and entity_id = $1", [plan],
+    );
+    expect(audit.rows).toHaveLength(1);
+    expect(audit.rows[0]).toMatchObject({ actor_user_id: owner, created_at: expect.anything() });
+    expect(audit.rows[0].metadata.name).toBeTruthy();
+
+    const restored = await asRole(db, "authenticated", (tx) => tx.query<{ id: string }>(
+      "select public.add_calendar_ministry($1, $2) as id", [cycle, active.ministry_id],
+    ), owner);
+    expect(restored.rows[0].id).toBe(plan);
+    expect(await exchange(plan, active.id, active.hash, "c5".repeat(32))).toBe(false);
+    expect(await context(plan, "c3".repeat(32))).toBeNull();
+    const replacement = crypto.randomUUID();
+    await invite(replacement, active.email, "f5".repeat(32));
+    expect(await exchange(plan, replacement, "f5".repeat(32), "f6".repeat(32))).toBe(true);
+    expect(await context(otherPlan, "f3".repeat(32))).toMatchObject({ grant_id: otherGrant });
+  });
+
+  it("rejects ministry removal from finalized or archived cycles", async () => {
+    await asRole(db, "authenticated", (tx) => tx.query("select public.transition_calendar_cycle($1, 'review', null)", [cycle]), owner);
+    await asRole(db, "authenticated", (tx) => tx.query("select public.transition_calendar_cycle($1, 'finalized', null)", [cycle]), owner);
+    await expect(asRole(db, "authenticated", (tx) => tx.query("select public.remove_calendar_ministry($1)", [plan]), owner))
+      .rejects.toMatchObject({ code: "RAR09" });
+    await asRole(db, "authenticated", (tx) => tx.query("select public.transition_calendar_cycle($1, 'archived', null)", [cycle]), owner);
+    await expect(asRole(db, "authenticated", (tx) => tx.query("select public.remove_calendar_ministry($1)", [plan]), owner))
+      .rejects.toMatchObject({ code: "RAR09" });
+    const status = await db.query<{ active: boolean }>("select active from public.ministry_calendar_plans where id = $1", [plan]);
+    expect(status.rows[0].active).toBe(true);
+  });
+
+  it("allows removing and re-adding a ministry during draft", async () => {
+    const created = await asRole(db, "authenticated", (tx) => tx.query<{ id: string }>(
+      "select public.save_calendar_cycle(null, 'Draft', current_date, current_date + 30, now(), now() + interval '5 days', '') as id",
+    ), owner);
+    const ministry = await db.query<{ id: string }>("select id from public.ministries where active limit 1");
+    const first = await asRole(db, "authenticated", (tx) => tx.query<{ id: string }>(
+      "select public.add_calendar_ministry($1, $2) as id", [created.rows[0].id, ministry.rows[0].id],
+    ), owner);
+    await asRole(db, "authenticated", (tx) => tx.query("select public.remove_calendar_ministry($1)", [first.rows[0].id]), owner);
+    const restored = await asRole(db, "authenticated", (tx) => tx.query<{ id: string }>(
+      "select public.add_calendar_ministry($1, $2) as id", [created.rows[0].id, ministry.rows[0].id],
+    ), owner);
+    expect(restored.rows[0].id).toBe(first.rows[0].id);
+  });
 });

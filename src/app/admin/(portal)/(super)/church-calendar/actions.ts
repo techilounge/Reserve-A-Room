@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { assertPermission } from "@/lib/auth/guards";
+import { calendarLocalToInstant } from "@/lib/calendar-planning/datetime";
 import { newPlannerGrant, newPlannerToken } from "@/lib/calendar-planning/token";
-import { localToUtc } from "@/lib/datetime";
 import { scheduleSystemEmailDelivery } from "@/lib/email/schedule";
 import { getServerEnv } from "@/lib/env/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -19,22 +19,25 @@ function finish(message: string, error = false): never {
   redirect(`${BASE}?${error ? "error" : "message"}=${encodeURIComponent(message)}`);
 }
 
-function instant(value: string) {
-  const [date, time] = value.split("T");
-  return date && time ? localToUtc(date, time, "America/Chicago")?.toISOString() : undefined;
-}
-
 export async function saveCycle(form: FormData) {
   await assertPermission("churchCalendar.manage");
   const id = str(form, "id");
-  const opens = instant(str(form, "opens"));
-  const deadline = instant(str(form, "deadline"));
-  if ((id && !uuid.test(id)) || !opens || !deadline) finish("Enter valid dates and times in the church time zone.", true);
   const supabase = await createSupabaseServerClient();
+  const settings = await supabase.rpc("get_admin_settings");
+  if (settings.error || !settings.data?.timezone) finish("The application timezone is unavailable. Try again.", true);
+  const timezone = settings.data.timezone;
+  if (str(form, "timezone") !== timezone) finish("The application timezone changed. Refresh the page and check the times before saving.", true);
+  const opens = calendarLocalToInstant(str(form, "opens"), timezone);
+  const deadline = calendarLocalToInstant(str(form, "deadline"), timezone);
+  if ((id && !uuid.test(id)) || !opens || !deadline) finish("Enter valid dates and times in the church time zone.", true);
   const { error } = await supabase.rpc("save_calendar_cycle", {
     p_id: (id || null) as unknown as string, p_name: str(form, "name"), p_start_date: str(form, "start"),
     p_end_date: str(form, "end"), p_opens_at: opens, p_deadline: deadline, p_instructions: str(form, "instructions"),
+    p_expected_timezone: timezone,
   });
+  if (error?.message === "Application timezone changed; reload before saving.") {
+    finish("The application timezone changed. Refresh the page and check the times before saving.", true);
+  }
   if (error) finish("Could not save the cycle. Check the dates, three-year limit, and cycle status.", true);
   finish("Planning cycle saved.");
 }
@@ -59,6 +62,16 @@ export async function addMinistry(form: FormData) {
   const { error } = await supabase.rpc("add_calendar_ministry", { p_cycle_id: cycle, p_ministry_id: ministry });
   if (error) finish("Could not add this ministry. It may already participate or the cycle may be closed.", true);
   finish("Ministry added to the cycle.");
+}
+
+export async function removeMinistry(form: FormData) {
+  await assertPermission("churchCalendar.manage");
+  const plan = str(form, "plan");
+  if (!uuid.test(plan)) finish("Choose a valid ministry plan.", true);
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("remove_calendar_ministry", { p_plan_id: plan });
+  if (error) finish("Could not remove this ministry. Refresh and check that the cycle is open or in draft.", true);
+  finish("Ministry removed. Its planner invitations and sessions have been revoked.");
 }
 
 export async function invitePlanner(form: FormData) {

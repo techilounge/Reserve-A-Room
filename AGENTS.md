@@ -31,7 +31,7 @@ If `docs/ENHANCEMENTS_IMPLEMENTATION_PLAN.md` is missing, recreate it from the s
 - Production URL: `https://reservearoom.stonehillchurch.org`.
 - Git production branch: `main`; Vercel tracks and deploys `main`.
 - Stack: Next.js 16 App Router, React 19, TypeScript, Supabase Auth/Postgres/RLS/Storage, Resend, Tailwind CSS, Vitest, PGlite database tests, and Playwright.
-- Application timezone: `America/Chicago`. Recurrence calculations and displayed reservation times must retain local wall-clock intent across DST changes.
+- Application timezone comes from `app_settings.timezone` (initially `America/Chicago`). Recurrence calculations and displayed reservation times must retain local wall-clock intent across DST changes and setting changes.
 - Supabase migrations are append-only once applied remotely. Create new timestamped migrations; do not edit already-applied migrations to change production behavior.
 - Browser code must never receive the Supabase service-role key, Resend API key, cron secrets, rate-limit secrets, or guest-link secrets.
 - Authorization must be enforced server-side and in Postgres/RLS or SECURITY DEFINER RPCs where applicable. Hiding or disabling a button is not an authorization boundary.
@@ -230,7 +230,7 @@ Verification completed for that fix before commit:
 - Phase 1 covers cycles, plans, independent grants/sessions, minimal resource catalog,
   safe RLS/RPCs, branded invitations, audit and tests. Stop before Phase 2 after reporting
   the implementation and exact checks. Update this checkpoint before ending the session.
-- Phase 1 is implemented locally for owner review. Migration
+- Phase 1 is implemented on the review branch for owner review. Migration
   `20261029100000_church_calendar_phase1.sql` is not applied to a hosted project.
   `/admin/church-calendar` manages cycles, ministries, invitations and resources;
   `/calendar-plan/[reference]` is the scoped invitation/access page. The full security,
@@ -245,6 +245,28 @@ Verification completed for that fix before commit:
   environment; changing it requires replacing and resending outstanding invitations.
   Next: stop for owner review. Do not start Phase 2, push a migration to production,
   deploy, merge, or publish legal updates without the owner's subsequent authorization.
+
+### Phase 1 review fixes — 2026-10-30
+
+- The reviewer withheld final Phase 1 approval pending two fixes. Cycle input, display
+  and planner deadlines now use `app_settings.timezone`; stale rendered forms and a
+  concurrent timezone change are rejected rather than silently shifting times.
+- Super Admins can remove a participating ministry from a draft/open cycle after
+  confirmation. The transaction preserves its plan/history, revokes its grants and
+  sessions, and records the actor, ministry and time. Re-adding it restores participation
+  without restoring credentials. Existing other-ministry access is unaffected.
+- The Phase 1 migration was edited because the owner/reviewer confirmed it has not been
+  applied to a hosted database. Once applied anywhere, subsequent schema changes must be
+  append-only. No hosted data or production settings were changed during these fixes.
+- Verification: typecheck and lint passed; unit tests 35 files / 233 tests; database tests
+  13 files / 159 tests; isolated production build passed; full Playwright 108/108, with
+  the final audit/error-message refinements separately passing the focused 3/3 browser tests.
+  No tests were skipped. Real provider delivery, real multi-connection PostgreSQL
+  contention, and hosting-log redaction remain pre-release checks.
+- Phase 1 is still awaiting the reviewer's final approval. Do not start Phase 2 until it
+  is authorized. Phase 2 follow-ups: owner decision on uniqueness of Primary/Secondary
+  labels and a planner Sign Out action. For PR work, the owner wants review branches
+  pushed and left unmerged for reviewer feedback; do not merge without authorization.
 
 ## Required quality gates
 

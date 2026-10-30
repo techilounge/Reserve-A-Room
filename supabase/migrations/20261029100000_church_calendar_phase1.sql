@@ -24,7 +24,11 @@ create table public.ministry_calendar_plans (
   cycle_id uuid not null references public.calendar_cycles(id),
   ministry_id uuid not null references public.ministries(id),
   reference_code uuid not null default gen_random_uuid() unique,
+  active boolean not null default true,
+  removed_at timestamptz,
+  removed_by uuid references public.profiles(id) on delete set null,
   created_at timestamptz not null default now(),
+  check ((active and removed_at is null and removed_by is null) or (not active and removed_at is not null)),
   unique (cycle_id, ministry_id)
 );
 
@@ -113,10 +117,17 @@ $$;
 
 create function public.save_calendar_cycle(
   p_id uuid, p_name text, p_start_date date, p_end_date date,
-  p_opens_at timestamptz, p_deadline timestamptz, p_instructions text
+  p_opens_at timestamptz, p_deadline timestamptz, p_instructions text, p_expected_timezone text default null
 ) returns uuid language plpgsql security definer set search_path = '' as $$
-declare v_actor uuid := private.require_super_admin(); v_id uuid;
+declare v_actor uuid := private.require_super_admin(); v_id uuid; v_timezone text;
 begin
+  -- Prevent a settings change between server-side conversion and saving the cycle.
+  if p_expected_timezone is not null then
+    select timezone into v_timezone from public.app_settings where id for share;
+    if v_timezone is distinct from p_expected_timezone then
+      raise exception 'Application timezone changed; reload before saving.' using errcode = 'RAR09';
+    end if;
+  end if;
   if p_id is null then
     insert into public.calendar_cycles(name, start_date, end_date, submission_opens_at, submission_deadline, instructions, created_by)
     values (btrim(p_name), p_start_date, p_end_date, p_opens_at, p_deadline, nullif(btrim(p_instructions), ''), v_actor)
@@ -171,6 +182,7 @@ $$;
 create function public.add_calendar_ministry(p_cycle_id uuid, p_ministry_id uuid)
 returns uuid language plpgsql security definer set search_path = '' as $$
 declare v_actor uuid := private.require_super_admin(); v_id uuid; v_status text;
+  v_plan public.ministry_calendar_plans; v_action text;
 begin
   select status into v_status from public.calendar_cycles where id = p_cycle_id for update;
   if v_status is null or v_status not in ('draft', 'open') then
@@ -179,10 +191,53 @@ begin
   if not exists (select 1 from public.ministries where id = p_ministry_id and active) then
     raise exception 'An active ministry is required.' using errcode = 'RAR09';
   end if;
-  insert into public.ministry_calendar_plans(cycle_id, ministry_id) values (p_cycle_id, p_ministry_id) returning id into v_id;
-  perform private.calendar_audit(v_actor, 'calendar_plan.created', 'calendar_plan', v_id,
-    jsonb_build_object('cycle_id', p_cycle_id, 'ministry_id', p_ministry_id));
+  select * into v_plan from public.ministry_calendar_plans
+    where cycle_id = p_cycle_id and ministry_id = p_ministry_id for update;
+  if found then
+    if v_plan.active then raise exception 'This ministry already participates.' using errcode = 'RAR09'; end if;
+    update public.ministry_calendar_plans set active = true, removed_at = null, removed_by = null
+      where id = v_plan.id returning id into v_id;
+    v_action := 'calendar_plan.restored';
+  else
+    insert into public.ministry_calendar_plans(cycle_id, ministry_id) values (p_cycle_id, p_ministry_id) returning id into v_id;
+    v_action := 'calendar_plan.created';
+  end if;
+  perform private.calendar_audit(v_actor, v_action, 'calendar_plan', v_id,
+    jsonb_build_object('cycle_id', p_cycle_id, 'ministry_id', p_ministry_id,
+      'name', (select name from public.ministries where id = p_ministry_id)));
   return v_id;
+end;
+$$;
+
+-- Participation is soft-removed so the plan, invitations and session history
+-- remain auditable. Lock order matches invitation/session operations.
+create function public.remove_calendar_ministry(p_plan_id uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid := private.require_super_admin(); v_cycle public.calendar_cycles;
+  v_plan public.ministry_calendar_plans; v_grant public.calendar_plan_access; v_revoked integer := 0;
+begin
+  select c.* into v_cycle from public.calendar_cycles c
+    join public.ministry_calendar_plans p on p.cycle_id = c.id where p.id = p_plan_id for update of c;
+  if not found or v_cycle.status not in ('draft', 'open') then
+    raise exception 'Ministries cannot be removed from this cycle.' using errcode = 'RAR09';
+  end if;
+  select * into v_plan from public.ministry_calendar_plans where id = p_plan_id for update;
+  if not found or not v_plan.active then
+    raise exception 'This ministry is not participating.' using errcode = 'RAR09';
+  end if;
+  update public.ministry_calendar_plans set active = false, removed_at = now(), removed_by = v_actor where id = p_plan_id;
+  for v_grant in update public.calendar_plan_access set revoked_at = now(), updated_at = now()
+    where plan_id = p_plan_id and revoked_at is null returning *
+  loop
+    v_revoked := v_revoked + 1;
+    perform private.calendar_audit(v_actor, 'calendar_access.revoked', 'calendar_access', v_grant.id,
+      jsonb_build_object('full_name', v_grant.contact_name, 'email', v_grant.contact_email, 'reason', 'Ministry removed from cycle'));
+  end loop;
+  update public.calendar_plan_sessions set revoked_at = now()
+    where revoked_at is null and grant_id in (select id from public.calendar_plan_access where plan_id = p_plan_id);
+  perform private.calendar_audit(v_actor, 'calendar_plan.removed', 'calendar_plan', p_plan_id,
+    jsonb_build_object('cycle_id', v_plan.cycle_id, 'ministry_id', v_plan.ministry_id, 'revoked_grants', v_revoked,
+      'name', (select name from public.ministries where id = v_plan.ministry_id)));
 end;
 $$;
 
@@ -220,7 +275,8 @@ begin
   if not found or v_cycle.status not in ('draft', 'open') or v_cycle.submission_deadline <= now() then
     raise exception 'This cycle is not accepting invitations.' using errcode = 'RAR09';
   end if;
-  perform 1 from public.ministry_calendar_plans where id = p_plan_id for update;
+  perform 1 from public.ministry_calendar_plans where id = p_plan_id and active for update;
+  if not found then raise exception 'This ministry is not participating.' using errcode = 'RAR09'; end if;
   select count(*) into v_count from public.calendar_plan_access
     where plan_id = p_plan_id and revoked_at is null and expires_at > now();
   if v_count >= 5 then raise exception 'A ministry plan can have at most five active planners.' using errcode = 'RAR09'; end if;
@@ -246,7 +302,7 @@ create function public.rotate_calendar_invitation(p_grant_id uuid, p_expected_ve
   p_token_hash text, p_token_seed text)
 returns uuid language plpgsql security definer set search_path = '' as $$
 declare v_actor uuid := private.require_super_admin(); v_cycle public.calendar_cycles;
-  v_grant public.calendar_plan_access; v_delivery uuid := gen_random_uuid();
+  v_grant public.calendar_plan_access; v_delivery uuid := gen_random_uuid(); v_active boolean;
 begin
   select c.* into v_cycle from public.calendar_cycles c
     join public.ministry_calendar_plans p on p.cycle_id = c.id
@@ -254,6 +310,9 @@ begin
   if not found or v_cycle.status not in ('draft', 'open') or v_cycle.submission_deadline <= now() then
     raise exception 'This cycle is not accepting invitations.' using errcode = 'RAR09';
   end if;
+  select p.active into v_active from public.ministry_calendar_plans p
+    join public.calendar_plan_access a on a.plan_id = p.id where a.id = p_grant_id for update of p;
+  if not coalesce(v_active, false) then raise exception 'This ministry is not participating.' using errcode = 'RAR09'; end if;
   select * into v_grant from public.calendar_plan_access where id = p_grant_id for update;
   if v_grant.revoked_at is not null or v_grant.expires_at <= now() or v_grant.version <> p_expected_version then
     raise exception 'Invitation is inactive or has changed. Refresh and try again.' using errcode = 'RAR09';
@@ -303,7 +362,7 @@ returns jsonb language sql stable security definer set search_path = '' as $$
   join public.calendar_cycles c on c.id = p.cycle_id
   join public.ministries m on m.id = p.ministry_id
   where private.is_calendar_service() and e.id = p_email_id and e.event_type = 'calendar_planner_invited'
-    and a.revoked_at is null and a.expires_at > now() and c.status in ('draft', 'open');
+    and p.active and a.revoked_at is null and a.expires_at > now() and c.status in ('draft', 'open');
 $$;
 
 create function public.calendar_invitation_delivery_status()
@@ -321,7 +380,7 @@ $$;
 create function public.exchange_calendar_planner_session(p_plan_id uuid, p_grant_id uuid,
   p_token_hash text, p_session_hash text)
 returns boolean language plpgsql security definer set search_path = '' as $$
-declare v_grant public.calendar_plan_access; v_cycle public.calendar_cycles;
+declare v_grant public.calendar_plan_access; v_cycle public.calendar_cycles; v_active boolean;
 begin
   if not private.is_calendar_service() then raise exception 'Service access required.' using errcode = 'RAR09'; end if;
   select c.* into v_cycle from public.calendar_cycles c
@@ -329,6 +388,8 @@ begin
     join public.calendar_plan_access a on a.plan_id = p.id
     where p.reference_code = p_plan_id and a.id = p_grant_id for update of c;
   if not found or v_cycle.status <> 'open' or now() < v_cycle.submission_opens_at or now() >= v_cycle.submission_deadline then return false; end if;
+  select active into v_active from public.ministry_calendar_plans where reference_code = p_plan_id for update;
+  if not coalesce(v_active, false) then return false; end if;
   select * into v_grant from public.calendar_plan_access where id = p_grant_id for update;
   if not found or v_grant.revoked_at is not null or v_grant.expires_at <= now()
     or v_grant.token_hash <> decode(p_token_hash, 'hex') then return false; end if;
@@ -346,14 +407,15 @@ create function public.calendar_planner_session_context(p_plan_id uuid, p_sessio
 returns jsonb language sql stable security definer set search_path = '' as $$
   select jsonb_build_object('plan_id', p.id, 'grant_id', a.id, 'contact_name', a.contact_name,
     'ministry_name', m.name, 'cycle_name', c.name, 'start_date', c.start_date, 'end_date', c.end_date,
-    'deadline', c.submission_deadline, 'instructions', c.instructions)
+    'deadline', c.submission_deadline, 'instructions', c.instructions, 'timezone', settings.timezone)
   from public.calendar_plan_sessions s
   join public.calendar_plan_access a on a.id = s.grant_id and a.version = s.grant_version
   join public.ministry_calendar_plans p on p.id = a.plan_id
   join public.calendar_cycles c on c.id = p.cycle_id
   join public.ministries m on m.id = p.ministry_id
+  join public.app_settings settings on settings.id
   where private.is_calendar_service() and p.reference_code = p_plan_id and s.session_hash = decode(p_session_hash, 'hex')
-    and s.revoked_at is null and s.expires_at > now() and a.revoked_at is null and a.expires_at > now()
+    and p.active and s.revoked_at is null and s.expires_at > now() and a.revoked_at is null and a.expires_at > now()
     and c.status = 'open' and now() >= c.submission_opens_at and now() < c.submission_deadline;
 $$;
 
@@ -381,11 +443,11 @@ $$;
 
 revoke execute on function private.calendar_audit(uuid, text, text, uuid, jsonb) from public, anon, authenticated, service_role;
 revoke execute on function private.is_calendar_service() from public, anon, authenticated, service_role;
-revoke execute on function public.save_calendar_cycle(uuid, text, date, date, timestamptz, timestamptz, text),
-  public.transition_calendar_cycle(uuid, text, text), public.add_calendar_ministry(uuid, uuid),
+revoke execute on function public.save_calendar_cycle(uuid, text, date, date, timestamptz, timestamptz, text, text),
+  public.transition_calendar_cycle(uuid, text, text), public.add_calendar_ministry(uuid, uuid), public.remove_calendar_ministry(uuid),
   public.save_calendar_resource(uuid, text, text, integer, boolean, text, text) from public, anon, service_role;
-grant execute on function public.save_calendar_cycle(uuid, text, date, date, timestamptz, timestamptz, text),
-  public.transition_calendar_cycle(uuid, text, text), public.add_calendar_ministry(uuid, uuid),
+grant execute on function public.save_calendar_cycle(uuid, text, date, date, timestamptz, timestamptz, text, text),
+  public.transition_calendar_cycle(uuid, text, text), public.add_calendar_ministry(uuid, uuid), public.remove_calendar_ministry(uuid),
   public.save_calendar_resource(uuid, text, text, integer, boolean, text, text) to authenticated;
 revoke execute on function public.calendar_invitation_delivery_status() from public, anon, service_role;
 grant execute on function public.calendar_invitation_delivery_status() to authenticated;

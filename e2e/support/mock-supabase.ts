@@ -168,6 +168,15 @@ const server = http.createServer(async (req, res) => {
         .update(`church-calendar-planner-v1:${a.id}:${a.version}:${a.seed}`).digest("base64url");
       return send(200, { plan: a.plan_id, grant: a.id, token });
     }
+    if (url.pathname === "/qa/timezone" && req.method === "POST") {
+      const { timezone } = await readBody(req) as { timezone?: string };
+      if (timezone !== "America/Chicago" && timezone !== "America/New_York") return send(400, { error: "Invalid test timezone" });
+      await db.query("update public.app_settings set timezone = $1", [timezone]);
+      return send(200, { ok: true });
+    }
+    if (url.pathname === "/qa/calendar-cycle") {
+      return send(200, await json("select to_jsonb(c) as j from public.calendar_cycles c where c.name = $1", [url.searchParams.get("name")]));
+    }
     // --- auth ---
     if (url.pathname === "/auth/v1/token" && req.method === "POST") {
       const body = await readBody(req);

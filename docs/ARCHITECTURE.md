@@ -792,6 +792,15 @@ checks the session and grant versions, expiries and revocations plus the cycle s
 deadline. Replacing or revoking one grant invalidates that grant's sessions only.
 Reopening requires an audited Super Admin reason; archiving is terminal in Phase 1.
 
+Cycle date/time inputs and all deadline displays use the current `app_settings.timezone`.
+Saving rejects a form rendered for an older timezone, and the database checks the
+expected setting while holding a row lock so a concurrent settings change cannot alter
+the meaning of the submitted times. Removing a participating ministry soft-removes its
+plan, revokes all of that plan's grants and sessions transactionally, and records the
+actor and time in the audit log. Re-adding the ministry reuses its historical plan but
+never revives its old invitations or sessions. The cycle and plan locks serialize
+removal with invitation creation and session exchange.
+
 Each invitation version has a distinct outbox delivery identity. The worker derives the
 link only on the server, never prints the calendar email body, uses one provider
 idempotency key per delivery, and stops uncertain retries after 23 hours so an operator

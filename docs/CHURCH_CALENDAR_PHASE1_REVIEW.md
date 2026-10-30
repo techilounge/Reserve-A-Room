@@ -1,8 +1,9 @@
 # Church Calendar Phase 1 — review and rollout notes
 
 Phase 1 is implemented on `codex/church-calendar-phase1`, based on `main` at
-`1f287eecb0979f40339011a49ab3b99508ec6514`. It is for owner review. No hosted database
-migration, deployment, merge, or WordPress integration is authorized by this phase.
+`1f287eecb0979f40339011a49ab3b99508ec6514`. The required review fixes are ready for
+follow-up review; Phase 1 is not yet finally approved. No hosted database migration,
+production deployment, merge, or WordPress integration is authorized by this phase.
 
 The complete changed-file list is available with
 `git diff --name-status main...codex/church-calendar-phase1` after the implementation
@@ -18,7 +19,7 @@ checkpoint document setup and handoff.
 
 - `/admin/church-calendar` is a Super Admin screen for creating and editing cycles,
   moving them through draft/open/review/finalized/archived, reopening review/finalized
-  cycles with an audited reason, adding ministries, managing each planner independently,
+  cycles with an audited reason, adding or removing ministries, managing each planner independently,
   and configuring the minimum resource catalog. Archived cycles cannot be reopened in
   Phase 1. Active resources can be read by staff and by a validated planner session;
   private notes are not included in those catalog reads.
@@ -45,7 +46,7 @@ requires the same validated session and plan reference as the access page. The s
 role has no direct grants on the new tables and uses the dedicated service-only RPCs.
 
 Authenticated management RPCs are `save_calendar_cycle`, `transition_calendar_cycle`,
-`add_calendar_ministry`, `save_calendar_resource`, `invite_calendar_planner`,
+`add_calendar_ministry`, `remove_calendar_ministry`, `save_calendar_resource`, `invite_calendar_planner`,
 `rotate_calendar_invitation`, `revoke_calendar_planner`,
 `calendar_invitation_delivery_status`, and `calendar_active_resources`. Each explicitly
 rechecks the relevant staff role. Service-only RPCs are `calendar_invitation_context`,
@@ -55,7 +56,7 @@ privileged function fixes `search_path`. The cycle row is locked before its stat
 checked; invitation creation also locks the plan before enforcing the five-active limit.
 
 The audit actions are `calendar_cycle.created`, `.updated`, `.transitioned`,
-`calendar_plan.created`, `calendar_access.invited`, `.expired`, `.rotated`, `.revoked`,
+`calendar_plan.created`, `.removed`, `.restored`, `calendar_access.invited`, `.expired`, `.rotated`, `.revoked`,
 `.opened`, and `calendar_resource.created` / `.updated`. Reopening includes the reason.
 Audit metadata contains no invitation token, seed, session bearer, or private link.
 
@@ -111,10 +112,12 @@ the separate, unapproved security-remediation branch.
 
 ## Limits and follow-up
 
-- Participating ministries can be added; removing a previously added ministry is not
-  available in this phase. Existing invitations can be revoked individually. Deadline
-  reminders and event submissions are later work; Phase 1 sends invitations and reports
-  delivery failures.
+- Removing a ministry requires confirmation and retains its plan, grant/session history
+  and audit records. It revokes that plan's grants and sessions; adding the ministry
+  again never restores those credentials. Deadline reminders and event submissions are
+  later work; Phase 1 sends invitations and reports delivery failures.
+- Phase 2 follow-ups: decide whether Primary and Secondary labels must each be unique,
+  and provide an explicit planner Sign Out action for shared computers.
 - PGlite covers the actual migrations and grant rules, but its single connection does
   not demonstrate real multi-connection PostgreSQL lock contention; verify that against
   an isolated real Postgres/Supabase instance before release.
@@ -127,9 +130,9 @@ the separate, unapproved security-remediation branch.
 
 ## Verification completed locally
 
-`npm run typecheck` and `npm run lint` passed. `npm test` passed 34 files / 231 tests;
-`npm run test:db` passed 13 files / 155 tests. `npm run build` passed with Supabase and
-Resend credentials disabled. The complete Playwright suite passed 107/107; the focused
-calendar file passed 2/2 again after the final migration restrictions. No tests were
-skipped. The first full browser run found two existing fixture timing/date collisions,
-which were corrected before the successful rerun. No real emails were sent.
+`npm run typecheck` and `npm run lint` passed. `npm test` passed 35 files / 233 tests;
+`npm run test:db` passed 13 files / 159 tests. `npm run build` passed with Supabase and
+Resend credentials disabled. The complete Playwright suite passed 108/108; the focused
+calendar file passed 3/3 after the final audit/error-message refinements. No tests were
+skipped. The initial focused timezone test had an ambiguous alert selector, corrected
+before the successful rerun. No real emails were sent.

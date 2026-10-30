@@ -13,7 +13,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 
 type Context = { contact_name: string; ministry_name: string; cycle_name: string; start_date: LocalDate;
-  end_date: LocalDate; deadline: string; instructions: string | null };
+  end_date: LocalDate; deadline: string; instructions: string | null; timezone: string };
 
 export default async function PlannerInvitationPage({ params, searchParams }: {
   params: Promise<{ planId: string }>;
@@ -47,7 +47,7 @@ export default async function PlannerInvitationPage({ params, searchParams }: {
         <h1 className="text-3xl font-semibold">{context.cycle_name}</h1>
         <p>Welcome, {context.contact_name}. Your access is for <strong>{context.ministry_name}</strong>.</p>
         <p>Calendar dates: {formatLongDate(context.start_date)} – {formatLongDate(context.end_date)}.</p>
-        <p>Planning deadline: {formatInstant(context.deadline, "America/Chicago")}.</p>
+        <p>Planning deadline: {formatInstant(context.deadline, context.timezone)} ({context.timezone}).</p>
         {context.instructions ? <p className="whitespace-pre-wrap">{context.instructions}</p> : null}
         <p className="text-muted-foreground">The church office will share the planning form when it is ready.</p>
       </> : <>

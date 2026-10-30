@@ -28,6 +28,8 @@ const ACTION_LABELS: Record<string, string> = {
   "calendar_cycle.updated": "Church calendar cycle updated",
   "calendar_cycle.transitioned": "Church calendar cycle status changed",
   "calendar_plan.created": "Ministry added to church calendar",
+  "calendar_plan.removed": "Ministry removed from church calendar",
+  "calendar_plan.restored": "Ministry restored to church calendar",
   "calendar_access.invited": "Planner invited",
   "calendar_access.opened": "Planner opened invitation",
   "calendar_access.expired": "Expired planner invitation replaced",

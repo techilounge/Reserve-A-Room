@@ -431,6 +431,9 @@ export type Database = {
           cycle_id: string;
           ministry_id: string;
           reference_code: string;
+          active: boolean;
+          removed_at: string | null;
+          removed_by: string | null;
           created_at: string;
         };
         Insert: {
@@ -438,6 +441,9 @@ export type Database = {
           cycle_id: string;
           ministry_id: string;
           reference_code?: string;
+          active?: boolean;
+          removed_at?: string | null;
+          removed_by?: string | null;
           created_at?: string;
         };
         Update: {
@@ -445,6 +451,9 @@ export type Database = {
           cycle_id?: string;
           ministry_id?: string;
           reference_code?: string;
+          active?: boolean;
+          removed_at?: string | null;
+          removed_by?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -460,6 +469,13 @@ export type Database = {
             columns: ["ministry_id"];
             isOneToOne: false;
             referencedRelation: "ministries";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ministry_calendar_plans_removed_by_fkey";
+            columns: ["removed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -1385,6 +1401,10 @@ export type Database = {
         Args: { p_method?: string };
         Returns: undefined;
       };
+      remove_calendar_ministry: {
+        Args: { p_plan_id: string };
+        Returns: undefined;
+      };
       retry_email: {
         Args: { p_id: string };
         Returns: undefined;
@@ -1402,7 +1422,7 @@ export type Database = {
         Returns: string;
       };
       save_calendar_cycle: {
-        Args: { p_id: string; p_name: string; p_start_date: string; p_end_date: string; p_opens_at: string; p_deadline: string; p_instructions: string };
+        Args: { p_id: string; p_name: string; p_start_date: string; p_end_date: string; p_opens_at: string; p_deadline: string; p_instructions: string; p_expected_timezone?: string };
         Returns: string;
       };
       save_calendar_resource: {
