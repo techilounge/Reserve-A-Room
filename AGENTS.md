@@ -218,20 +218,39 @@ Verification completed for that fix before commit:
 - Verification: typecheck and lint passed with no warnings; 33 unit-test files / 227 tests passed; 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 103/103. A restored-state check at 1000px, 320px and in dark mode showed no axe violations and no horizontal overflow.
 - Status: committed locally; not yet pushed or deployed.
 
-## Church Calendar Phase 3 checkpoint — 2026-11-03
+## Church Calendar Phase 4 checkpoint — 2026-11-03
+
+- Phase 3 was approved at `ba4428d07227034d1e36254806f1726b44ce3524`; Phase 4
+  resources are authorized on `codex/church-calendar-phase1`. Stop for review before
+  Phase 5; do not merge, deploy, run hosted migrations, expose event approval, create
+  room reservations, or build the Conflict Center.
+- Phase 4 appends `20261104100000_church_calendar_resources.sql`: Super Admin
+  configuration locks a resource and prevents quantity reductions below peak confirmed
+  concurrent use. A private allocation ledger and private, ungranted allocation/release
+  primitives serialize mutations on the resource row; row-version updates protect
+  stricter PostgreSQL isolation levels. Staff availability reports confirmed and
+  provisional demand separately using half-open interval endpoint sweeps and the most
+  recent immutable submitted snapshot. The Super Admin resource page supports editing,
+  deactivation, and aggregate demand lookup. Planner requests stay provisional.
+- The real PostgreSQL race harness is `scripts/test-calendar-resource-concurrency.mjs`.
+  It requires an empty local `calendar_race_*` database and refuses non-loopback hosts.
+  The portable PostgreSQL binaries and isolated test cluster are in ignored `.next`;
+  they are local test tools, not deployed dependencies. Before claiming Phase 4 complete,
+  run the race on the final committed SHA and the complete typecheck/lint/unit/DB/build/
+  Playwright gates; report exact totals to the reviewer. Confirmed allocations are not
+  user-accessible: Phase 6 must revalidate current event/cycle state, lock resources in
+  stable order, and coordinate reservations and approval atomically.
 
 - The Phase 3 reviewer reviewed `b7e5e745a3d7eea10ff529212c3db01aa9c0ca86` and
-  requires one narrow recurrence-interval correction before approval. Phase 4 remains
-  unauthorized. The follow-up hides the interval for weekdays and both yearly rules,
+  required one narrow recurrence-interval correction, approved at `ba4428d`. The follow-up hides the interval for weekdays and both yearly rules,
   rejects tampered non-1 intervals, and adds append-only migration
   `20261103100000_calendar_fixed_recurrence_intervals.sql` to enforce the invariant on
   draft writes and submission inserts. Existing inconsistent historical rows are not
   rewritten; their drafts must be corrected before a new submission. Run all checks on
-  the exact follow-up commit and push this branch for the reviewer's re-review.
+  the exact Phase 4 commit and push this branch for the reviewer's re-review.
 - The reviewer approved Phase 2 at `a7d58865193e9cea021b229a38bc11794f07367b`
-  and authorized **Phase 3 only**. Implement the bounded occurrence engine and stop
-  for reviewer approval before Phase 4. No production merge, deployment, hosted
-  migration, confirmed resource allocation, actual reservation, approval, conflict
+  and authorized Phase 3, which has since been approved. No production merge, deployment, hosted
+  migration, production resource allocation, actual reservation, approval, conflict
   resolution, or booking-horizon bypass is authorized. Preserve legal/notification
   release gates and the existing reservation recurrence 12-month/50-instance limit.
 - Phase 3 appends `20261102100000_church_calendar_occurrences.sql` with provisional
@@ -239,12 +258,12 @@ Verification completed for that fix before commit:
   Complete draft schedules also materialize a revision-checked mutable projection,
   allowing date-specific exceptions before submission; staff read immutable snapshots.
   The materializer runs in the submission transaction, caps events at 1,200 dates,
-  preserves logical IDs, detects DST gaps and retains superseded history. Do not
-  begin Phase 4 before review; no production rollout or hosted migration occurred.
+  preserves logical IDs, detects DST gaps and retains superseded history. No production
+  rollout or hosted migration occurred.
 
 - Historical review at `a7ea458` required soft withdrawal, stable specific-date
   identities/per-date times and all-day events. Those fixes were approved at `a7d5886`.
-  Stop before Phase 4; do not merge or deploy. Branded submission and
+  Stop before Phase 5; do not merge or deploy. Branded submission and
   change-request emails are a production release blocker, and legal approval is still
   required before enabling the planner policy gate. Primary/Secondary uniqueness is
   an open, non-blocking owner decision.
@@ -265,7 +284,7 @@ Verification completed for that fix before commit:
   Super Admin may reopen a cycle, with an audited reason.
 - Phase 1 covers cycles, plans, independent grants/sessions, minimal resource catalog,
   safe RLS/RPCs, branded invitations, audit and tests. Later phases use the same review
-  branch; Phase 1 and Phase 2 have since been approved.
+  branch; Phases 1 through 3 have since been approved.
 - Phase 1 is implemented on the review branch for owner review. Migration
   `20261029100000_church_calendar_phase1.sql` is not applied to a hosted project.
   `/admin/church-calendar` manages cycles, ministries, invitations and resources;
@@ -279,8 +298,8 @@ Verification completed for that fix before commit:
   PostgreSQL concurrency, and hosting-log redaction still need isolated release checks.
 - Required server-only `CALENDAR_PLAN_LINK_SECRET` must be generated independently per
   environment; changing it requires replacing and resending outstanding invitations.
-  Next: implement and verify Phase 3, then request owner/reviewer review. Do not
-  start Phase 4, push a migration to production, deploy, merge, enable planner policies,
+  Next: verify Phase 4, then request owner/reviewer review. Do not
+  start Phase 5, push a migration to production, deploy, merge, enable planner policies,
   or publish legal updates without the owner's subsequent authorization. Proposed legal
   wording is in `docs/CHURCH_CALENDAR_LEGAL_DRAFT.md`; Primary/Secondary uniqueness is
   undecided and labels retain their existing descriptive behavior.

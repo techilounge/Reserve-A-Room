@@ -125,6 +125,7 @@ export async function saveResource(form: FormData) {
     p_quantity: quantity, p_active: form.get("active") === "on", p_description: str(form, "description"),
     p_private_notes: str(form, "notes"),
   });
+  if (error?.message === "Quantity is below existing confirmed allocations.") finish("The quantity cannot be lower than existing confirmed allocations.", true);
   if (error) finish("Could not save the resource. Check its name, category, and quantity.", true);
   finish("Calendar resource saved.");
 }

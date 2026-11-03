@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { hasPermission } from "@/lib/auth/guards";
-import { calendarInstantToLocal } from "@/lib/calendar-planning/datetime";
+import { calendarInstantToLocal, calendarLocalToInstant } from "@/lib/calendar-planning/datetime";
 import { formatInstant } from "@/lib/datetime";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -49,7 +49,7 @@ function ResourceForm({ resource }: { resource?: { id: string; name: string; cat
   </form>;
 }
 
-export default async function ChurchCalendarPage({ searchParams }: { searchParams: Promise<{ message?: string; error?: string }> }) {
+export default async function ChurchCalendarPage({ searchParams }: { searchParams: Promise<{ message?: string; error?: string; resource?: string; from?: string; to?: string }> }) {
   // Layouts and pages may render in parallel; do not rely on the layout's guard alone.
   if (!(await hasPermission("churchCalendar.manage"))) return null;
   const query = await searchParams;
@@ -70,6 +70,11 @@ export default async function ChurchCalendarPage({ searchParams }: { searchParam
   const cycles = cyclesResult.data; const plans = plansResult.data; const grants = grantsResult.data;
   const resources = resourcesResult.data; const ministries = ministriesResult.data;
   const timezone = settingsResult.data.timezone;
+  const requestedResource = resources.find(resource => resource.id === query.resource);
+  const from = query.from ? calendarLocalToInstant(query.from, timezone) : null;
+  const to = query.to ? calendarLocalToInstant(query.to, timezone) : null;
+  const availability = requestedResource && from && to
+    ? await supabase.rpc("calendar_resource_availability", { p_resource: requestedResource.id, p_start: from, p_end: to }) : null;
   return <div className="space-y-6">
     <PageHeader title="Church Calendar" description="Manage planning cycles, ministry invitations, and the resource catalog." />
     {query.message ? <p role="status" className="rounded-lg border border-green-600 p-3">{query.message}</p> : null}
@@ -135,9 +140,22 @@ export default async function ChurchCalendarPage({ searchParams }: { searchParam
       })}
     </section>
     <section className={card} aria-labelledby="resources"><h2 id="resources" className="text-xl font-semibold">Resource catalog</h2>
-      <p className="text-sm text-muted-foreground">Configure resources for future planning. This catalog does not allocate resources or check availability.</p>
+      <p className="text-sm text-muted-foreground">Manage the resources planners may request. Confirmed allocations are protected when quantities change; requests do not reserve resources.</p>
       <details><summary className="cursor-pointer font-medium">Add a resource</summary><div className="pt-4"><ResourceForm /></div></details>
       {resources.map((resource) => <details key={resource.id} className="border-t pt-3"><summary className="cursor-pointer font-medium">{resource.name} · {resource.active ? "Active" : "Archived"} · Quantity {resource.available_quantity}</summary><div className="pt-4"><ResourceForm resource={resource} /></div></details>)}
+      <details open={!!query.resource} className="border-t pt-3"><summary className="cursor-pointer font-medium">View resource demand</summary>
+        <p className="mt-2 text-sm text-muted-foreground">Submitted requests are provisional. Confirmed allocations and requests are shown separately, in {timezone}.</p>
+        <form method="get" className="mt-3 grid gap-3 sm:grid-cols-3">
+          <label className={field}>Resource<select className={selectStyle} name="resource" defaultValue={query.resource ?? ""} required><option value="" disabled>Choose a resource</option>{resources.map(resource => <option key={resource.id} value={resource.id}>{resource.name}{resource.active ? "" : " (inactive)"}</option>)}</select></label>
+          <label className={field}>From<Input type="datetime-local" name="from" defaultValue={query.from} required /></label>
+          <label className={field}>Until<Input type="datetime-local" name="to" defaultValue={query.to} required /></label>
+          <div className="sm:col-span-3"><Button type="submit" variant="outline">Show demand</Button></div>
+        </form>
+        {query.resource && (!requestedResource || !from || !to || availability?.error) ? <p role="alert" className="mt-3">Choose a valid resource and a range of up to three years, with an end after the start.</p> : null}
+        {availability?.data ? <div className="mt-3 space-y-2" aria-live="polite">{availability.data.map(segment => <p key={segment.segment_start} className="rounded border p-2 text-sm">
+          {formatInstant(segment.segment_start, timezone)} – {formatInstant(segment.segment_end, timezone)}: capacity {segment.capacity}, confirmed {segment.confirmed}, provisional {segment.provisional}.
+        </p>)}</div> : null}
+      </details>
     </section>
   </div>;
 }

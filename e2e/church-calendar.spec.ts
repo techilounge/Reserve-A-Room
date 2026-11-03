@@ -4,6 +4,34 @@ import AxeBuilder from "@axe-core/playwright";
 import { TEST_ACCOUNTS } from "./support/accounts";
 import { signInAs } from "./support/helpers";
 
+test("Super Admins can edit a resource and inspect its demand", async ({ browser }) => {
+  const context = await browser.newContext();
+  await signInAs(context, "superAdmin");
+  const page = await context.newPage();
+  await page.goto("/admin/church-calendar");
+  const catalog = page.getByRole("region", { name: "Resource catalog" });
+  await catalog.getByText("Add a resource").click();
+  const create = catalog.locator("details").filter({ hasText: "Add a resource" });
+  await create.getByLabel("Resource name").fill("Browser resource");
+  await create.getByLabel("Quantity").fill("3");
+  await create.getByRole("button", { name: "Add resource" }).click();
+  const resource = catalog.locator("details").filter({ hasText: "Browser resource" }).first();
+  await resource.locator("summary").click();
+  await resource.getByLabel("Quantity").fill("2");
+  await resource.getByLabel("Active").uncheck();
+  await resource.getByRole("button", { name: "Save resource" }).click();
+  await expect(catalog.getByText("Browser resource · Archived · Quantity 2")).toBeVisible();
+  await catalog.getByText("View resource demand").click();
+  await catalog.getByRole("combobox", { name: "Resource", exact: true }).selectOption({ label: "Browser resource (inactive)" });
+  const from = new Date(Date.now() + 86400000).toISOString().slice(0, 16);
+  const to = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 16);
+  await catalog.getByLabel("From", { exact: true }).fill(from);
+  await catalog.getByLabel("Until").fill(to);
+  await catalog.getByRole("button", { name: "Show demand" }).click();
+  await expect(catalog.getByText(/capacity 2, confirmed 0, provisional 0/)).toBeVisible();
+  await context.close();
+});
+
 test("a Super Admin configures a cycle and independently rotates one planner's access", async ({ browser }) => {
   test.setTimeout(120_000); // Includes three events, occurrence exceptions, staff review and accessibility checks.
   const staff = await browser.newContext({ viewport: { width: 390, height: 844 } });

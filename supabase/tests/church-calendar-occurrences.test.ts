@@ -186,6 +186,76 @@ describe("Church Calendar occurrence materialization", () => {
     expect(snapshot.rows[0].count).toBe(occurrences.rows.length);
   });
 
+  it("separates proposed demand, protects capacity changes, and retains allocation history", async () => {
+    await db.query("select set_config('request.jwt.claims', $1, false)", [JSON.stringify({ sub: owner, role: "authenticated" })]);
+    const snapshots = await db.query<{ id: string; occupancy_start: string; occupancy_end: string }>(`
+      select o.id, o.occupancy_start::text, o.occupancy_end::text from public.calendar_submission_occurrences o
+      join public.calendar_event_submissions s on s.id=o.submission_id
+      where s.event_id=$1 and s.plan_revision=1 order by o.local_start`, [specific]);
+    const competing = (await db.query<{ id: string }>(`select o.id from public.calendar_submission_occurrences o
+      join public.calendar_event_submissions s on s.id=o.submission_id
+      where s.event_id=$1 and o.local_start=(select local_start from public.calendar_submission_occurrences where id=$2)`, [copy, snapshots.rows[0].id])).rows[0].id;
+    const configure = (quantity: number, active: boolean) => asRole(db, "authenticated", tx => tx.query(
+      "select public.save_calendar_resource($1, 'Lights', 'equipment', $2, $3, '', '')", [resourceA, quantity, active]), owner);
+    await configure(2, true);
+    const alloc = (id: string) => db.query<{ id: string }>("select private.calendar_allocate_resource($1,$2) as id", [id, resourceA]);
+    const first = (await alloc(snapshots.rows[0].id)).rows[0].id;
+    await expect(alloc(snapshots.rows[0].id)).rejects.toMatchObject({ code: "RAR09", message: "Resource is already allocated to this occurrence." });
+    await expect(alloc(competing)).rejects.toMatchObject({ code: "RAR09", message: "Resource capacity exceeded." });
+    const second = (await alloc(snapshots.rows[1].id)).rows[0].id;
+    await expect(configure(1, true)).rejects.toMatchObject({ code: "RAR09", message: "Quantity is below existing confirmed allocations." });
+    await configure(2, false);
+    await expect(alloc(competing)).rejects.toMatchObject({ code: "RAR09", message: "Resource unavailable." });
+    const result = await asRole(db, "authenticated", tx => tx.query<{ confirmed: number; provisional: number; capacity: number }>(
+      "select * from public.calendar_resource_availability($1,$2,$3)", [resourceA, snapshots.rows[0].occupancy_start, snapshots.rows[0].occupancy_end]), owner);
+    expect(result.rows).toMatchObject([{ confirmed: 2, provisional: 2, capacity: 2 }]);
+    await expect(asRole(db, "anon", tx => tx.query("select * from public.calendar_resource_availability($1,$2,$3)", [resourceA, snapshots.rows[0].occupancy_start, snapshots.rows[0].occupancy_end])))
+      .rejects.toMatchObject({ code: "42501" });
+    await expect(asRole(db, "authenticated", tx => tx.query("select * from public.calendar_resource_allocations"), owner)).rejects.toMatchObject({ code: "42501" });
+    await expect(asRole(db, "authenticated", tx => tx.query("select private.calendar_allocate_resource($1,$2)", [competing, resourceA]), owner)).rejects.toMatchObject({ code: "42501" });
+    for (const role of ["anon", "authenticated", "service_role"]) {
+      expect((await db.query<{ allowed: boolean }>("select has_function_privilege($1,'private.calendar_allocate_resource(uuid,uuid)','execute') as allowed", [role])).rows[0].allowed).toBe(false);
+    }
+    expect((await db.query<{ n: number }>("select count(*)::int as n from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like '%approve%calendar%'")).rows[0].n).toBe(0);
+    await db.query("select private.calendar_release_resource($1)", [first]);
+    await db.query("select private.calendar_release_resource($1)", [second]);
+    await configure(5, true);
+    expect((await db.query<{ n: number }>("select count(*)::int as n from public.calendar_resource_allocations where status='released'")).rows[0].n).toBe(2);
+    expect((await db.query<{ n: number }>("select count(*)::int as n from public.audit_logs where action in ('calendar_resource.allocated','calendar_resource.released')")).rows[0].n).toBe(4);
+  });
+
+  it("sweeps overlapping quantities by interval and includes an occurrence override", async () => {
+    await expect(db.transaction(async tx => {
+      await tx.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: owner, role: "authenticated" })]);
+      const existing = await tx.query<{ id: string; submission_id: string }>(`select o.id, o.submission_id from public.calendar_submission_occurrences o
+        join public.calendar_event_submissions s on s.id=o.submission_id where s.event_id=$1 order by o.local_start`, [specific]);
+      const base = (await tx.query<{ t: string }>("select (date_trunc('hour', now()) + interval '5 days')::text as t")).rows[0].t;
+      await tx.query(`insert into public.calendar_resource_allocations(submission_occurrence_id,resource_id,quantity,occupancy_start,occupancy_end,created_by)
+        values ($1,$3,2,$4::timestamptz,$4::timestamptz + interval '1 hour',$5),
+               ($2,$3,2,$4::timestamptz + interval '1 hour',$4::timestamptz + interval '2 hours',$5)`,
+      [existing.rows[0].id, existing.rows[1].id, resourceB, base, owner]);
+      expect((await tx.query<{ peak: number }>("select private.calendar_resource_peak($1,$2,$2::timestamptz + interval '2 hours') as peak", [resourceB, base])).rows[0].peak).toBe(2);
+      const created = await tx.query<{ id: string }>(`with occurrence as (
+        insert into public.calendar_event_occurrences(event_id,source_key,schedule_revision,local_start,local_end,timezone,all_day,start_at,end_at,occupancy_start,occupancy_end)
+        values ($1,'sweep-test',1,$2::timestamptz at time zone 'America/Chicago',($2::timestamptz + interval '2 hours') at time zone 'America/Chicago',
+          'America/Chicago',false,$2,$2::timestamptz + interval '2 hours',$2,$2::timestamptz + interval '2 hours') returning *
+      ) insert into public.calendar_submission_occurrences(submission_id,occurrence_id,logical_occurrence_id,local_start,local_end,timezone,all_day,start_at,end_at,occupancy_start,occupancy_end)
+        select $3,id,logical_occurrence_id,local_start,local_end,timezone,all_day,start_at,end_at,occupancy_start,occupancy_end from occurrence returning id`,
+      [specific, base, existing.rows[0].submission_id]);
+      const id = created.rows[0].id;
+      await tx.query("insert into public.calendar_submission_resource_requests values ($1,$2,'exception',3,'Override')", [id, resourceB]);
+      const before = await tx.query<{ confirmed: number; provisional: number }>("select confirmed, provisional from public.calendar_resource_availability($1,$2,$2::timestamptz + interval '2 hours')", [resourceB, base]);
+      expect(before.rows.length).toBeGreaterThan(0);
+      expect(before.rows.every(row => row.confirmed === 2 && row.provisional === 3)).toBe(true);
+      await tx.query("select private.calendar_allocate_resource($1,$2)", [id, resourceB]);
+      const after = await tx.query<{ confirmed: number; provisional: number }>("select confirmed, provisional from public.calendar_resource_availability($1,$2,$2::timestamptz + interval '2 hours')", [resourceB, base]);
+      expect(after.rows.length).toBeGreaterThan(0);
+      expect(after.rows.every(row => row.confirmed === 5 && row.provisional === 0)).toBe(true);
+      await expect(tx.query("update public.calendar_submission_resource_requests set quantity_requested=4 where submission_occurrence_id=$1", [id])).rejects.toMatchObject({ code: "RAR09" });
+      throw new Error("ROLLBACK_FIXTURE");
+    })).rejects.toThrow("ROLLBACK_FIXTURE");
+  });
+
   it("is idempotent and protects immutable submission occurrence and request history", async () => {
     const submission = (await db.query<{ id: string }>("select id from public.calendar_event_submissions where event_id=$1 and plan_revision=1", [specific])).rows[0].id;
     for (const frequency of ["weekdays", "yearly_date", "yearly_nth_weekday"]) {
@@ -276,6 +346,25 @@ describe("Church Calendar occurrence materialization", () => {
     expect((await db.query<{ count: number }>("select count(*)::int as count from public.calendar_submission_room_requests r join public.calendar_submission_occurrences o on o.id=r.submission_occurrence_id join public.calendar_event_submissions s on s.id=o.submission_id where s.event_id=$1 and s.plan_revision=1 and r.room_id=$2", [specific, roomA])).rows[0].count).toBe(2);
   });
 
+  it("removes withdrawn resource proposals only on resubmission, without changing the prior snapshot", async () => {
+    const previous = (await db.query<{ id: string; occupancy_start: string; occupancy_end: string; occurrence_id: string }>(`
+      select o.id, o.occupancy_start::text, o.occupancy_end::text, o.occurrence_id
+      from public.calendar_submission_occurrences o join public.calendar_event_submissions s on s.id=o.submission_id
+      join public.calendar_submission_resource_requests r on r.submission_occurrence_id=o.id
+      where s.event_id=$1 and s.plan_revision=2 and r.resource_id=$2`, [specific, resourceB])).rows[0];
+    const demand = async () => asRole(db, "authenticated", tx => tx.query<{ provisional: number }>(
+      "select provisional from public.calendar_resource_availability($1,$2,$3)", [resourceB, previous.occupancy_start, previous.occupancy_end]), owner);
+    expect((await demand()).rows.some(row => row.provisional === 3)).toBe(true);
+    await asRole(db, "authenticated", tx => tx.query("select public.calendar_request_plan_changes($1, 'Remove resource')", [plan]), owner);
+    const event = (await portal()).events.find(row => row.id === specific)!;
+    await asRole(db, "service_role", tx => tx.query("select public.calendar_set_occurrence_exception($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+      [reference, session, previous.occurrence_id, Number(event.draft_version), "resource", resourceB, "remove", null, ""]));
+    expect((await demand()).rows.some(row => row.provisional === 3)).toBe(true);
+    await submit();
+    expect((await demand()).rows.every(row => row.provisional === 0)).toBe(true);
+    expect((await db.query<{ quantity_requested: number }>("select quantity_requested from public.calendar_submission_resource_requests where submission_occurrence_id=$1 and resource_id=$2", [previous.id, resourceB])).rows[0].quantity_requested).toBe(3);
+  });
+
   it("rejects a nonexistent spring-forward time and rolls back the whole submission", async () => {
     await asRole(db, "authenticated", tx => tx.query("select public.calendar_request_plan_changes($1, 'Add event')", [plan]), owner);
     const marchSunday = 1 + (7 - new Date(Date.UTC(year, 2, 1)).getUTCDay()) % 7 + 7;
@@ -319,7 +408,7 @@ describe("Church Calendar occurrence materialization", () => {
       "select private.recurrence_date_matches('daily',1::smallint,null,null,null,null,null,null,$1::date,null,($1::date + interval '1 year 1 day')::date) as allowed", [date(1, 1)],
     );
     expect(legacy.rows[0].allowed).toBe(false);
-    expect((await db.query<{ name: string | null }>("select to_regclass('public.calendar_resource_allocations')::text as name")).rows[0].name).toBeNull();
+    expect((await db.query<{ n: number }>("select count(*)::int as n from public.calendar_resource_allocations where status='confirmed'")).rows[0].n).toBe(0);
   });
 
   it("accepts exactly 1,200 explicit occurrences without creating reservations", async () => {

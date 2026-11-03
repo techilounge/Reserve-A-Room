@@ -401,6 +401,7 @@ describe("function privileges (catalog-wide allowlist)", () => {
       "public.calendar_active_resources",
       "public.calendar_invitation_delivery_status",
       "public.calendar_request_plan_changes",
+      "public.calendar_resource_availability",
       "public.calendar_staff_occurrences",
       "public.calendar_staff_plan_list",
       "public.cancel_reservation",

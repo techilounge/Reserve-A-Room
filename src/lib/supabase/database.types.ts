@@ -993,6 +993,77 @@ export type Database = {
           },
         ];
       };
+      calendar_resource_allocations: {
+        Row: {
+          id: string;
+          submission_occurrence_id: string;
+          resource_id: string;
+          quantity: number;
+          occupancy_start: string;
+          occupancy_end: string;
+          status: string;
+          created_by: string;
+          created_at: string;
+          released_by: string | null;
+          released_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          submission_occurrence_id: string;
+          resource_id: string;
+          quantity: number;
+          occupancy_start: string;
+          occupancy_end: string;
+          status?: string;
+          created_by: string;
+          created_at?: string;
+          released_by?: string | null;
+          released_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          submission_occurrence_id?: string;
+          resource_id?: string;
+          quantity?: number;
+          occupancy_start?: string;
+          occupancy_end?: string;
+          status?: string;
+          created_by?: string;
+          created_at?: string;
+          released_by?: string | null;
+          released_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_resource_allocations_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_resource_allocations_released_by_fkey";
+            columns: ["released_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_resource_allocations_resource_id_fkey";
+            columns: ["resource_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_resources";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_resource_allocations_submission_occurrence_id_fkey";
+            columns: ["submission_occurrence_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_submission_occurrences";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       calendar_resources: {
         Row: {
           id: string;
@@ -2336,6 +2407,10 @@ export type Database = {
       calendar_request_plan_changes: {
         Args: { p_plan_id: string; p_reason: string };
         Returns: undefined;
+      };
+      calendar_resource_availability: {
+        Args: { p_resource: string; p_start: string; p_end: string };
+        Returns: { segment_start: string; segment_end: string; capacity: number; confirmed: number; provisional: number }[];
       };
       calendar_save_event_draft: {
         Args: { p_plan_id: string; p_session_hash: string; p_event_id: string; p_data: Json };
