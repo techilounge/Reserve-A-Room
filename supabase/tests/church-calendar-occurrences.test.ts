@@ -69,6 +69,25 @@ beforeAll(async () => {
 afterAll(async () => { await db.close(); });
 
 describe("Church Calendar occurrence materialization", () => {
+  it("rejects unsupported intervals in planner saves and keeps supported intervals configurable", async () => {
+    const common = { kind: "recurring", timezone, all_day: true, start_date: date(1, 1), end_date: date(1, 15),
+      weekdays: [1], weekday: 1, month_ordinals: [1], month_ordinal: 1, day_of_month: 1, month_of_year: 1 };
+    for (const frequency of ["weekdays", "yearly_date", "yearly_nth_weekday"]) {
+      for (const interval of [2, null]) {
+        await expect(save(eventData("Tampered interval", { ...common, frequency, interval_count: interval })))
+          .rejects.toMatchObject({ code: "23514", constraint: "calendar_schedules_fixed_interval_check" });
+      }
+      const id = (await save(eventData("Fixed interval", { ...common, frequency, interval_count: 1 }))).rows[0].id;
+      expect((await db.query<{ interval_count: number }>("select interval_count from public.calendar_event_schedules where event_id=$1", [id])).rows[0].interval_count).toBe(1);
+      await asRole(db, "service_role", tx => tx.query("select public.calendar_remove_event_draft($1,$2,$3,1)", [reference, session, id]));
+    }
+    for (const frequency of ["daily", "weekly", "monthly_day", "monthly_nth_weekday"]) {
+      const id = (await save(eventData("Configurable interval", { ...common, frequency, interval_count: 2 }))).rows[0].id;
+      expect((await db.query<{ interval_count: number }>("select interval_count from public.calendar_event_schedules where event_id=$1", [id])).rows[0].interval_count).toBe(2);
+      await asRole(db, "service_role", tx => tx.query("select public.calendar_remove_event_draft($1,$2,$3,1)", [reference, session, id]));
+    }
+  });
+
   it("matches the existing recurrence rules over their shared one-year range", async () => {
     const rules: { rule: RecurrenceInput["rule"]; storage: Record<string, unknown>; through: string }[] = [
       { rule: { frequency: "daily", interval: 3 }, storage: { frequency: "daily", interval_count: 3 }, through: "2028-02-15" },
@@ -162,13 +181,20 @@ describe("Church Calendar occurrence materialization", () => {
     expect(hour(priorSunday)).toBe(14);
     const ambiguous = await db.query<{ instant: string }>("select private.calendar_local_instant($1::timestamp, $2)::text as instant", [`${date(11, novemberSunday)} 01:30:00`, timezone]);
     expect(new Date(ambiguous.rows[0].instant).toISOString()).toBe(`${date(11, novemberSunday)}T07:30:00.000Z`);
-    expect((await db.query<{ count: number }>("select count(*)::int as count from public.calendar_event_room_requests")).rows[0].count).toBe(occurrences.rows.length);
+    expect((await db.query<{ count: number }>("select count(*)::int as count from public.calendar_event_room_requests r join public.calendar_event_occurrences o on o.id=r.occurrence_id where o.status='scheduled'")).rows[0].count).toBe(occurrences.rows.length);
     const snapshot = await db.query<{ count: number }>("select count(*)::int as count from public.calendar_submission_occurrences");
     expect(snapshot.rows[0].count).toBe(occurrences.rows.length);
   });
 
   it("is idempotent and protects immutable submission occurrence and request history", async () => {
     const submission = (await db.query<{ id: string }>("select id from public.calendar_event_submissions where event_id=$1 and plan_revision=1", [specific])).rows[0].id;
+    for (const frequency of ["weekdays", "yearly_date", "yearly_nth_weekday"]) {
+      await expect(db.query(`insert into public.calendar_event_submissions
+        select (jsonb_populate_record(null::public.calendar_event_submissions, to_jsonb(s) ||
+          jsonb_build_object('id', gen_random_uuid(), 'plan_revision', 100, 'schedule_kind', 'recurring', 'frequency', $2::text, 'interval_count', 2))).*
+        from public.calendar_event_submissions s where s.id=$1`, [submission, frequency]))
+        .rejects.toMatchObject({ code: "23514", constraint: "calendar_submissions_fixed_interval_check" });
+    }
     const before = (await db.query<{ count: number }>("select count(*)::int as count from public.calendar_submission_occurrences where submission_id=$1", [submission])).rows[0].count;
     await db.query("select private.calendar_materialize_submission($1)", [submission]);
     expect((await db.query<{ count: number }>("select count(*)::int as count from public.calendar_submission_occurrences where submission_id=$1", [submission])).rows[0].count).toBe(before);

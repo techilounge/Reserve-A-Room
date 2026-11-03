@@ -1,6 +1,16 @@
 # Church Calendar — Phase 0 architecture and implementation plan
 
-**Checkpoint:** The reviewer approved Phase 2 at `a7d58865193e9cea021b229a38bc11794f07367b` and authorized Phase 3 only. Work remains on `codex/church-calendar-phase1` based on `main` commit `1f287eecb0979f40339011a49ab3b99508ec6514`; the mixed `03b721c` security work remains separate. Stop for review before Phase 4. No merge or production rollout is authorized.
+**Checkpoint:** The reviewer approved Phase 2 and reviewed Phase 3 at `b7e5e745a3d7eea10ff529212c3db01aa9c0ca86`. Phase 3 requires the recurrence-interval follow-up before approval; Phase 4 is not authorized. Work remains on `codex/church-calendar-phase1` based on `main` commit `1f287eecb0979f40339011a49ab3b99508ec6514`; the mixed `03b721c` security work remains separate. No merge or production rollout is authorized.
+
+- Phase 3 review follow-up: `weekdays`, `yearly_date`, and `yearly_nth_weekday`
+  have a fixed interval of 1; the UI hides the interval, the Server Action rejects
+  manipulated values, and append-only migration
+  `20261103100000_calendar_fixed_recurrence_intervals.sql` enforces the rule on
+  draft writes and new submissions. The constraints are `NOT VALID` to preserve
+  pre-existing historical rows without silently changing their meaning; an old
+  incompatible draft must be reviewed and saved again before submission. Daily,
+  weekly, and both monthly rules retain adjustable intervals. Verify the final SHA,
+  push only the review branch, then stop for Phase 3 re-review.
 
 ### Phase 3 local implementation
 
@@ -267,4 +277,4 @@ These are recommendations and phase-specific decisions, not newly approved polic
 11. **Website sources:** determine whether the public website calendars share a source and verify plugin/API permissions before Phase 10.
 12. **Security workstream sequencing:** review its independent branch and preview/migration requirements before adopting it as a deployed calendar dependency; no production deploy is implied by this proposal.
 
-**Next action:** implement and verify Phase 3, push the development branch, and stop for reviewer approval. Do not begin Phase 4, merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.
+**Next action:** verify and push the Phase 3 recurrence-interval follow-up, then stop for reviewer approval. Do not begin Phase 4, merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.

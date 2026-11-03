@@ -68,6 +68,37 @@ test("a Super Admin configures a cycle and independently rotates one planner's a
     await planner.getByRole("button", { name: "Continue to planning" }).click();
     await planner.getByText("Add an event").click();
     const editor = planner.locator("details").filter({ hasText: "Add an event" });
+    await editor.getByLabel("Event title").fill("Planning browser test");
+    await editor.getByLabel("Schedule type").selectOption("recurring");
+    await editor.getByLabel("Repeat interval").fill("2");
+    for (const frequency of ["weekdays", "yearly_date", "yearly_nth_weekday"]) {
+      await editor.getByLabel("Frequency").selectOption(frequency);
+      await expect(editor.getByLabel("Repeat interval")).toHaveCount(0);
+      await editor.locator("form").first().evaluate(form => {
+        const input = document.createElement("input");
+        input.type = "hidden"; input.name = "interval_count"; input.value = "2"; input.dataset.tampered = "true";
+        form.appendChild(input);
+      });
+      await editor.getByRole("button", { name: "Save event" }).click();
+      await expect(editor.getByRole("alert")).toHaveText("Weekday and yearly schedules always repeat at an interval of 1.");
+      await editor.locator('[data-tampered="true"]').evaluate(input => input.remove());
+    }
+    for (const frequency of ["daily", "weekly", "monthly_day", "monthly_nth_weekday"]) {
+      await editor.getByLabel("Frequency").selectOption(frequency);
+      await expect(editor.getByLabel("Repeat interval")).toHaveValue("2");
+    }
+    await editor.getByLabel("Frequency").selectOption("weekdays");
+    await editor.getByLabel("Event title").fill("Fixed interval test");
+    await editor.getByLabel("Start date", { exact: true }).first().fill(new Date(now + 86400000).toISOString().slice(0, 10));
+    await editor.getByLabel("End date (same as start for one day)").fill(new Date(now + 8 * 86400000).toISOString().slice(0, 10));
+    await editor.getByRole("checkbox", { name: "All-day event" }).check();
+    await editor.getByRole("button", { name: "Save event" }).click();
+    await planner.getByText(/Fixed interval test · CAL-/).click();
+    await planner.getByRole("button", { name: "Delete draft" }).click();
+    await planner.getByRole("alertdialog").getByRole("button", { name: "Delete draft" }).click();
+    await expect(planner.getByText(/Fixed interval test · CAL-/)).not.toBeVisible();
+    await planner.getByText("Add an event").click();
+    await editor.getByLabel("Schedule type").selectOption("one_time");
     const date = new Date(now + 86400000).toISOString().slice(0, 10);
     await editor.getByLabel("Event title").fill("Planning browser test");
     await editor.getByLabel("Start date").fill(date);

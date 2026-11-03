@@ -141,6 +141,10 @@ export async function savePlannerDraft(_previous: { error: string }, form: FormD
   const optionalNumber = (name: string) => value(name) ? Number(value(name)) : null;
   const frequency = value("frequency") || null;
   const kind = value("kind");
+  const fixedInterval = kind === "recurring" && ["weekdays", "yearly_date", "yearly_nth_weekday"].includes(frequency ?? "");
+  if (fixedInterval && value("interval_count") && value("interval_count") !== "1") {
+    return { error: "Weekday and yearly schedules always repeat at an interval of 1." };
+  }
   const allDay = form.has("all_day");
   const dateIds = form.getAll("date_id").map(String);
   const dateStarts = form.getAll("date_start").map(String);
@@ -159,7 +163,7 @@ export async function savePlannerDraft(_previous: { error: string }, form: FormD
     public_contact_name: value("public_contact_name"), public_contact_email: value("public_contact_email"), requester_notes: value("requester_notes"),
     schedule: { kind, timezone: value("timezone"), all_day: allDay, start_date: value("start_date"), end_date: value("end_date"),
       start_time: value("start_time"), end_time: value("end_time"), frequency: kind === "recurring" ? frequency : null,
-      interval_count: kind === "recurring" ? optionalNumber("interval_count") : null,
+      interval_count: kind === "recurring" ? fixedInterval ? 1 : optionalNumber("interval_count") : null,
       weekdays: kind === "recurring" && frequency === "weekly" ? form.getAll("weekdays").map(Number) : null,
       weekday: kind === "recurring" && ["monthly_nth_weekday", "yearly_nth_weekday"].includes(frequency ?? "") ? optionalNumber("weekday") : null,
       month_ordinals: kind === "recurring" && frequency === "monthly_nth_weekday" ? form.getAll("month_ordinals").map(Number) : null,

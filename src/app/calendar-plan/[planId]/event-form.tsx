@@ -29,6 +29,8 @@ export function EventForm({ plan, timezone, catalog, event }: { plan: string; ti
   const [allDay, setAllDay] = useState(s?.all_day ?? false);
   const [dates, setDates] = useState(() => (event?.dates ?? []).map(date => ({ ...date, key: date.id })));
   const [frequency, setFrequency] = useState(s?.frequency ?? "daily");
+  const [interval, setInterval] = useState(String(s?.interval_count ?? 1));
+  const adjustableInterval = ["daily", "weekly", "monthly_day", "monthly_nth_weekday"].includes(frequency);
   const [state, action, pending] = useActionState(savePlannerDraft, { error: "" });
   const [, startTransition] = useTransition();
   return <div className="space-y-3 rounded-lg border p-4">
@@ -81,7 +83,9 @@ export function EventForm({ plan, timezone, catalog, event }: { plan: string; ti
         <div hidden={kind !== "recurring"} className="space-y-3"><label className="block">Frequency <select className={field} name="frequency" value={frequency} onChange={e => setFrequency(e.target.value)}>
           <option value="daily">Every number of days</option><option value="weekdays">Weekdays</option><option value="weekly">Weekly</option><option value="monthly_day">Monthly by date</option><option value="monthly_nth_weekday">Monthly by week and weekday</option><option value="yearly_date">Yearly by date</option><option value="yearly_nth_weekday">Yearly by week and weekday</option>
         </select></label>
-        <label className="block">Repeat interval <input className={field} name="interval_count" type="number" min={1} max={365} defaultValue={s?.interval_count ?? 1} /></label>
+        {adjustableInterval ? <label className="block">Repeat interval <input className={field} name="interval_count" type="number" min={1} max={365} value={interval} onChange={e => setInterval(e.target.value)} /></label>
+          : <p className="text-sm text-muted-foreground">This schedule repeats {frequency === "weekdays" ? "every weekday" : "every year"}.</p>}
+        {!adjustableInterval && s?.frequency === frequency && (s.interval_count ?? 1) !== 1 ? <p role="alert">The previously saved interval is unsupported. Saving will use an interval of 1; review the schedule before submitting.</p> : null}
         <fieldset hidden={frequency !== "weekly"}><legend>Days for a weekly schedule</legend>{weekdays.map((day, i) => <label key={day} className="mr-3 inline-flex gap-1"><input type="checkbox" name="weekdays" value={i} defaultChecked={s?.weekdays?.includes(i)} />{day}</label>)}</fieldset>
         <label className={["monthly_nth_weekday", "yearly_nth_weekday"].includes(frequency) ? "block" : "hidden"}>Weekday <select className={field} name="weekday" defaultValue={s?.weekday ?? 0}>{weekdays.map((day, i) => <option key={day} value={i}>{day}</option>)}</select></label>
         <fieldset hidden={frequency !== "monthly_nth_weekday"}><legend>Weeks of month</legend>{ordinals.map(([i, label]) => <label key={i} className="mr-3 inline-flex gap-1"><input type="checkbox" name="month_ordinals" value={i} defaultChecked={s?.month_ordinals?.includes(i)} />{label}</label>)}</fieldset>

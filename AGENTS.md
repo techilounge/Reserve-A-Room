@@ -220,6 +220,14 @@ Verification completed for that fix before commit:
 
 ## Church Calendar Phase 3 checkpoint — 2026-11-03
 
+- The Phase 3 reviewer reviewed `b7e5e745a3d7eea10ff529212c3db01aa9c0ca86` and
+  requires one narrow recurrence-interval correction before approval. Phase 4 remains
+  unauthorized. The follow-up hides the interval for weekdays and both yearly rules,
+  rejects tampered non-1 intervals, and adds append-only migration
+  `20261103100000_calendar_fixed_recurrence_intervals.sql` to enforce the invariant on
+  draft writes and submission inserts. Existing inconsistent historical rows are not
+  rewritten; their drafts must be corrected before a new submission. Run all checks on
+  the exact follow-up commit and push this branch for the reviewer's re-review.
 - The reviewer approved Phase 2 at `a7d58865193e9cea021b229a38bc11794f07367b`
   and authorized **Phase 3 only**. Implement the bounded occurrence engine and stop
   for reviewer approval before Phase 4. No production merge, deployment, hosted
