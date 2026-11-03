@@ -1,6 +1,14 @@
 # Church Calendar — Phase 0 architecture and implementation plan
 
-**Checkpoint:** The reviewer approved Phase 3 at `ba4428d07227034d1e36254806f1726b44ce3524` and authorized Phase 4 only. Work remains on `codex/church-calendar-phase1` based on `main` commit `1f287eecb0979f40339011a49ab3b99508ec6514`; the mixed `03b721c` security work remains separate. Stop for Phase 4 review. No Phase 5, merge or production rollout is authorized.
+**Checkpoint:** The reviewer requires a targeted Phase 4 fix after reviewing `6953d3a6f0da06b83bf4dee05eee19e3466846c5`. Work remains on `codex/church-calendar-phase1` based on `main` commit `1f287eecb0979f40339011a49ab3b99508ec6514`; the mixed `03b721c` security work remains separate. Stop for Phase 4 re-review. No Phase 5, merge or production rollout is authorized.
+
+- Review follow-up: migration `20261105100000_calendar_active_plan_resource_demand.sql`
+  excludes inactive plans from provisional demand and retains active
+  `changes_requested` plans' last submitted snapshot. On restoration, a revision floor
+  prevents the old proposal from reappearing or being allocated until a new submission;
+  the admin page explains the required new invitation and revision. Historic submissions
+  and confirmed allocations remain intact. Run full quality gates and real PostgreSQL
+  concurrency races on the follow-up commit, then push only the review branch.
 
 ### Phase 4 resource foundations
 

@@ -427,4 +427,58 @@ describe("Church Calendar occurrence materialization", () => {
     expect((await db.query<{ n: number }>("select count(*)::int as n from public.calendar_submission_occurrences where submission_id=$1", [submission])).rows[0].n).toBe(1200);
     expect((await db.query<{ n: number }>("select count(*)::int as n from public.reservations")).rows[0].n).toBe(before);
   }, 120_000);
+
+  it("excludes removed and restored ministries until a fresh submission while retaining history", async () => {
+    const current = (await db.query<{ id: string; occupancy_start: string; occupancy_end: string }>(`
+      select o.id, o.occupancy_start::text, o.occupancy_end::text
+      from public.calendar_submission_occurrences o join public.calendar_event_submissions s on s.id=o.submission_id
+      join public.ministry_calendar_plans p on p.id=$1 and p.submission_revision=s.plan_revision
+      join public.calendar_submission_resource_requests r on r.submission_occurrence_id=o.id and r.resource_id=$2
+      where s.event_id=$3 order by o.local_start limit 1`, [plan, resourceA, specific])).rows[0];
+    const demand = async () => (await asRole(db, "authenticated", tx => tx.query<{ confirmed: number; provisional: number }>(
+      "select confirmed,provisional from public.calendar_resource_availability($1,$2,$3)",
+      [resourceA, current.occupancy_start, current.occupancy_end]), owner)).rows;
+    const original = await demand();
+    expect(original.some(row => row.provisional > 0)).toBe(true);
+    const planDetails = (await db.query<{ cycle_id: string; ministry_id: string; submission_revision: number }>(
+      "select cycle_id,ministry_id,submission_revision from public.ministry_calendar_plans where id=$1", [plan])).rows[0];
+    const history = (await db.query<{ n: number }>("select count(*)::int as n from public.calendar_event_submissions where event_id=$1", [specific])).rows[0].n;
+    await asRole(db, "authenticated", tx => tx.query("select public.calendar_request_plan_changes($1,'Review after removal')", [plan]), owner);
+    expect(await demand()).toEqual(original);
+    await asRole(db, "authenticated", tx => tx.query("select public.remove_calendar_ministry($1)", [plan]), owner);
+    expect((await demand()).every(row => row.provisional === 0)).toBe(true);
+    expect((await db.query<{ n: number }>("select count(*)::int as n from public.calendar_event_submissions where event_id=$1", [specific])).rows[0].n).toBe(history);
+    expect((await db.query<{ id: string }>("select id from public.calendar_submission_occurrences where id=$1", [current.id])).rows[0].id).toBe(current.id);
+    const restored = await asRole(db, "authenticated", tx => tx.query<{ id: string }>("select public.add_calendar_ministry($1,$2) as id", [planDetails.cycle_id, planDetails.ministry_id]), owner);
+    expect(restored.rows[0].id).toBe(plan);
+    expect((await demand()).every(row => row.provisional === 0)).toBe(true);
+    const restoredPlan = (await db.query<{ resource_submission_floor: number; submission_status: string }>("select resource_submission_floor,submission_status from public.ministry_calendar_plans where id=$1", [plan])).rows[0];
+    expect(restoredPlan).toEqual({ resource_submission_floor: planDetails.submission_revision, submission_status: "changes_requested" });
+    const replacement = crypto.randomUUID(), replacementToken = "94".repeat(32), replacementSession = "95".repeat(32);
+    await asRole(db, "authenticated", tx => tx.query("select public.invite_calendar_planner($1,$2,'Replacement','restored@example.org',null,'additional',$3,$4)", [plan, replacement, replacementToken, "96".repeat(16)]), owner);
+    await asRole(db, "service_role", tx => tx.query("select public.exchange_calendar_planner_session($1,$2,$3,$4)", [reference, replacement, replacementToken, replacementSession]));
+    await asRole(db, "service_role", tx => tx.query("select public.calendar_accept_planner_policies($1,$2,'p1','t1')", [reference, replacementSession]));
+    await asRole(db, "service_role", tx => tx.query("select public.calendar_submit_plan($1,$2,'',false)", [reference, replacementSession]));
+    expect((await demand()).some(row => row.provisional > 0)).toBe(true);
+    expect((await db.query<{ id: string }>("select id from public.calendar_submission_occurrences where id=$1", [current.id])).rows[0].id).toBe(current.id);
+    const latest = (await db.query<{ id: string }>(`select o.id from public.calendar_submission_occurrences o
+      join public.calendar_event_submissions s on s.id=o.submission_id
+      join public.ministry_calendar_plans p on p.id=$1 and p.submission_revision=s.plan_revision
+      join public.calendar_submission_resource_requests r on r.submission_occurrence_id=o.id and r.resource_id=$2
+      where s.event_id=$3 order by o.local_start limit 1`, [plan, resourceA, specific])).rows[0].id;
+    const weeklyLatest = (await db.query<{ id: string }>(`select o.id from public.calendar_submission_occurrences o
+      join public.calendar_event_submissions s on s.id=o.submission_id
+      join public.ministry_calendar_plans p on p.id=$1 and p.submission_revision=s.plan_revision
+      join public.calendar_submission_resource_requests r on r.submission_occurrence_id=o.id and r.resource_id=$2
+      where s.event_id=$3 order by o.local_start limit 1`, [plan, resourceA, weekly])).rows[0].id;
+    await db.query("select set_config('request.jwt.claims', $1, false)", [JSON.stringify({ sub: owner, role: "authenticated" })]);
+    const confirmed = (await db.query<{ id: string }>("select private.calendar_allocate_resource($1,$2) as id", [latest, resourceA])).rows[0].id;
+    await asRole(db, "authenticated", tx => tx.query("select public.remove_calendar_ministry($1)", [plan]), owner);
+    expect((await demand()).some(row => row.confirmed === 4 && row.provisional === 0)).toBe(true);
+    await asRole(db, "authenticated", tx => tx.query("select public.add_calendar_ministry($1,$2)", [planDetails.cycle_id, planDetails.ministry_id]), owner);
+    expect((await demand()).every(row => row.provisional === 0)).toBe(true);
+    expect((await demand()).some(row => row.confirmed === 4)).toBe(true);
+    expect((await db.query<{ status: string }>("select status from public.calendar_resource_allocations where id=$1", [confirmed])).rows[0].status).toBe("confirmed");
+    await expect(db.query("select private.calendar_allocate_resource($1,$2)", [weeklyLatest, resourceA])).rejects.toMatchObject({ code: "RAR09", message: "Resource request unavailable." });
+  });
 });

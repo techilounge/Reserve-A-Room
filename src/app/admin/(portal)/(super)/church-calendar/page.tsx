@@ -109,6 +109,7 @@ export default async function ChurchCalendarPage({ searchParams }: { searchParam
             const ministry = ministries.find((m) => m.id === plan.ministry_id);
             return <div key={plan.id} className="space-y-3 rounded-lg border p-4">
               <h4 className="font-semibold">{ministry?.name ?? "Ministry"}</h4>
+              {plan.submission_revision > 0 && plan.submission_revision <= plan.resource_submission_floor ? <p className="text-sm text-muted-foreground">This restored ministry’s previous submission is retained for history but excluded from resource demand. Invite a planner and {plan.submission_status === "submitted" ? "request changes so they can " : "ask them to "}submit a new revision.</p> : null}
               {editable ? <form id={`remove-${plan.id}`} action={removeMinistry}>
                 <input type="hidden" name="plan" value={plan.id} />
                 <CalendarConfirmButton formId={`remove-${plan.id}`} label="Remove ministry from cycle"

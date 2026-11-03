@@ -1504,6 +1504,7 @@ export type Database = {
           submitted_at: string | null;
           requester_message: string | null;
           changes_requested_reason: string | null;
+          resource_submission_floor: number;
         };
         Insert: {
           id?: string;
@@ -1519,6 +1520,7 @@ export type Database = {
           submitted_at?: string | null;
           requester_message?: string | null;
           changes_requested_reason?: string | null;
+          resource_submission_floor?: number;
         };
         Update: {
           id?: string;
@@ -1534,6 +1536,7 @@ export type Database = {
           submitted_at?: string | null;
           requester_message?: string | null;
           changes_requested_reason?: string | null;
+          resource_submission_floor?: number;
         };
         Relationships: [
           {

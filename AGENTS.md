@@ -220,6 +220,16 @@ Verification completed for that fix before commit:
 
 ## Church Calendar Phase 4 checkpoint — 2026-11-03
 
+- The reviewer withheld Phase 4 approval at `6953d3a6f0da06b83bf4dee05eee19e3466846c5`
+  because removed ministries still counted as provisional resource demand. Follow-up
+  migration `20261105100000_calendar_active_plan_resource_demand.sql` filters inactive
+  plans, retains the last submitted snapshot while an active plan awaits changes, and
+  uses a revision floor so restoring a removed plan cannot revive stale demand or
+  allocate its old requests until a fresh revision is submitted. Confirmed allocations
+  remain counted and historical snapshots are unchanged. Run the full gates and the
+  real PostgreSQL races on the final review commit, push this branch, and stop for the
+  narrow Phase 4 re-review. Phase 5 still requires reviewer authorization; exclusive
+  event coverage and the large-event warning threshold remain owner decisions.
 - Phase 3 was approved at `ba4428d07227034d1e36254806f1726b44ce3524`; Phase 4
   resources are authorized on `codex/church-calendar-phase1`. Stop for review before
   Phase 5; do not merge, deploy, run hosted migrations, expose event approval, create
