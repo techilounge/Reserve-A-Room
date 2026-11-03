@@ -152,6 +152,12 @@ previously submitted event from the next revision; the earlier submission is ret
 Branded notifications for submissions and change requests must be implemented and
 verified before a production release.
 
+Phase 3 materializes submitted dates as planning proposals, including all-day and
+repeating schedules. Planners can stage room/resource exceptions for individual
+dates after staff request changes; staff can inspect the last submitted details.
+These requests do not reserve rooms or allocate resources. Phase 3 remains on the
+review branch and requires review before proceeding.
+
 For an isolated local or preview environment, configure a separate Supabase project,
 apply `20261029100000_church_calendar_phase1.sql` after all preceding migrations, and
 set a distinct `CALENDAR_PLAN_LINK_SECRET`, Resend sender, and existing service/cron

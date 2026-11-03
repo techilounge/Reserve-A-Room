@@ -1,6 +1,31 @@
 # Church Calendar — Phase 0 architecture and implementation plan
 
-**Checkpoint:** The reviewer approved Phase 1 at `dbee565098f583d5462ed6edfe99f6460aae17ce` and reviewed Phase 2 at `a7ea4589029d35cc4cc2d0952ea8e00f8c77e4ff`. Phase 2 is **not yet approved**; three targeted fixes must be reviewed before Phase 3. Work remains on `codex/church-calendar-phase1` based on `main` commit `1f287eecb0979f40339011a49ab3b99508ec6514`; the mixed `03b721c` security work remains separate. No merge or production rollout is authorized.
+**Checkpoint:** The reviewer approved Phase 2 at `a7d58865193e9cea021b229a38bc11794f07367b` and authorized Phase 3 only. Work remains on `codex/church-calendar-phase1` based on `main` commit `1f287eecb0979f40339011a49ab3b99508ec6514`; the mixed `03b721c` security work remains separate. Stop for review before Phase 4. No merge or production rollout is authorized.
+
+### Phase 3 local implementation
+
+- Append-only migration `20261102100000_church_calendar_occurrences.sql` adds
+  provisional occurrence and request tables, per-occurrence room/resource
+  exceptions, and immutable submitted occurrence/request snapshots. Submission
+  materializes atomically from typed submitted inputs, not live drafts. Specific
+  date UUIDs select stable occurrence identities; removed future dates are
+  superseded, and duplicated events obtain different identities.
+- Occurrence generation allows at most 1,200 instances per event. It preserves
+  local wall-clock times, rejects nonexistent local times, and chooses PostgreSQL's
+  standard-time (later) instant for ambiguous fall-back times. All-day intervals
+  run from local midnight to midnight after the inclusive last date; setup and
+  cleanup expand occupancy in elapsed minutes without changing event times.
+- Planners can review complete draft dates and edit per-date room/resource requests
+  before their first submission or during a revision. Saving a valid schedule or an
+  exception transactionally recomputes the draft projection while preserving explicit
+  exceptions; incomplete or invalid drafts have no current preview. Staff continue to
+  see immutable submitted occurrence/request snapshots. No
+  operational reservation, confirmed resource allocation, conflict resolution,
+  approval, or booking-horizon bypass is added. Existing `reservation_series`
+  recurrence remains separately capped at one year and 50 instances.
+- Real multi-connection PostgreSQL concurrency, real-provider delivery, legal
+  approval, planner notifications, and production log redaction remain release
+  checks. Phase 3 is for reviewer approval; do not begin Phase 4 or deploy.
 
 ### Phase 2 implementation handoff
 
@@ -39,8 +64,8 @@
   owner/legal review, not publication; approved version identifiers and approved public
   terms require a separate reviewed configuration change before a release. Primary and
   Secondary labels remain descriptive until the owner decides whether they are unique.
-- This phase creates no persistent occurrences, conflict engine, allocations, or live
-  WordPress synchronization. Phase 3 and production rollout are not authorized. PGlite
+- At the Phase 2 checkpoint there were no persistent occurrences, conflict engine,
+  allocations, or live WordPress synchronization. PGlite
   serializes test connections; real multi-connection race verification and preview
   hosting-log redaction remain pre-release checks. The planner proposal workflow does
   not send submission or change-request emails in this phase; notification automation
@@ -51,10 +76,10 @@
   build. The existing complete Playwright suite passed 108/108 on the preceding
   iteration; after the final targeted changes, the mobile planner workflow and the new
   staff page's light/dark accessibility tests passed 3/3. No tests were skipped.
-- **Next:** push the review branch, stop for Phase 2 review, and obtain the owner/legal
-  decision on the draft wording and the owner's Primary/Secondary uniqueness choice.
-  No production merge, deployment, hosted migration, policy activation, or Phase 3 work
-  is authorized by the Phase 2 approval alone.
+- Historical next step was Phase 2 review, which is now complete. The owner/legal
+  decision on the draft wording and the Primary/Secondary uniqueness choice remain open.
+  Phase 3 is authorized; production merge, deployment, hosted migration, and policy
+  activation remain unauthorized.
 
 ### Phase 1 implementation handoff
 
@@ -242,4 +267,4 @@ These are recommendations and phase-specific decisions, not newly approved polic
 11. **Website sources:** determine whether the public website calendars share a source and verify plugin/API permissions before Phase 10.
 12. **Security workstream sequencing:** review its independent branch and preview/migration requirements before adopting it as a deployed calendar dependency; no production deploy is implied by this proposal.
 
-**Next action:** verify and push the final remediation SHA, then stop for the reviewer's narrow Phase 2 re-review. Do not begin Phase 3, merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.
+**Next action:** implement and verify Phase 3, push the development branch, and stop for reviewer approval. Do not begin Phase 4, merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.

@@ -78,8 +78,36 @@ export async function submitPlannerPlan(form: FormData) {
     p_plan_id: plan, p_session_hash: hash, p_message: String(form.get("message") ?? ""),
     p_confirm_empty: form.get("confirmEmpty") === "yes",
   });
-  if (error) redirect(`/calendar-plan/${plan}?error=${error.message === "Every event needs a complete schedule." ? "notready" : error.message === "An event contains an unavailable room, resource, or ministry." ? "unavailableSelection" : "submit"}`);
+  if (error) {
+    const reason = error.message === "Every event needs a complete schedule." ? "notready"
+      : error.message === "An event contains an unavailable room, resource, or ministry." ? "unavailableSelection"
+      : error.message === "A calendar event uses a nonexistent local time." ? "dst"
+      : error.message === "A calendar event may have at most 1200 occurrences." ? "occurrenceLimit"
+      : error.message === "The calendar schedule has no occurrences." ? "noOccurrences" : "submit";
+    if (error.message === "An occurrence resource override needs an event-wide default.") redirect(`/calendar-plan/${plan}?error=override`);
+    redirect(`/calendar-plan/${plan}?error=${reason}`);
+  }
   redirect(`/calendar-plan/${plan}?submitted=1`);
+}
+
+export async function setOccurrenceException(form: FormData) {
+  const { plan, hash } = await plannerCredentials(form);
+  const event = String(form.get("event") ?? "");
+  const occurrence = String(form.get("occurrence") ?? "");
+  const item = String(form.get("item") ?? "");
+  const kind = String(form.get("kind") ?? "");
+  const operation = String(form.get("operation") ?? "");
+  const version = Number(form.get("draft_version"));
+  const quantityText = String(form.get("quantity") ?? "").trim();
+  const quantity = quantityText ? Number(quantityText) : null;
+  if (!UUID.test(event) || !UUID.test(occurrence) || !UUID.test(item) || !Number.isSafeInteger(version) || version < 1 ||
+    (quantity !== null && (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 100000))) redirect(`/calendar-plan/${plan}?error=save`);
+  const { error } = await createSupabaseServiceClient().rpc("calendar_set_occurrence_exception", {
+    p_plan_id: plan, p_session_hash: hash, p_occurrence_id: occurrence, p_expected_version: version,
+    p_kind: kind, p_item_id: item, p_operation: operation, p_quantity: quantity as number, p_notes: String(form.get("notes") ?? ""),
+  });
+  const page = Math.max(1, Number.parseInt(String(form.get("page") ?? "1"), 10) || 1);
+  redirect(`/calendar-plan/${plan}/occurrences/${event}?page=${page}${error ? "&error=exception" : "&updated=1"}`);
 }
 
 export async function removePlannerDraft(form: FormData) {

@@ -770,7 +770,7 @@ Church Calendar events are separate from operational reservations. Planning uses
 independently revocable per-person grants and sessions, event-level room/resource
 templates, and distinct planning versus operational conflicts. Event ownership derives
 from the ministry plan, and public occurrence identities survive ordinary edits. Only
-Phase 2 planning portal and event submission are authorized following Phase 1 approval;
+Phase 3 occurrence materialization is authorized following Phase 2 approval;
 the remaining architecture and policy gates are documented in
 `docs/CHURCH_CALENDAR_IMPLEMENTATION_PLAN.md`. The calendar design is not deployed.
 
@@ -801,6 +801,20 @@ earlier snapshots and audit entries remain. Historical dates whose old row was a
 deleted cannot recover their original ID and are assigned a new snapshot identity.
 Planner notification of change requests and submission notifications remain mandatory
 before production release, along with the legal review and policy gate approval.
+
+Phase 3 appends `20261102100000_church_calendar_occurrences.sql`. A transactionally
+executed submission trigger expands typed, immutable inputs into current provisional
+occurrences and immutable per-submission occurrence/request rows. The separate
+calendar matcher never changes the ordinary reservation series' one-year/50-instance
+cap. Per-event generation is limited to 1,200; selected-date UUIDs drive stable lookup
+while occurrence IDs remain random. Removed future occurrences are superseded and
+past records remain historical. Complete drafts have a separately versioned mutable
+projection, and plan-scoped, version-checked exceptions update that projection without
+altering earlier submitted snapshots. All-day end dates are exclusive local midnight
+after the final calendar date. Nonexistent local times fail submission; ambiguous
+fall-back times use PostgreSQL's standard-time (later) instant. Setup and cleanup
+expand the UTC occupancy range in elapsed minutes. No reservation, confirmed resource
+allocation, approval or conflict engine is written in this phase.
 
 Per-person invitation tokens are HMAC-derived from a random seed using a dedicated
 server secret; only the seed and token hash are stored. A non-consuming GET is followed

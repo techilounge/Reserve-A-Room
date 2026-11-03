@@ -240,6 +240,122 @@ export type Database = {
           },
         ];
       };
+      calendar_event_occurrences: {
+        Row: {
+          id: string;
+          event_id: string;
+          logical_occurrence_id: string;
+          source_key: string;
+          source_date_id: string | null;
+          schedule_revision: number;
+          local_start: string;
+          local_end: string;
+          timezone: string;
+          all_day: boolean;
+          start_at: string;
+          end_at: string;
+          event_range: string | null;
+          occupancy_start: string;
+          occupancy_end: string;
+          occupancy_range: string | null;
+          status: string;
+          superseded_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          event_id: string;
+          logical_occurrence_id?: string;
+          source_key: string;
+          source_date_id?: string | null;
+          schedule_revision: number;
+          local_start: string;
+          local_end: string;
+          timezone: string;
+          all_day: boolean;
+          start_at: string;
+          end_at: string;
+          event_range?: never;
+          occupancy_start: string;
+          occupancy_end: string;
+          occupancy_range?: never;
+          status?: string;
+          superseded_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          event_id?: string;
+          logical_occurrence_id?: string;
+          source_key?: string;
+          source_date_id?: string | null;
+          schedule_revision?: number;
+          local_start?: string;
+          local_end?: string;
+          timezone?: string;
+          all_day?: boolean;
+          start_at?: string;
+          end_at?: string;
+          event_range?: never;
+          occupancy_start?: string;
+          occupancy_end?: string;
+          occupancy_range?: never;
+          status?: string;
+          superseded_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_occurrences_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_events";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_event_resource_requests: {
+        Row: {
+          occurrence_id: string;
+          resource_id: string;
+          origin: string;
+          quantity_requested: number;
+          notes: string | null;
+        };
+        Insert: {
+          occurrence_id: string;
+          resource_id: string;
+          origin: string;
+          quantity_requested: number;
+          notes?: string | null;
+        };
+        Update: {
+          occurrence_id?: string;
+          resource_id?: string;
+          origin?: string;
+          quantity_requested?: number;
+          notes?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_resource_requests_occurrence_id_fkey";
+            columns: ["occurrence_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_event_occurrences";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_event_resource_requests_resource_id_fkey";
+            columns: ["resource_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_resources";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       calendar_event_resource_templates: {
         Row: {
           event_id: string;
@@ -272,6 +388,39 @@ export type Database = {
             columns: ["resource_id"];
             isOneToOne: false;
             referencedRelation: "calendar_resources";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_event_room_requests: {
+        Row: {
+          occurrence_id: string;
+          room_id: string;
+          origin: string;
+        };
+        Insert: {
+          occurrence_id: string;
+          room_id: string;
+          origin: string;
+        };
+        Update: {
+          occurrence_id?: string;
+          room_id?: string;
+          origin?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_room_requests_occurrence_id_fkey";
+            columns: ["occurrence_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_event_occurrences";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_event_room_requests_room_id_fkey";
+            columns: ["room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
             referencedColumns: ["id"];
           },
         ];
@@ -601,6 +750,81 @@ export type Database = {
           },
         ];
       };
+      calendar_occurrence_resource_exceptions: {
+        Row: {
+          occurrence_id: string;
+          resource_id: string;
+          operation: string;
+          quantity_requested: number | null;
+          notes: string | null;
+        };
+        Insert: {
+          occurrence_id: string;
+          resource_id: string;
+          operation: string;
+          quantity_requested?: number | null;
+          notes?: string | null;
+        };
+        Update: {
+          occurrence_id?: string;
+          resource_id?: string;
+          operation?: string;
+          quantity_requested?: number | null;
+          notes?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_occurrence_resource_exceptions_occurrence_id_fkey";
+            columns: ["occurrence_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_event_occurrences";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_occurrence_resource_exceptions_resource_id_fkey";
+            columns: ["resource_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_resources";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_occurrence_room_exceptions: {
+        Row: {
+          occurrence_id: string;
+          room_id: string;
+          operation: string;
+          reason: string | null;
+        };
+        Insert: {
+          occurrence_id: string;
+          room_id: string;
+          operation: string;
+          reason?: string | null;
+        };
+        Update: {
+          occurrence_id?: string;
+          room_id?: string;
+          operation?: string;
+          reason?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_occurrence_room_exceptions_occurrence_id_fkey";
+            columns: ["occurrence_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_event_occurrences";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_occurrence_room_exceptions_room_id_fkey";
+            columns: ["room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       calendar_plan_access: {
         Row: {
           id: string;
@@ -909,6 +1133,114 @@ export type Database = {
           },
         ];
       };
+      calendar_submission_occurrences: {
+        Row: {
+          id: string;
+          submission_id: string;
+          occurrence_id: string;
+          logical_occurrence_id: string;
+          source_date_id: string | null;
+          local_start: string;
+          local_end: string;
+          timezone: string;
+          all_day: boolean;
+          start_at: string;
+          end_at: string;
+          occupancy_start: string;
+          occupancy_end: string;
+          event_range: string | null;
+          occupancy_range: string | null;
+        };
+        Insert: {
+          id?: string;
+          submission_id: string;
+          occurrence_id: string;
+          logical_occurrence_id: string;
+          source_date_id?: string | null;
+          local_start: string;
+          local_end: string;
+          timezone: string;
+          all_day: boolean;
+          start_at: string;
+          end_at: string;
+          occupancy_start: string;
+          occupancy_end: string;
+          event_range?: never;
+          occupancy_range?: never;
+        };
+        Update: {
+          id?: string;
+          submission_id?: string;
+          occurrence_id?: string;
+          logical_occurrence_id?: string;
+          source_date_id?: string | null;
+          local_start?: string;
+          local_end?: string;
+          timezone?: string;
+          all_day?: boolean;
+          start_at?: string;
+          end_at?: string;
+          occupancy_start?: string;
+          occupancy_end?: string;
+          event_range?: never;
+          occupancy_range?: never;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_submission_occurrences_occurrence_id_fkey";
+            columns: ["occurrence_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_event_occurrences";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_submission_occurrences_submission_id_fkey";
+            columns: ["submission_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_event_submissions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_submission_resource_requests: {
+        Row: {
+          submission_occurrence_id: string;
+          resource_id: string;
+          origin: string;
+          quantity_requested: number;
+          notes: string | null;
+        };
+        Insert: {
+          submission_occurrence_id: string;
+          resource_id: string;
+          origin: string;
+          quantity_requested: number;
+          notes?: string | null;
+        };
+        Update: {
+          submission_occurrence_id?: string;
+          resource_id?: string;
+          origin?: string;
+          quantity_requested?: number;
+          notes?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_submission_resource_requ_submission_occurrence_id_fkey";
+            columns: ["submission_occurrence_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_submission_occurrences";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_submission_resource_requests_resource_id_fkey";
+            columns: ["resource_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_resources";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       calendar_submission_resource_templates: {
         Row: {
           submission_id: string;
@@ -941,6 +1273,39 @@ export type Database = {
             columns: ["submission_id"];
             isOneToOne: false;
             referencedRelation: "calendar_event_submissions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_submission_room_requests: {
+        Row: {
+          submission_occurrence_id: string;
+          room_id: string;
+          origin: string;
+        };
+        Insert: {
+          submission_occurrence_id: string;
+          room_id: string;
+          origin: string;
+        };
+        Update: {
+          submission_occurrence_id?: string;
+          room_id?: string;
+          origin?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_submission_room_requests_room_id_fkey";
+            columns: ["room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_submission_room_requests_submission_occurrence_id_fkey";
+            columns: ["submission_occurrence_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_submission_occurrences";
             referencedColumns: ["id"];
           },
         ];
@@ -1944,6 +2309,10 @@ export type Database = {
         Args: never;
         Returns: { grant_id: string; status: Database["public"]["Enums"]["email_status"]; error_message: string; attempted_at: string }[];
       };
+      calendar_planner_occurrences: {
+        Args: { p_plan_id: string; p_session_hash: string; p_event_id: string };
+        Returns: Json;
+      };
       calendar_planner_policy_status: {
         Args: { p_plan_id: string; p_session_hash: string };
         Returns: Json;
@@ -1971,6 +2340,14 @@ export type Database = {
       calendar_save_event_draft: {
         Args: { p_plan_id: string; p_session_hash: string; p_event_id: string; p_data: Json };
         Returns: string;
+      };
+      calendar_set_occurrence_exception: {
+        Args: { p_plan_id: string; p_session_hash: string; p_occurrence_id: string; p_expected_version: number; p_kind: string; p_item_id: string; p_operation: string; p_quantity: number; p_notes: string };
+        Returns: number;
+      };
+      calendar_staff_occurrences: {
+        Args: { p_submission_id: string };
+        Returns: Json;
       };
       calendar_staff_plan_list: {
         Args: never;

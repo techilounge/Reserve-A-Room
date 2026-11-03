@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/page-header";
@@ -10,7 +11,7 @@ export const metadata: Metadata = { title: "Church Calendar Plans" };
 const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const weekName = (week: number) => ({ "-1": "last", "1": "first", "2": "second", "3": "third", "4": "fourth" })[String(week)] ?? String(week);
 type Plan = { id: string; cycle: string; ministry: string; status: string; revision: number; submitted_at: string;
-  message: string | null; events: { reference: string; title: string; start_date: string; end_date: string; start_time: string | null; end_time: string | null; all_day: boolean;
+  message: string | null; events: { id: string; reference: string; title: string; start_date: string; end_date: string; start_time: string | null; end_time: string | null; all_day: boolean;
     timezone: string; schedule_kind: string; frequency: string | null; description: string | null; public_description: string | null;
     interval_count: number | null; weekdays: number[] | null; weekday: number | null; month_ordinals: number[] | null;
     month_ordinal: number | null; day_of_month: number | null; month_of_year: number | null;
@@ -58,6 +59,7 @@ export default async function CalendarSubmissions({ searchParams }: { searchPara
             <p>Rooms requested: {event.rooms.join(", ") || "None"}</p>
             <p>Co-sponsoring ministries: {event.ministries.join(", ") || "None"}</p>
             <p>Resources requested: {event.resources.map(resource => `${resource.name} (${resource.quantity})${resource.notes ? `: ${resource.notes}` : ""}`).join(", ") || "None"}</p>
+            <Link className="underline" href={`/admin/calendar-submissions/occurrences/${event.id}`}>View submitted dates and requests</Link>
           </div>
         </details>
       </li>)}</ul> : <p>No events were submitted.</p>}

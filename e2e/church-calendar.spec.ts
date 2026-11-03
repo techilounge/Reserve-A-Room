@@ -5,7 +5,7 @@ import { TEST_ACCOUNTS } from "./support/accounts";
 import { signInAs } from "./support/helpers";
 
 test("a Super Admin configures a cycle and independently rotates one planner's access", async ({ browser }) => {
-  test.setTimeout(90_000); // Includes three events, staff review, revision and accessibility checks.
+  test.setTimeout(120_000); // Includes three events, occurrence exceptions, staff review and accessibility checks.
   const staff = await browser.newContext({ viewport: { width: 390, height: 844 } });
   await signInAs(staff, "superAdmin");
   const page = await staff.newPage();
@@ -104,6 +104,16 @@ test("a Super Admin configures a cycle and independently rotates one planner's a
     await secondDate.getByLabel("End time").fill("15:00");
     await editor.getByRole("button", { name: "Save event" }).click();
     await expect(planner.getByText(/Selected dates test · CAL-/)).toBeVisible();
+    await planner.getByText(/Selected dates test · CAL-/).click();
+    await planner.getByRole("link", { name: "View dates and requests" }).click();
+    await expect(planner.getByRole("heading", { name: "Selected dates test: draft dates" })).toBeVisible();
+    const draftDate = planner.getByRole("listitem").first();
+    await draftDate.getByText("Change requests for this date").click();
+    await draftDate.locator('select[name="item"]').first().selectOption({ label: "Conference Room" });
+    await draftDate.getByRole("button", { name: "Save room change" }).click();
+    await expect(planner.getByRole("status")).toContainText("Change saved");
+    await expect(planner.getByText("Requested rooms: Conference Room").first()).toBeVisible();
+    await planner.getByRole("link", { name: "Back to your plan" }).click();
     await planner.getByText("Add an event").click();
     await editor.getByLabel("Event title").fill("All day test");
     await editor.getByLabel("Start date", { exact: true }).first().fill(date);
@@ -120,10 +130,26 @@ test("a Super Admin configures a cycle and independently rotates one planner's a
     const allDayReview = submissions.locator("details").filter({ has: submissions.locator("summary").filter({ hasText: "All day test" }) });
     await allDayReview.locator("summary").click();
     await expect(allDayReview.getByText(/All day/).last()).toBeVisible();
+    await allDayReview.getByRole("link", { name: "View submitted dates and requests" }).click();
+    await expect(submissions.getByRole("heading", { name: "Submitted Calendar Dates" })).toBeVisible();
+    await expect(submissions.getByText(/All day/).first()).toBeVisible();
+    await submissions.getByRole("link", { name: "Back to submitted plans" }).click();
     await submissions.locator("summary").filter({ hasText: "Request changes" }).click();
     await submissions.getByLabel("What needs to change?").fill("Please remove the first event.");
     await submissions.getByRole("button", { name: "Request changes" }).click();
     await planner.reload();
+    await planner.getByText(/Selected dates test · CAL-/).click();
+    await planner.getByRole("link", { name: "View dates and requests" }).click();
+    await expect(planner.getByRole("heading", { name: "Selected dates test: draft dates" })).toBeVisible();
+    expect(await planner.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    expect((await new AxeBuilder({ page: planner }).analyze()).violations).toEqual([]);
+    const submittedDate = planner.getByRole("listitem").first();
+    await submittedDate.getByText("Change requests for this date").click();
+    expect((await new AxeBuilder({ page: planner }).analyze()).violations).toEqual([]);
+    await submittedDate.locator('select[name="item"]').first().selectOption({ label: "Conference Room" });
+    await submittedDate.getByRole("button", { name: "Save room change" }).click();
+    await expect(planner.getByRole("status")).toContainText("Change saved");
+    await planner.getByRole("link", { name: "Back to your plan" }).click();
     const stalePlanner = await visitor.newPage();
     await stalePlanner.goto(`/calendar-plan/${details.plan}`);
     await stalePlanner.getByText(/Selected dates test · CAL-/).click();

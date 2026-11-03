@@ -98,6 +98,7 @@ export default async function PlannerInvitationPage({ params, searchParams }: {
             {portal.events.length ? <ul className="space-y-3">{portal.events.map(event => <li key={event.id}>
               <details><summary>{event.title} · {event.reference_code} · {isReady(event) ? "Ready" : "Needs attention"} · {event.schedule.start_date ?? "Date needed"}{event.schedule.all_day ? " · All day" : event.schedule.kind === "specific_dates" ? " · Times vary" : ` ${event.schedule.start_time?.slice(0, 5) ?? ""}–${event.schedule.end_time?.slice(0, 5) ?? ""}`}</summary>
                 <p>Requested rooms: {event.rooms.map(id => portal.rooms.find(room => room.id === id)?.name ?? "Unavailable room").join(", ") || "None"}</p>
+                <Link className="underline" href={`/calendar-plan/${planId}/occurrences/${event.id}`}>View dates and requests</Link>
                 {portal.status !== "submitted" ? <EventForm plan={planId} timezone={context.timezone} catalog={portal} event={event} /> : <p>Submitted for review.</p>}
               </details>
             </li>)}</ul> : <p>No events have been added.</p>}
@@ -113,6 +114,10 @@ export default async function PlannerInvitationPage({ params, searchParams }: {
         {search.error === "notready" ? <p role="alert">Complete the dates, times, and repeat details for each event before submitting your plan.</p> : null}
         {search.error === "unavailableSelection" ? <p role="alert">A selected room, resource, or ministry is unavailable. Edit the event and remove that selection before submitting.</p> : null}
         {search.error === "stale" ? <p role="alert">This event changed or is no longer editable. Review the latest version before trying again.</p> : null}
+        {search.error === "dst" ? <p role="alert">A selected local time does not exist because the clocks move forward. Change that time before submitting.</p> : null}
+        {search.error === "occurrenceLimit" ? <p role="alert">An event cannot have more than 1,200 dates. Shorten its schedule before submitting.</p> : null}
+        {search.error === "noOccurrences" ? <p role="alert">A repeating schedule has no dates in its selected range. Review the repeat settings.</p> : null}
+        {search.error === "override" ? <p role="alert">A date-specific resource quantity needs an event-wide request. Restore the default or change the date-specific request before submitting.</p> : null}
       </> : <>
         <h1 className="text-3xl font-semibold">{search.signedOut ? "You are signed out" : "Planning access unavailable"}</h1>
         {!search.signedOut ? <p>This invitation may have expired, been replaced, or the planning cycle may be closed. Contact the church office for help.</p> : null}
