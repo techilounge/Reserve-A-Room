@@ -8,14 +8,15 @@ import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { duplicatePlannerDraft, removePlannerDraft, savePlannerDraft } from "./actions";
 
 type Option = { id: string; name: string; active: boolean };
-type Schedule = { kind: string; timezone: string; start_date: string | null; end_date: string | null; start_time: string | null; end_time: string | null;
+type Schedule = { kind: string; timezone: string; all_day: boolean; start_date: string | null; end_date: string | null; start_time: string | null; end_time: string | null;
   frequency: string | null; interval_count: number | null; weekdays: number[] | null; weekday: number | null;
   month_ordinals: number[] | null; month_ordinal: number | null; day_of_month: number | null; month_of_year: number | null };
+export type DateEntry = { id: string; start_date: string; end_date: string; start_time: string | null; end_time: string | null };
 export type PlannerEvent = { id: string; title: string; reference_code: string; description: string | null; public_description: string | null;
   category: string; scope: string; protection: string; visibility: string; location_type: string; offsite_location: string | null;
   virtual_url: string | null; estimated_attendance: number; food_drinks_planned: boolean; setup_minutes: number; cleanup_minutes: number;
   public_contact_name: string | null; public_contact_email: string | null; requester_notes: string | null; revision: number; draft_version: number;
-  schedule: Schedule; dates: string[]; rooms: string[]; ministries: string[]; resources: { id: string; quantity: number; notes: string | null }[] };
+  schedule: Schedule; dates: DateEntry[]; rooms: string[]; ministries: string[]; resources: { id: string; quantity: number; notes: string | null }[] };
 export type PlannerCatalog = { rooms: Option[]; ministries: Option[]; resources: Option[] };
 
 const field = "block w-full rounded border border-input bg-background p-2";
@@ -25,6 +26,8 @@ const ordinals = [[1, "First"], [2, "Second"], [3, "Third"], [4, "Fourth"], [-1,
 export function EventForm({ plan, timezone, catalog, event }: { plan: string; timezone: string; catalog: PlannerCatalog; event?: PlannerEvent }) {
   const s = event?.schedule;
   const [kind, setKind] = useState(s?.kind ?? "one_time");
+  const [allDay, setAllDay] = useState(s?.all_day ?? false);
+  const [dates, setDates] = useState(() => (event?.dates ?? []).map(date => ({ ...date, key: date.id })));
   const [frequency, setFrequency] = useState(s?.frequency ?? "daily");
   const [state, action, pending] = useActionState(savePlannerDraft, { error: "" });
   const [, startTransition] = useTransition();
@@ -59,9 +62,22 @@ export function EventForm({ plan, timezone, catalog, event }: { plan: string; ti
         <p className="text-sm text-muted-foreground">You can save an incomplete schedule and return later. Complete it before submitting your plan.</p>
         <label className="block">Start date <input className={field} type="date" name="start_date" defaultValue={s?.start_date ?? ""} /></label>
         <label className="block">End date (same as start for one day) <input className={field} type="date" name="end_date" defaultValue={s?.end_date ?? ""} /></label>
-        <label className="block">Start time <input className={field} type="time" name="start_time" defaultValue={s?.start_time ?? ""} /></label>
-        <label className="block">End time <input className={field} type="time" name="end_time" defaultValue={s?.end_time ?? ""} /></label>
-        <label className={kind === "specific_dates" ? "block" : "hidden"}>For selected dates: enter dates as YYYY-MM-DD, separated by commas <textarea className={field} name="dates" defaultValue={event?.dates.join(", ") ?? ""} /></label>
+        <label className="flex gap-2"><input type="checkbox" name="all_day" checked={allDay} onChange={e => setAllDay(e.target.checked)} /> All-day event</label>
+        <label className={!allDay && kind !== "specific_dates" ? "block" : "hidden"}>Start time <input className={field} type="time" name="start_time" defaultValue={s?.start_time ?? ""} /></label>
+        <label className={!allDay && kind !== "specific_dates" ? "block" : "hidden"}>End time <input className={field} type="time" name="end_time" defaultValue={s?.end_time ?? ""} /></label>
+        <div hidden={kind !== "specific_dates"} className="space-y-3">
+          <p>Each selected date can have its own start and end. Dates must fall within the schedule range above.</p>
+          {dates.map((date, index) => <fieldset key={date.key} className="space-y-2 rounded border p-3">
+            <legend>Selected date {index + 1}</legend>
+            <input type="hidden" name="date_id" value={date.id} />
+            <label className="block">Start date <input className={field} name="date_start" type="date" defaultValue={date.start_date} /></label>
+            <label className="block">End date <input className={field} name="date_end" type="date" defaultValue={date.end_date} /></label>
+            <label className={allDay ? "hidden" : "block"}>Start time <input className={field} name="date_start_time" type="time" defaultValue={date.start_time ?? ""} /></label>
+            <label className={allDay ? "hidden" : "block"}>End time <input className={field} name="date_end_time" type="time" defaultValue={date.end_time ?? ""} /></label>
+            <Button type="button" variant="outline" onClick={() => setDates(current => current.filter(item => item.key !== date.key))}>Remove selected date {index + 1}</Button>
+          </fieldset>)}
+          <Button type="button" variant="outline" onClick={() => setDates(current => [...current, { key: crypto.randomUUID(), id: "", start_date: "", end_date: "", start_time: null, end_time: null }])}>Add selected date</Button>
+        </div>
         <div hidden={kind !== "recurring"} className="space-y-3"><label className="block">Frequency <select className={field} name="frequency" value={frequency} onChange={e => setFrequency(e.target.value)}>
           <option value="daily">Every number of days</option><option value="weekdays">Weekdays</option><option value="weekly">Weekly</option><option value="monthly_day">Monthly by date</option><option value="monthly_nth_weekday">Monthly by week and weekday</option><option value="yearly_date">Yearly by date</option><option value="yearly_nth_weekday">Yearly by week and weekday</option>
         </select></label>
@@ -86,11 +102,12 @@ export function EventForm({ plan, timezone, catalog, event }: { plan: string; ti
       <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save event"}</Button>
     </form>
     {event ? <form action={duplicatePlannerDraft}><input type="hidden" name="plan" value={plan} /><input type="hidden" name="event" value={event.id} /><Button variant="outline" type="submit">Duplicate event</Button></form> : null}
-    {event && event.revision === 0 ? <ConfirmationDialog
-      trigger={<Button variant="outline" type="button">Delete draft</Button>}
-      title="Delete this draft?" description="This removes the draft event from your plan."
-      confirmLabel="Delete draft" destructive onConfirm={async () => {
-        const values = new FormData(); values.set("plan", plan); values.set("event", event.id);
+    {event ? <ConfirmationDialog
+      trigger={<Button variant="outline" type="button">{event.revision ? "Withdraw event" : "Delete draft"}</Button>}
+      title={event.revision ? "Withdraw this event?" : "Delete this draft?"}
+      description={event.revision ? "The event will be omitted from your next submission. Earlier submitted versions remain in the church's records." : "This removes the draft event from your plan."}
+      confirmLabel={event.revision ? "Withdraw event" : "Delete draft"} destructive onConfirm={async () => {
+        const values = new FormData(); values.set("plan", plan); values.set("event", event.id); values.set("draft_version", String(event.draft_version));
         await removePlannerDraft(values);
       }} /> : null}
   </div>;

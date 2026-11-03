@@ -10,14 +10,14 @@ export const metadata: Metadata = { title: "Church Calendar Plans" };
 const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const weekName = (week: number) => ({ "-1": "last", "1": "first", "2": "second", "3": "third", "4": "fourth" })[String(week)] ?? String(week);
 type Plan = { id: string; cycle: string; ministry: string; status: string; revision: number; submitted_at: string;
-  message: string | null; events: { reference: string; title: string; start_date: string; end_date: string; start_time: string; end_time: string;
+  message: string | null; events: { reference: string; title: string; start_date: string; end_date: string; start_time: string | null; end_time: string | null; all_day: boolean;
     timezone: string; schedule_kind: string; frequency: string | null; description: string | null; public_description: string | null;
     interval_count: number | null; weekdays: number[] | null; weekday: number | null; month_ordinals: number[] | null;
     month_ordinal: number | null; day_of_month: number | null; month_of_year: number | null;
     location_type: string; offsite_location: string | null; virtual_url: string | null; scope: string; protection: string;
     visibility: string; food_drinks_planned: boolean; setup_minutes: number; cleanup_minutes: number;
     public_contact_name: string | null; public_contact_email: string | null; estimated_attendance: number; requester_notes: string | null; rooms: string[]; ministries: string[];
-    dates: string[]; resources: { name: string; quantity: number; notes: string | null }[] }[] };
+    dates: { id: string; start_date: string; end_date: string; start_time: string | null; end_time: string | null }[]; resources: { name: string; quantity: number; notes: string | null }[] }[] };
 
 export default async function CalendarSubmissions({ searchParams }: { searchParams: Promise<{ error?: string; updated?: string }> }) {
   const params = await searchParams;
@@ -36,7 +36,7 @@ export default async function CalendarSubmissions({ searchParams }: { searchPara
       {plan.events.length ? <ul className="space-y-2">{plan.events.map(event => <li key={event.reference}>
         <details className="rounded border p-3"><summary>{event.title} · {event.reference}</summary>
           <div className="mt-2 space-y-2 text-sm">
-            <p>{event.start_date} to {event.end_date} · {event.start_time}–{event.end_time} ({event.timezone})</p>
+            <p>{event.start_date} to {event.end_date} · {event.all_day ? "All day" : event.schedule_kind === "specific_dates" ? "Times listed below" : `${event.start_time}–${event.end_time}`} ({event.timezone})</p>
             <p>Schedule: {event.schedule_kind.replaceAll("_", " ")}{event.frequency ? ` · ${event.frequency.replaceAll("_", " ")}` : ""}</p>
             {event.frequency ? <p>Every {event.interval_count} interval(s)
               {event.weekdays?.length ? ` · ${event.weekdays.map(day => weekdays[day]).join(", ")}` : ""}
@@ -45,7 +45,7 @@ export default async function CalendarSubmissions({ searchParams }: { searchPara
               {event.month_ordinal !== null ? ` · ${weekName(event.month_ordinal)} week` : ""}
               {event.day_of_month !== null ? ` · day ${event.day_of_month}` : ""}
               {event.month_of_year !== null ? ` · month ${event.month_of_year}` : ""}</p> : null}
-            {event.dates.length ? <p>Selected dates: {event.dates.join(", ")}</p> : null}
+            {event.dates.length ? <div><p>Selected dates:</p><ul className="list-inside list-disc">{event.dates.map(date => <li key={date.id}>{date.start_date} to {date.end_date} · {event.all_day ? "All day" : `${date.start_time}–${date.end_time}`}</li>)}</ul></div> : null}
             <p>Location: {event.location_type} · Expected attendance: {event.estimated_attendance}</p>
             {event.offsite_location ? <p>Offsite location: {event.offsite_location}</p> : null}
             {event.virtual_url ? <p className="break-all">Online meeting link: {event.virtual_url}</p> : null}

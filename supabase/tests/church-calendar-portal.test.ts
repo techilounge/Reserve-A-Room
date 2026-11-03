@@ -102,7 +102,7 @@ describe("planner portal security foundations", () => {
     ));
     expect(duplicate.rows[0].id).not.toBe(eventId);
     expect((await db.query<{ count: number }>("select count(*)::int as count from public.calendar_event_room_templates where event_id = $1", [duplicate.rows[0].id])).rows[0].count).toBe(2);
-    await asRole(db, "service_role", tx => tx.query("select public.calendar_remove_event_draft($1, $2, $3)", [reference, sessions[0], duplicate.rows[0].id]));
+    await asRole(db, "service_role", tx => tx.query("select public.calendar_remove_event_draft($1, $2, $3, 1)", [reference, sessions[0], duplicate.rows[0].id]));
     await expect(asRole(db, "service_role", tx => tx.query(
       "select public.calendar_save_event_draft($1, $2, $3, $4::jsonb)", [reference, sessions[1], result.rows[0].id, JSON.stringify(event)],
     ))).rejects.toMatchObject({ code: "RAR09" });
@@ -120,7 +120,7 @@ describe("planner portal security foundations", () => {
     ));
     await expect(asRole(db, "service_role", tx => tx.query("select public.calendar_submit_plan($1, $2, '', false)", [reference, sessions[0]])))
       .rejects.toMatchObject({ code: "RAR09" });
-    await asRole(db, "service_role", tx => tx.query("select public.calendar_remove_event_draft($1, $2, $3)", [reference, sessions[0], result.rows[0].id]));
+    await asRole(db, "service_role", tx => tx.query("select public.calendar_remove_event_draft($1, $2, $3, 1)", [reference, sessions[0], result.rows[0].id]));
   });
 
   it("keeps unavailable selections visible and requires correction before submission", async () => {

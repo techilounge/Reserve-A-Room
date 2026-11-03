@@ -85,11 +85,12 @@ export async function submitPlannerPlan(form: FormData) {
 export async function removePlannerDraft(form: FormData) {
   const { plan, hash } = await plannerCredentials(form);
   const id = String(form.get("event") ?? "");
-  if (!UUID.test(id)) redirect(`/calendar-plan/${plan}?error=save`);
+  const version = Number(form.get("draft_version"));
+  if (!UUID.test(id) || !Number.isSafeInteger(version) || version < 1) redirect(`/calendar-plan/${plan}?error=save`);
   const { error } = await createSupabaseServiceClient().rpc("calendar_remove_event_draft", {
-    p_plan_id: plan, p_session_hash: hash, p_event_id: id,
+    p_plan_id: plan, p_session_hash: hash, p_event_id: id, p_expected_version: version,
   });
-  if (error) redirect(`/calendar-plan/${plan}?error=save`);
+  if (error) redirect(`/calendar-plan/${plan}?error=${error.message === "Event cannot be removed from this plan." ? "stale" : "save"}`);
   redirect(`/calendar-plan/${plan}`);
 }
 
@@ -112,6 +113,15 @@ export async function savePlannerDraft(_previous: { error: string }, form: FormD
   const optionalNumber = (name: string) => value(name) ? Number(value(name)) : null;
   const frequency = value("frequency") || null;
   const kind = value("kind");
+  const allDay = form.has("all_day");
+  const dateIds = form.getAll("date_id").map(String);
+  const dateStarts = form.getAll("date_start").map(String);
+  const dateEnds = form.getAll("date_end").map(String);
+  const dateStartTimes = form.getAll("date_start_time").map(String);
+  const dateEndTimes = form.getAll("date_end_time").map(String);
+  if (kind === "specific_dates" && [dateStarts, dateEnds, dateStartTimes, dateEndTimes].some(values => values.length !== dateIds.length)) {
+    return { error: "Check the selected dates and try again." };
+  }
   const data = {
     draft_version: optionalNumber("draft_version"), title: value("title"), description: value("description"), public_description: value("public_description"),
     category: value("category"), scope: value("scope"), protection: value("protection"), visibility: value("visibility"),
@@ -119,7 +129,7 @@ export async function savePlannerDraft(_previous: { error: string }, form: FormD
     estimated_attendance: Number(value("estimated_attendance")), food_drinks_planned: form.has("food_drinks_planned"),
     setup_minutes: Number(value("setup_minutes") || 0), cleanup_minutes: Number(value("cleanup_minutes") || 0),
     public_contact_name: value("public_contact_name"), public_contact_email: value("public_contact_email"), requester_notes: value("requester_notes"),
-    schedule: { kind, timezone: value("timezone"), start_date: value("start_date"), end_date: value("end_date"),
+    schedule: { kind, timezone: value("timezone"), all_day: allDay, start_date: value("start_date"), end_date: value("end_date"),
       start_time: value("start_time"), end_time: value("end_time"), frequency: kind === "recurring" ? frequency : null,
       interval_count: kind === "recurring" ? optionalNumber("interval_count") : null,
       weekdays: kind === "recurring" && frequency === "weekly" ? form.getAll("weekdays").map(Number) : null,
@@ -128,7 +138,8 @@ export async function savePlannerDraft(_previous: { error: string }, form: FormD
       month_ordinal: kind === "recurring" && frequency === "yearly_nth_weekday" ? optionalNumber("month_ordinal") : null,
       day_of_month: kind === "recurring" && ["monthly_day", "yearly_date"].includes(frequency ?? "") ? optionalNumber("day_of_month") : null,
       month_of_year: kind === "recurring" && ["yearly_date", "yearly_nth_weekday"].includes(frequency ?? "") ? optionalNumber("month_of_year") : null },
-    dates: kind === "specific_dates" ? value("dates").split(/[\s,]+/).filter(Boolean) : [],
+    dates: kind === "specific_dates" ? dateIds.map((id, i) => ({ id, start_date: dateStarts[i], end_date: dateEnds[i],
+      start_time: allDay ? "" : dateStartTimes[i], end_time: allDay ? "" : dateEndTimes[i] })) : [],
     rooms: form.getAll("rooms").map(String), ministries: form.getAll("ministries").map(String),
     resources: form.getAll("resources").map(String).map(resource => ({ id: resource, quantity: Number(value(`resource_quantity_${resource}`) || 1), notes: value(`resource_notes_${resource}`) })),
   };
@@ -141,7 +152,7 @@ export async function savePlannerDraft(_previous: { error: string }, form: FormD
       return { error: "Another planner changed this event, or it is no longer editable. Copy any unsaved text before refreshing." };
     }
     const safeMessages = ["Schedule dates or timezone are invalid.", "Choose dates for the selected schedule.",
-      "The recurrence rule is incomplete.", "Selected date is outside the schedule.", "Weekdays must be unique.",
+      "The recurrence rule is incomplete.", "Selected date is outside the schedule.", "Selected date is not editable.", "Duplicate selected date identity.", "Weekdays must be unique.",
       "Weeks of the month must be unique.", "Room unavailable.", "Resource unavailable.", "Ministry unavailable.",
       "This plan has been submitted."];
     return { error: safeMessages.includes(error.message) ? error.message : "Check your event details and dates, then try again. Your entries are still here." };

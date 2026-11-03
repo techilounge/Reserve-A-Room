@@ -793,6 +793,15 @@ submission reads and change requests require an active staff profile. A planner 
 revokes only its current session. No conflict engine, occurrence materialization or
 allocation is implemented in this phase.
 
+The Phase 2 review migration `20261031100000_calendar_phase2_review_fixes.sql`
+preserves selected-date row IDs across edits, tombstones removed dates, snapshots their
+local date/time bounds and logical IDs, and stores an explicit all-day flag. A submitted
+event withdrawn during a requested revision is soft-removed from future submissions;
+earlier snapshots and audit entries remain. Historical dates whose old row was already
+deleted cannot recover their original ID and are assigned a new snapshot identity.
+Planner notification of change requests and submission notifications remain mandatory
+before production release, along with the legal review and policy gate approval.
+
 Per-person invitation tokens are HMAC-derived from a random seed using a dedicated
 server secret; only the seed and token hash are stored. A non-consuming GET is followed
 by a same-origin Server Action, a fail-closed IP/reference rate limit and a service-only

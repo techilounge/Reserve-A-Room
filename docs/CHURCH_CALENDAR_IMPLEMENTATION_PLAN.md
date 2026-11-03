@@ -1,8 +1,27 @@
 # Church Calendar — Phase 0 architecture and implementation plan
 
-**Checkpoint — 2026-10-30:** The reviewer approved Phase 1 at `dbee565098f583d5462ed6edfe99f6460aae17ce` and authorized **Phase 2** on the existing `codex/church-calendar-phase1` branch. Phase 2 must stop for owner review before Phase 3. No merge to `main` or production deployment is authorized. The branch is based on `main` commit `1f287eecb0979f40339011a49ab3b99508ec6514`; the mixed security remediation in `03b721c` remains separate. See `docs/CHURCH_CALENDAR_PHASE1_REVIEW.md` and the handoff below.
+**Checkpoint:** The reviewer approved Phase 1 at `dbee565098f583d5462ed6edfe99f6460aae17ce` and reviewed Phase 2 at `a7ea4589029d35cc4cc2d0952ea8e00f8c77e4ff`. Phase 2 is **not yet approved**; three targeted fixes must be reviewed before Phase 3. Work remains on `codex/church-calendar-phase1` based on `main` commit `1f287eecb0979f40339011a49ab3b99508ec6514`; the mixed `03b721c` security work remains separate. No merge or production rollout is authorized.
 
 ### Phase 2 implementation handoff
+
+- Review remediation appends `20261031100000_calendar_phase2_review_fixes.sql`:
+  previously submitted events can be soft-withdrawn during a revision; their last
+  submitted snapshot stays visible to staff until resubmission and remains immutable
+  thereafter. Withdrawal also checks the event's draft version so a stale form cannot
+  discard another planner's newer edits. Specific-date entry IDs are retained across edits and removals are
+  tombstoned; individual date entries have their own start/end dates and times.
+  All-day schedules retain an explicit flag in drafts and snapshots and do not
+  require wall-clock times. Existing data is backfilled; a previously destroyed
+  historical date identity cannot be reconstructed and receives a new stable ID.
+- The reviewer requires a complete Playwright run against the **exact final commit**,
+  after all changes and before pushing. Run typecheck, lint, unit and database tests,
+  a production build, and the entire Playwright suite on that same SHA. If a fix or
+  documentation edit changes the commit, rerun the complete verification on the new
+  SHA; record results in the response without amending the verified commit afterward.
+- Submission and change-request notifications are a **production release blocker**:
+  implement and verify branded delivery to planners and staff before release. Keep the
+  existing policy gate disabled until church owner/legal approval of the legal wording.
+  Primary/Secondary uniqueness remains a non-blocking owner decision.
 
 - `20261030100000_calendar_planning_portal.sql` appends private planning events,
   typed schedules and request templates plus immutable per-submission snapshots;
@@ -223,4 +242,4 @@ These are recommendations and phase-specific decisions, not newly approved polic
 11. **Website sources:** determine whether the public website calendars share a source and verify plugin/API permissions before Phase 10.
 12. **Security workstream sequencing:** review its independent branch and preview/migration requirements before adopting it as a deployed calendar dependency; no production deploy is implied by this proposal.
 
-**Next action:** submit the Phase 2 branch for owner/reviewer review. Do not begin Phase 3, merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.
+**Next action:** verify and push the final remediation SHA, then stop for the reviewer's narrow Phase 2 re-review. Do not begin Phase 3, merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.

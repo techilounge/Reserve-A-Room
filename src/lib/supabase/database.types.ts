@@ -323,6 +323,7 @@ export type Database = {
           month_ordinal: number | null;
           day_of_month: number | null;
           month_of_year: number | null;
+          all_day: boolean;
         };
         Insert: {
           event_id: string;
@@ -340,6 +341,7 @@ export type Database = {
           month_ordinal?: number | null;
           day_of_month?: number | null;
           month_of_year?: number | null;
+          all_day?: boolean;
         };
         Update: {
           event_id?: string;
@@ -357,6 +359,7 @@ export type Database = {
           month_ordinal?: number | null;
           day_of_month?: number | null;
           month_of_year?: number | null;
+          all_day?: boolean;
         };
         Relationships: [
           {
@@ -396,8 +399,8 @@ export type Database = {
           timezone: string;
           start_date: string;
           end_date: string;
-          start_time: string;
-          end_time: string;
+          start_time: string | null;
+          end_time: string | null;
           frequency: string | null;
           interval_count: number | null;
           weekdays: number[] | null;
@@ -406,6 +409,7 @@ export type Database = {
           month_ordinal: number | null;
           day_of_month: number | null;
           month_of_year: number | null;
+          all_day: boolean;
         };
         Insert: {
           id?: string;
@@ -434,8 +438,8 @@ export type Database = {
           timezone: string;
           start_date: string;
           end_date: string;
-          start_time: string;
-          end_time: string;
+          start_time?: string | null;
+          end_time?: string | null;
           frequency?: string | null;
           interval_count?: number | null;
           weekdays?: number[] | null;
@@ -444,6 +448,7 @@ export type Database = {
           month_ordinal?: number | null;
           day_of_month?: number | null;
           month_of_year?: number | null;
+          all_day?: boolean;
         };
         Update: {
           id?: string;
@@ -472,8 +477,8 @@ export type Database = {
           timezone?: string;
           start_date?: string;
           end_date?: string;
-          start_time?: string;
-          end_time?: string;
+          start_time?: string | null;
+          end_time?: string | null;
           frequency?: string | null;
           interval_count?: number | null;
           weekdays?: number[] | null;
@@ -482,6 +487,7 @@ export type Database = {
           month_ordinal?: number | null;
           day_of_month?: number | null;
           month_of_year?: number | null;
+          all_day?: boolean;
         };
         Relationships: [
           {
@@ -805,16 +811,28 @@ export type Database = {
           id: string;
           event_id: string;
           local_date: string;
+          local_end_date: string;
+          local_start_time: string | null;
+          local_end_time: string | null;
+          removed_at: string | null;
         };
         Insert: {
           id?: string;
           event_id: string;
           local_date: string;
+          local_end_date: string;
+          local_start_time?: string | null;
+          local_end_time?: string | null;
+          removed_at?: string | null;
         };
         Update: {
           id?: string;
           event_id?: string;
           local_date?: string;
+          local_end_date?: string;
+          local_start_time?: string | null;
+          local_end_time?: string | null;
+          removed_at?: string | null;
         };
         Relationships: [
           {
@@ -830,14 +848,26 @@ export type Database = {
         Row: {
           submission_id: string;
           local_date: string;
+          logical_date_id: string;
+          local_end_date: string;
+          local_start_time: string | null;
+          local_end_time: string | null;
         };
         Insert: {
           submission_id: string;
           local_date: string;
+          logical_date_id: string;
+          local_end_date: string;
+          local_start_time?: string | null;
+          local_end_time?: string | null;
         };
         Update: {
           submission_id?: string;
           local_date?: string;
+          logical_date_id?: string;
+          local_end_date?: string;
+          local_start_time?: string | null;
+          local_end_time?: string | null;
         };
         Relationships: [
           {
@@ -1931,7 +1961,7 @@ export type Database = {
         Returns: Json;
       };
       calendar_remove_event_draft: {
-        Args: { p_plan_id: string; p_session_hash: string; p_event_id: string };
+        Args: { p_plan_id: string; p_session_hash: string; p_event_id: string; p_expected_version: number };
         Returns: undefined;
       };
       calendar_request_plan_changes: {

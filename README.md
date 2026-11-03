@@ -146,6 +146,11 @@ The planner policy gate defaults to disabled; the proposed text in
 `docs/CHURCH_CALENDAR_LEGAL_DRAFT.md` is for owner/legal review only. Do not
 enable the gate or publish revised terms until they have been approved. Phase 2
 is for branch review and must not be deployed to production yet.
+Selected dates can have individual start and end dates and times, and all-day
+events do not require times. When staff request changes, planners can withdraw a
+previously submitted event from the next revision; the earlier submission is retained.
+Branded notifications for submissions and change requests must be implemented and
+verified before a production release.
 
 For an isolated local or preview environment, configure a separate Supabase project,
 apply `20261029100000_church_calendar_phase1.sql` after all preceding migrations, and

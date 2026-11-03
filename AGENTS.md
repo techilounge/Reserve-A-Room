@@ -220,6 +220,21 @@ Verification completed for that fix before commit:
 
 ## Church Calendar Phase 2 checkpoint — 2026-10-30
 
+- Reviewer decision: **Phase 2 is not yet approved** at `a7ea458`; address soft
+  withdrawal, stable specific-date identities/per-date times and all-day events,
+  then run the complete suite against the exact final committed SHA before pushing.
+  Stop for re-review; do not begin Phase 3, merge or deploy. Branded submission and
+  change-request emails are a production release blocker, and legal approval is still
+  required before enabling the planner policy gate. Primary/Secondary uniqueness is
+  an open, non-blocking owner decision.
+- The remediation uses append-only migration `20261031100000_calendar_phase2_review_fixes.sql`.
+  Specific-date IDs survive edits; removals are tombstoned; snapshots retain date IDs,
+  local date/time details and all-day status. Previously submitted events may be
+  withdrawn only when changes are requested, with a draft-version check, preserving
+  prior snapshots and audit.
+  The full exact-SHA verification results belong in the handoff response; do not amend
+  the reviewed commit after testing without repeating verification on the new SHA.
+
 - The owner approved corrected Phase 0 and Phase 1 and authorized Phase 2. The detailed
   specification is `docs/CHURCH_CALENDAR_IMPLEMENTATION_PLAN.md`.
 - Work on `codex/church-calendar-phase1`, based on verified main `1f287ee`; keep the

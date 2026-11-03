@@ -13,10 +13,10 @@ export const CHURCH_TZ = "America/Chicago";
 export type Queryable = Pick<PGlite, "query" | "exec"> | Transaction;
 
 /** Fresh database with the Supabase stub and every migration applied, in order. */
-export async function createTestDb(): Promise<PGlite> {
+export async function createTestDb(throughMigration?: string): Promise<PGlite> {
   const db = await PGlite.create({ extensions: { btree_gist, pg_trgm } });
   await db.exec(readFileSync(path.join(import.meta.dirname, "supabase-stub.sql"), "utf8"));
-  const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql")).sort();
+  const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql") && (!throughMigration || f <= throughMigration)).sort();
   for (const file of files) {
     try {
       await db.exec(readFileSync(path.join(MIGRATIONS_DIR, file), "utf8"));
