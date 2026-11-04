@@ -182,6 +182,16 @@ test("a Super Admin configures a cycle and independently rotates one planner's a
     await expect(planner.getByText(/All day test · CAL-.*All day/)).toBeVisible();
     await planner.getByRole("button", { name: "Submit plan" }).click();
     await expect(planner.getByRole("status")).toContainText("submitted");
+    const conflictPage = await staff.newPage();
+    await conflictPage.goto("/admin/calendar-conflicts");
+    await expect(conflictPage.getByRole("heading", { name: "Conflict Center" })).toBeVisible();
+    const warning = conflictPage.getByRole("listitem").filter({ hasText: "Events from the same ministry overlap" }).first();
+    await expect(warning).toBeVisible();
+    await warning.getByRole("combobox", { name: "Event acknowledged" }).selectOption({ index: 1 });
+    await warning.getByLabel("Reason").fill("Ministry confirmed the overlap");
+    await warning.getByRole("button", { name: "Record decision" }).click();
+    await expect(conflictPage.getByRole("status")).toContainText("Decision recorded");
+    await conflictPage.close();
     const submissions = await staff.newPage();
     await submissions.goto("/admin/calendar-submissions");
     const submitted = submissions.locator("li").filter({ hasText: "Planning browser test" }).first();

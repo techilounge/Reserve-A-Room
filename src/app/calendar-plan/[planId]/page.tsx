@@ -43,6 +43,7 @@ export default async function PlannerInvitationPage({ params, searchParams }: {
   let context: Context | null = null;
   let policy: Policy | null = null;
   let portal: Portal | null = null;
+  let conflictEvents: Set<string> | null = null;
   const session = (await cookies()).get("calendar_planner")?.value;
   if (validPlan && session && TOKEN.test(session) && !search.token) {
     const { data } = await createSupabaseServiceClient().rpc("calendar_planner_session_context", {
@@ -59,6 +60,12 @@ export default async function PlannerInvitationPage({ params, searchParams }: {
           p_plan_id: planId, p_session_hash: hashPlannerBearer(session),
         });
         portal = portalData as Portal | null;
+        if (portal?.revision) {
+          const { data: conflicts } = await createSupabaseServiceClient().rpc("calendar_planner_conflicts", {
+            p_plan_id: planId, p_session_hash: hashPlannerBearer(session),
+          });
+          if (conflicts) conflictEvents = new Set(conflicts.map(conflict => conflict.event_id));
+        }
       }
     }
   }
@@ -92,11 +99,13 @@ export default async function PlannerInvitationPage({ params, searchParams }: {
           </form> : portal ? <section className="space-y-4" aria-label="Your calendar plan">
             <p>Requests are proposals; rooms and resources are not reserved until approved.</p>
             <p>Plan status: {portal.status.replaceAll("_", " ")} {portal.revision ? `(submission ${portal.revision})` : ""}</p>
+            {portal.revision && conflictEvents === null ? <p role="alert">Review information is temporarily unavailable. Contact the church office if you need help.</p> : null}
             <p>{portal.events.length} event(s) · {portal.events.filter(isReady).length} ready · {portal.events.filter(event => !isReady(event)).length} need attention</p>
             {portal.changes_requested_reason ? <p>Changes requested: {portal.changes_requested_reason}</p> : null}
             {search.submitted ? <p role="status">Your plan was submitted to the church office.</p> : null}
             {portal.events.length ? <ul className="space-y-3">{portal.events.map(event => <li key={event.id}>
               <details><summary>{event.title} · {event.reference_code} · {isReady(event) ? "Ready" : "Needs attention"} · {event.schedule.start_date ?? "Date needed"}{event.schedule.all_day ? " · All day" : event.schedule.kind === "specific_dates" ? " · Times vary" : ` ${event.schedule.start_time?.slice(0, 5) ?? ""}–${event.schedule.end_time?.slice(0, 5) ?? ""}`}</summary>
+                {conflictEvents?.has(event.id) ? <p>Some dates or requests need church office review. Contact the office for help.</p> : null}
                 <p>Requested rooms: {event.rooms.map(id => portal.rooms.find(room => room.id === id)?.name ?? "Unavailable room").join(", ") || "None"}</p>
                 <Link className="underline" href={`/calendar-plan/${planId}/occurrences/${event.id}`}>View dates and requests</Link>
                 {portal.status !== "submitted" ? <EventForm plan={planId} timezone={context.timezone} catalog={portal} event={event} /> : <p>Submitted for review.</p>}

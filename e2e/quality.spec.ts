@@ -29,6 +29,7 @@ const ADMIN_PAGES = [
   "/admin/reservations/new",
   "/admin/calendar",
   "/admin/calendar-submissions",
+  "/admin/calendar-conflicts",
   "/admin/notifications",
   "/admin/recurring-requests",
   "/admin/recurring-guide",

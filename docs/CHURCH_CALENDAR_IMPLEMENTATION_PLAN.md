@@ -1,6 +1,25 @@
 # Church Calendar — Phase 0 architecture and implementation plan
 
-**Checkpoint:** The reviewer requires a targeted Phase 4 fix after reviewing `6953d3a6f0da06b83bf4dee05eee19e3466846c5`. Work remains on `codex/church-calendar-phase1` based on `main` commit `1f287eecb0979f40339011a49ab3b99508ec6514`; the mixed `03b721c` security work remains separate. Stop for Phase 4 re-review. No Phase 5, merge or production rollout is authorized.
+**Checkpoint:** The reviewer approved Phase 4 at `47985dbe40c2d10499d6a69e502e5ea9a304ae12` and authorized Phase 5. Work remains on `codex/church-calendar-phase1` based on `main` commit `1f287eecb0979f40339011a49ab3b99508ec6514`; the mixed `03b721c` security work remains separate. Stop for Phase 5 review. No Phase 6, merge or production rollout is authorized.
+
+### Phase 5 conflict foundations
+
+- `20261106100000_church_calendar_conflicts.sql` distinguishes hard operational and
+  policy blocks from planning conflicts and attendance/capacity warnings, using the
+  current immutable submitted snapshots, confirmed resource allocations and existing
+  reservations. On-site exclusivity covers the property and full occupancy, but not
+  offsite/virtual events; church-wide scope alone never implies exclusivity. A Super
+  Admin can adjust the large-event threshold, initially 100; room capacity remains a
+  separate warning. Planner conflict guidance is scoped and non-identifying.
+- Staff decisions record an event and reason against a fingerprint of the current
+  submitted/operational facts and policy revision; hard blocks cannot be decided away.
+  Phase 5 does not approve an event, allocate resources, or create room reservations.
+  Since no approved calendar-event state exists yet, Phase 6 must add its operational
+  exclusivity comparisons and revalidate all decisions in the approval transaction.
+- The current conflict query considers every active submitted occurrence and the staff
+  list is unpaginated. Profile realistic full-cycle workloads and introduce bounded
+  querying/pagination where needed before release; the present tests do not establish
+  performance at the maximum supported planning scale.
 
 - Review follow-up: migration `20261105100000_calendar_active_plan_resource_demand.sql`
   excludes inactive plans from provisional demand and retains active
@@ -124,7 +143,7 @@
 - Limitations to verify before release: real Resend delivery, deployment request-log/query-string redaction, and genuinely concurrent Postgres transactions (PGlite serializes its local connection). No production deployment or hosted migration has occurred. Stop for owner review after Phase 1; legal language requires owner/legal approval before the Phase 2 portal is released.
 - The Phase 1 migration was changed in place only because it has not been applied to a hosted database. Once it is applied, use append-only migrations. Phase 2 review follow-ups: ask the owner whether Primary and Secondary are descriptive labels or must be unique (the reviewer recommends one of each and up to three Additional planners); provide an explicit planner Sign Out action for shared computers. These are not Phase 1 blockers and must not be implemented before Phase 2 is authorized.
 
-**Owner decisions:** cycle maximum three years; architectural occurrence maximum 1,200 for Phase 3; each plan allows at most **five active, unexpired, unrevoked independently managed planners**, including primary, secondary and additional contacts. Revoked or expired grants do not count. Only Super Admin may reopen a cycle, with a required audited reason. Exclusivity coverage and large-event thresholds remain deferred to Phase 5; overnight, outside-hours and non-grid exceptions are disabled pending Phase 6 policy; public cancellation policy remains deferred to Phase 9. Plan per-planner/per-version first-access acknowledgment, with legal review of draft terms before Phase 2 release. WordPress writes are out of scope.
+**Owner decisions:** cycle maximum three years; architectural occurrence maximum 1,200 for Phase 3; each plan allows at most **five active, unexpired, unrevoked independently managed planners**, including primary, secondary and additional contacts. Revoked or expired grants do not count. Only Super Admin may reopen a cycle, with a required audited reason. The Phase 5 review supplied initial on-site occupancy exclusivity and a configurable large-event threshold of 100; overnight, outside-hours and non-grid exceptions are disabled pending Phase 6 policy; public cancellation policy remains deferred to Phase 9. Plan per-planner/per-version first-access acknowledgment, with legal review of draft terms before Phase 2 release. WordPress writes are out of scope.
 
 **Repository at start of correction:** `codex/church-calendar-management` was clean at `03b721c00a2f8debc23603d9d663a0b6d8636c7e`; local `main`, `origin/main`, and the read-only GitHub `main` query all resolved to `1f287eecb0979f40339011a49ab3b99508ec6514`. The branch was **one commit ahead and zero behind** that main. `03b721c` combines this Phase 0 plan/ADR and handoff with unrelated dependency, Auth, abuse-control, email, cron, UI, test and migration changes. The same SHA was pushed to `preview/security-remediations-2026-10-27`, which Vercel reported as a successful Preview build; that does not prove the migration exists on the preview database or that runtime email is ready. The security migration `20261027100000_email_delivery_retry_guard.sql` is in the branch, but no hosted migration or production deployment was confirmed in this correction.
 
@@ -218,7 +237,7 @@ The staff Conflict Center labels hard operational/policy blocks, unresolved plan
 | Approved calendar event's linked active room reservation | Hard operational room conflict | Blocks; do not double-count its occurrence and reservation. |
 | Other active proposal(s) for same resource | Provisional resource planning conflict when combined concurrent demand exceeds capacity | Staff decision/priority or change required; no confirmed allocation yet. |
 | Confirmed allocation(s) | Hard operational resource conflict if confirmed demand plus this request exceeds capacity at any instant | Blocks until capacity/request/time changes. |
-| Proposed exclusive event or proposal requesting exclusivity | Planning conflict if the approved exclusivity policy says they overlap | Decision required; exact coverage remains an owner decision before Phase 5. |
+| Proposed exclusive event or proposal requesting exclusivity | Planning conflict for overlapping on-site occupancy | Decision required under the initial property-wide on-site policy. |
 | Approved exclusive event or an exclusive candidate versus an approved event | Hard block if the approved exclusivity policy covers the pair | Blocks; never assume all offsite, public, or church-wide events are covered without policy. |
 | Same-ministry event | Soft warning | Record a reason tied to the current fingerprint if proceeding. |
 | Church-wide event overlapping another church-wide event | Soft warning, unless explicitly exclusive and covered by policy | Record a reason, or block when an approved exclusive applies. |
@@ -228,7 +247,7 @@ The staff Conflict Center labels hard operational/policy blocks, unresolved plan
 
 For quantities, calculate **confirmed capacity** and **provisional demand** separately. Sweep sorted occupancy endpoints for each resource using `[start,end)` semantics (process end before start at the same instant): confirmed allocations form baseline demand; add the effective requested quantities of participating proposals for planning warnings. Flag intervals where the combined concurrent sum exceeds `available_quantity`; do not sum disjoint intervals that merely each overlap a long candidate. On approval ignore other provisional demands for the hard physical check, but require their planning decisions, lock resource rows in stable order, recompute confirmed demand plus the candidate, and allocate only if capacity remains. Two candidate approvals racing for one van must yield exactly one allocation; planning warnings never reserve capacity.
 
-`scope` answers what kind of activity an event is (`ministry`, `church_wide`, `administrative`, `community`); `protection` is only `normal` or `exclusive`. Church-wide does not imply exclusivity. The provisional exclusive rule is a hard block against another approved, covered Church Calendar event with overlapping **owner-selected event or occupancy range**. Whether coverage means all events, on-site only, entire property, particular scopes or another policy is explicitly undecided; do not hard-code it before owner decision in Phase 5. Proposed-versus-proposed exclusive overlaps remain planning decisions until a winner is approved. Overrides for soft/planning decisions include conflict type, normalized identities and both revision fingerprints; they cannot override hard conflicts.
+`scope` answers what kind of activity an event is (`ministry`, `church_wide`, `administrative`, `community`); `protection` is only `normal` or `exclusive`. Church-wide does not imply exclusivity. The initial Phase 5 policy covers on-site Church Calendar events across the property, using the full occupancy range; offsite and virtual events are excluded. Proposed-versus-proposed exclusive overlaps remain planning decisions until a winner is approved. Phase 6 must enforce the corresponding hard block for approved events. Overrides for soft/planning decisions include conflict type, normalized identities and both revision fingerprints; they cannot override hard conflicts.
 
 `approve_calendar_event(event_id, expected_revision, decisions)` is an authenticated SECURITY DEFINER RPC with empty search path, fully qualified names and `private.require_staff()`. It locks and rechecks current revision, state, occurrences, policy and conflicts; locks requested rooms/resources in stable order; creates all approved room holds, allocations, audit/notification rows and email outbox rows; sets event approval and recalculates plan; and commits atomically. Any failed insert, exclusion violation, quantity shortage or stale decision rolls back the entire event including earlier holds. Two competing room approvals are settled by the existing exclusion constraint. For quantities, serialize *all* allocation, release, approved-edit and resource-quantity changes on each resource row; after locking, recompute concurrent demand using an endpoint sweep across overlapping `[)` ranges (not a naive sum of all individually overlapping bookings, which can overcount disjoint periods). A subsequent transaction sees the committed allocations. Use real parallel PostgreSQL connections for race tests; PGlite alone may not prove concurrency.
 
@@ -289,8 +308,8 @@ These are recommendations and phase-specific decisions, not newly approved polic
 
 1. **Cycle length:** owner approved a maximum of three years for Phase 1.
 2. **Occurrences:** owner approved 1,200 per event as the architectural default for Phase 3.
-3. **Exclusive scope and range:** whole property, all church events, on-site events only, specific scopes, and event versus occupancy range; decide before Phase 5. Church-wide alone is never automatically exclusive.
-4. **Large-event warning:** attendance threshold and shared-audience criteria; decide before Phase 5.
+3. **Exclusive scope and range:** initial policy is all on-site Church Calendar events across the property, using occupancy; offsite/virtual events are excluded. Church-wide alone is never automatically exclusive.
+4. **Large-event warning:** configurable threshold, initially 100; shared-audience criteria remain a future decision.
 5. **Overnight occupancy:** owner chose disabled by default; decide whether an authorized exception exists and how continuous holds work before Phase 6.
 6. **Outside normal hours and non-grid times:** disabled by default; distinguish public booking hours from building access, and decide whether a separate override/actor/reason is required before Phase 6.
 7. **Planner contacts:** owner approved independent primary, secondary and additional grants, up to five active planners per plan; revoked or expired grants do not count.
@@ -300,4 +319,4 @@ These are recommendations and phase-specific decisions, not newly approved polic
 11. **Website sources:** determine whether the public website calendars share a source and verify plugin/API permissions before Phase 10.
 12. **Security workstream sequencing:** review its independent branch and preview/migration requirements before adopting it as a deployed calendar dependency; no production deploy is implied by this proposal.
 
-**Next action:** verify and push Phase 4, then stop for reviewer approval. Do not begin Phase 5, merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.
+**Next action:** verify and push Phase 5, then stop for reviewer approval. Do not begin Phase 6, merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.

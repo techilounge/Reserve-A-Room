@@ -147,6 +147,51 @@ export type Database = {
           },
         ];
       };
+      calendar_conflict_decisions: {
+        Row: {
+          id: string;
+          fingerprint: string;
+          conflict_type: string;
+          selected_event_id: string;
+          reason: string;
+          decided_by: string;
+          decided_at: string;
+        };
+        Insert: {
+          id?: string;
+          fingerprint: string;
+          conflict_type: string;
+          selected_event_id: string;
+          reason: string;
+          decided_by: string;
+          decided_at?: string;
+        };
+        Update: {
+          id?: string;
+          fingerprint?: string;
+          conflict_type?: string;
+          selected_event_id?: string;
+          reason?: string;
+          decided_by?: string;
+          decided_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_conflict_decisions_decided_by_fkey";
+            columns: ["decided_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_conflict_decisions_selected_event_id_fkey";
+            columns: ["selected_event_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_events";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       calendar_cycles: {
         Row: {
           id: string;
@@ -2367,6 +2412,14 @@ export type Database = {
         Args: never;
         Returns: { id: string; name: string; category: string; description: string; available_quantity: number }[];
       };
+      calendar_conflict_policy_get: {
+        Args: never;
+        Returns: { large_event_threshold: number; revision: number }[];
+      };
+      calendar_conflict_policy_save: {
+        Args: { p_threshold: number };
+        Returns: undefined;
+      };
       calendar_duplicate_event_draft: {
         Args: { p_plan_id: string; p_session_hash: string; p_event_id: string };
         Returns: string;
@@ -2382,6 +2435,14 @@ export type Database = {
       calendar_invitation_delivery_status: {
         Args: never;
         Returns: { grant_id: string; status: Database["public"]["Enums"]["email_status"]; error_message: string; attempted_at: string }[];
+      };
+      calendar_list_conflicts: {
+        Args: never;
+        Returns: { fingerprint: string; classification: string; conflict_type: string; event_id: string; other_event_id: string; occurrence_id: string; starts_at: string; ends_at: string; timezone: string; details: Json; selected_event_id: string; reason: string; decided_at: string }[];
+      };
+      calendar_planner_conflicts: {
+        Args: { p_plan_id: string; p_session_hash: string };
+        Returns: { event_id: string; classification: string; conflict_type: string; starts_at: string; ends_at: string }[];
       };
       calendar_planner_occurrences: {
         Args: { p_plan_id: string; p_session_hash: string; p_event_id: string };
@@ -2402,6 +2463,10 @@ export type Database = {
       calendar_planner_session_context: {
         Args: { p_plan_id: string; p_session_hash: string };
         Returns: Json;
+      };
+      calendar_record_conflict_decision: {
+        Args: { p_fingerprint: string; p_selected_event: string; p_reason: string };
+        Returns: undefined;
       };
       calendar_remove_event_draft: {
         Args: { p_plan_id: string; p_session_hash: string; p_event_id: string; p_expected_version: number };

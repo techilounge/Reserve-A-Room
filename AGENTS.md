@@ -218,7 +218,28 @@ Verification completed for that fix before commit:
 - Verification: typecheck and lint passed with no warnings; 33 unit-test files / 227 tests passed; 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 103/103. A restored-state check at 1000px, 320px and in dark mode showed no axe violations and no horizontal overflow.
 - Status: committed locally; not yet pushed or deployed.
 
-## Church Calendar Phase 4 checkpoint — 2026-11-03
+## Church Calendar Phase 5 checkpoint — 2026-11-03
+
+- Phase 4 was approved at `47985dbe40c2d10499d6a69e502e5ea9a304ae12`; Phase 5
+  conflicts are authorized on `codex/church-calendar-phase1`. Use the reviewer's
+  initial policy: exclusive on-site church events cover the property for the full
+  setup/event/cleanup occupancy; offsite and virtual events are excluded. Scope
+  `church_wide` is not itself exclusive. The large-event warning defaults to 100
+  attendees and is configurable by a Super Admin; room-capacity warnings are separate.
+- Phase 5 appends `20261106100000_church_calendar_conflicts.sql`, adds the staff
+  Conflict Center and non-identifying planner guidance. Operational/policy hard blocks,
+  provisional planning conflicts and warnings are distinct; staff decisions identify
+  a selected event and reason, are fingerprinted to current inputs, and cannot override
+  hard blocks. No approval or room-reservation creation is exposed. Existing schema has
+  no approved Church Calendar event state; Phase 6 must extend and recheck operational
+  approved-event/exclusivity handling inside its atomic approval transaction.
+- Conflict queries currently compute all active submitted occurrences and the staff
+  screen is not paginated. Profile representative full-cycle workloads and add bounded
+  querying/pagination as needed before production release; small test fixtures do not
+  establish production-scale performance.
+- Verify all checks and the complete browser suite on the final commit, push only the
+  existing review branch, and stop for review before Phase 6. No production deployment,
+  hosted migration, policy publication, or external notification is authorized.
 
 - The reviewer withheld Phase 4 approval at `6953d3a6f0da06b83bf4dee05eee19e3466846c5`
   because removed ministries still counted as provisional resource demand. Follow-up
@@ -228,11 +249,11 @@ Verification completed for that fix before commit:
   allocate its old requests until a fresh revision is submitted. Confirmed allocations
   remain counted and historical snapshots are unchanged. Run the full gates and the
   real PostgreSQL races on the final review commit, push this branch, and stop for the
-  narrow Phase 4 re-review. Phase 5 still requires reviewer authorization; exclusive
-  event coverage and the large-event warning threshold remain owner decisions.
+  narrow Phase 4 re-review. That re-review approved Phase 4 and authorized Phase 5
+  using the initial exclusivity and warning policies described above.
 - Phase 3 was approved at `ba4428d07227034d1e36254806f1726b44ce3524`; Phase 4
   resources are authorized on `codex/church-calendar-phase1`. Stop for review before
-  Phase 5; do not merge, deploy, run hosted migrations, expose event approval, create
+  Phase 6; do not merge, deploy, run hosted migrations, expose event approval, create
   room reservations, or build the Conflict Center.
 - Phase 4 appends `20261104100000_church_calendar_resources.sql`: Super Admin
   configuration locks a resource and prevents quantity reductions below peak confirmed
@@ -273,7 +294,7 @@ Verification completed for that fix before commit:
 
 - Historical review at `a7ea458` required soft withdrawal, stable specific-date
   identities/per-date times and all-day events. Those fixes were approved at `a7d5886`.
-  Stop before Phase 5; do not merge or deploy. Branded submission and
+  Stop before Phase 6; do not merge or deploy. Branded submission and
   change-request emails are a production release blocker, and legal approval is still
   required before enabling the planner policy gate. Primary/Secondary uniqueness is
   an open, non-blocking owner decision.
@@ -308,8 +329,8 @@ Verification completed for that fix before commit:
   PostgreSQL concurrency, and hosting-log redaction still need isolated release checks.
 - Required server-only `CALENDAR_PLAN_LINK_SECRET` must be generated independently per
   environment; changing it requires replacing and resending outstanding invitations.
-  Next: verify Phase 4, then request owner/reviewer review. Do not
-  start Phase 5, push a migration to production, deploy, merge, enable planner policies,
+  Next: verify Phase 5, then request owner/reviewer review. Do not
+  start Phase 6, push a migration to production, deploy, merge, enable planner policies,
   or publish legal updates without the owner's subsequent authorization. Proposed legal
   wording is in `docs/CHURCH_CALENDAR_LEGAL_DRAFT.md`; Primary/Secondary uniqueness is
   undecided and labels retain their existing descriptive behavior.
