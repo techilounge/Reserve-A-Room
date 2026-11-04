@@ -1,6 +1,6 @@
 # Church Calendar — Phase 0 architecture and implementation plan
 
-**Checkpoint:** The reviewer approved Phase 4 at `47985dbe40c2d10499d6a69e502e5ea9a304ae12` and authorized Phase 5. Work remains on `codex/church-calendar-phase1` based on `main` commit `1f287eecb0979f40339011a49ab3b99508ec6514`; the mixed `03b721c` security work remains separate. Stop for Phase 5 review. No Phase 6, merge or production rollout is authorized.
+**Checkpoint:** The reviewer requested Phase 5 decision-model remediation at `ecda643bfd800e9758a7d48cc396f99d3fbcea7e`. Work remains on `codex/church-calendar-phase1` based on `main` commit `1f287eecb0979f40339011a49ab3b99508ec6514`; the mixed `03b721c` security work remains separate. Stop for Phase 5 follow-up review. No Phase 6, merge or production rollout is authorized.
 
 ### Phase 5 conflict foundations
 
@@ -11,8 +11,13 @@
   offsite/virtual events; church-wide scope alone never implies exclusivity. A Super
   Admin can adjust the large-event threshold, initially 100; room capacity remains a
   separate warning. Planner conflict guidance is scoped and non-identifying.
-- Staff decisions record an event and reason against a fingerprint of the current
-  submitted/operational facts and policy revision; hard blocks cannot be decided away.
+- Follow-up migration `20261107100000_calendar_conflict_decision_context.sql` stores
+  append-only typed decisions: planning conflicts require an `advance` selection;
+  warnings require an `acknowledge` reason with no selected event. PostgreSQL derives
+  immutable historical context and audit metadata from the same submitted/operational
+  facts and policy revision that generate the current fingerprint. Legacy preview
+  decisions remain explicitly incomplete history and require a new typed decision.
+  Hard blocks cannot be decided away.
   Phase 5 does not approve an event, allocate resources, or create room reservations.
   Since no approved calendar-event state exists yet, Phase 6 must add its operational
   exclusivity comparisons and revalidate all decisions in the approval transaction.

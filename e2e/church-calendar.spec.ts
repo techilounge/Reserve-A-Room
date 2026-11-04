@@ -187,10 +187,11 @@ test("a Super Admin configures a cycle and independently rotates one planner's a
     await expect(conflictPage.getByRole("heading", { name: "Conflict Center" })).toBeVisible();
     const warning = conflictPage.getByRole("listitem").filter({ hasText: "Events from the same ministry overlap" }).first();
     await expect(warning).toBeVisible();
-    await warning.getByRole("combobox", { name: "Event acknowledged" }).selectOption({ index: 1 });
-    await warning.getByLabel("Reason").fill("Ministry confirmed the overlap");
-    await warning.getByRole("button", { name: "Record decision" }).click();
+    await expect(warning.getByRole("combobox")).toHaveCount(0);
+    await warning.getByLabel("Acknowledgment reason").fill("Ministry confirmed the overlap");
+    await warning.getByRole("button", { name: "Acknowledge warning" }).click();
     await expect(conflictPage.getByRole("status")).toContainText("Decision recorded");
+    await expect(warning.getByRole("button", { name: "Update acknowledgment" })).toBeVisible();
     await conflictPage.close();
     const submissions = await staff.newPage();
     await submissions.goto("/admin/calendar-submissions");

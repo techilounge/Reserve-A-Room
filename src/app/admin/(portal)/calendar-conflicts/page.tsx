@@ -57,13 +57,14 @@ export default async function ConflictCenter({ searchParams }: { searchParams: P
         {d.attendance !== undefined ? <p>Attendance: {d.attendance}{d.capacity !== undefined ? ` · Room capacity: ${d.capacity}` : ""}{d.threshold !== undefined ? ` · Threshold: ${d.threshold}` : ""}</p> : null}
         {conflict.classification === "hard" ? <p>Correct the underlying issue before this event can proceed. This block cannot be overridden here.</p> : <form action={saveConflictDecision} className="space-y-2 border-t pt-3">
           <input type="hidden" name="fingerprint" value={conflict.fingerprint} />
-          <label className="block text-sm font-medium">{conflict.classification === "planning" ? "Event selected to advance" : "Event acknowledged"}
+          <input type="hidden" name="decision_type" value={conflict.classification === "planning" ? "advance" : "acknowledge"} />
+          {conflict.classification === "planning" ? <label className="block text-sm font-medium">Event selected to advance
             <select name="selected" defaultValue={conflict.selected_event_id ?? ""} required className="mt-1 block w-full rounded border bg-background p-2">
               <option value="" disabled>Select an event</option>{options.map(person => <option key={person.event_id} value={person.event_id}>{person.title}{person.ministry ? ` · ${person.ministry}` : ""}</option>)}
-            </select></label>
-          <label className="block text-sm font-medium">Reason<textarea name="reason" minLength={3} maxLength={1000} required defaultValue={conflict.reason ?? ""} className="mt-1 block w-full rounded border bg-background p-2" /></label>
-          <Button type="submit" variant="outline">{conflict.selected_event_id ? "Update decision" : "Record decision"}</Button>
-          {conflict.selected_event_id ? <p className="text-sm">A decision is recorded for the current details. Changes may require a new decision.</p> : null}
+            </select></label> : null}
+          <label className="block text-sm font-medium">{conflict.classification === "warning" ? "Acknowledgment reason" : "Reason"}<textarea name="reason" minLength={3} maxLength={1000} required defaultValue={conflict.reason ?? ""} className="mt-1 block w-full rounded border bg-background p-2" /></label>
+          <Button type="submit" variant="outline">{conflict.classification === "warning" ? (conflict.decision_type ? "Update acknowledgment" : "Acknowledge warning") : (conflict.decision_type ? "Update decision" : "Record decision")}</Button>
+          {conflict.decision_type ? <p className="text-sm">A decision is recorded for the current details. Changes may require a new decision.</p> : null}
         </form>}
       </li>;
     })}</ol>

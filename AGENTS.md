@@ -220,6 +220,20 @@ Verification completed for that fix before commit:
 
 ## Church Calendar Phase 5 checkpoint — 2026-11-03
 
+- Reviewer requested Phase 5 decision-model remediation at `ecda643`: append
+  `20261107100000_calendar_conflict_decision_context.sql`, separate `advance`
+  (selected participant required) from `acknowledge` (no selected event), and
+  keep hard conflicts non-overridable. Warning UI has no winner selector.
+  Decisions are append-only; PostgreSQL snapshots the fingerprint facts, policy
+  revision, related entity, affected ranges, and each submitted participant's
+  event, revision and occurrence identities into the decision and audit record.
+  Older preview decisions retain explicitly incomplete legacy history and cannot
+  satisfy a current typed decision; they must be reviewed again. The current
+  fingerprint remains the validity authority.
+- Run the complete checks and PostgreSQL concurrency tests on the final remediation
+  commit, push only `codex/church-calendar-phase1`, and stop for review; Phase 6 is
+  not authorized. Report exact results and the final SHA in the handoff response.
+
 - Phase 4 was approved at `47985dbe40c2d10499d6a69e502e5ea9a304ae12`; Phase 5
   conflicts are authorized on `codex/church-calendar-phase1`. Use the reviewer's
   initial policy: exclusive on-site church events cover the property for the full

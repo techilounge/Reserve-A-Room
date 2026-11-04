@@ -152,28 +152,37 @@ export type Database = {
           id: string;
           fingerprint: string;
           conflict_type: string;
-          selected_event_id: string;
+          selected_event_id: string | null;
           reason: string;
           decided_by: string;
           decided_at: string;
+          decision_order: number;
+          decision_type: string;
+          context: Json;
         };
         Insert: {
           id?: string;
           fingerprint: string;
           conflict_type: string;
-          selected_event_id: string;
+          selected_event_id?: string | null;
           reason: string;
           decided_by: string;
           decided_at?: string;
+          decision_order?: never;
+          decision_type?: string;
+          context: Json;
         };
         Update: {
           id?: string;
           fingerprint?: string;
           conflict_type?: string;
-          selected_event_id?: string;
+          selected_event_id?: string | null;
           reason?: string;
           decided_by?: string;
           decided_at?: string;
+          decision_order?: never;
+          decision_type?: string;
+          context?: Json;
         };
         Relationships: [
           {
@@ -2438,7 +2447,7 @@ export type Database = {
       };
       calendar_list_conflicts: {
         Args: never;
-        Returns: { fingerprint: string; classification: string; conflict_type: string; event_id: string; other_event_id: string; occurrence_id: string; starts_at: string; ends_at: string; timezone: string; details: Json; selected_event_id: string; reason: string; decided_at: string }[];
+        Returns: { fingerprint: string; classification: string; conflict_type: string; event_id: string; other_event_id: string; occurrence_id: string; starts_at: string; ends_at: string; timezone: string; details: Json; decision_type: string; selected_event_id: string; reason: string; decided_at: string }[];
       };
       calendar_planner_conflicts: {
         Args: { p_plan_id: string; p_session_hash: string };
@@ -2465,7 +2474,7 @@ export type Database = {
         Returns: Json;
       };
       calendar_record_conflict_decision: {
-        Args: { p_fingerprint: string; p_selected_event: string; p_reason: string };
+        Args: { p_fingerprint: string; p_decision_type: string; p_reason: string; p_selected_event?: string };
         Returns: undefined;
       };
       calendar_remove_event_draft: {
