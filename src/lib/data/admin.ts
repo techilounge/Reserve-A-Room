@@ -5,6 +5,7 @@ import { collectExportPages } from "@/lib/reservations/export-limits";
 import type { ReservationFilters } from "@/lib/reservations/filter-types";
 import type { Database, Enums, Tables } from "@/lib/supabase/database.types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { PHASE6_APPROVAL_UI_ENABLED } from "@/lib/calendar-planning/phase6-gate";
 
 /**
  * Staff reads. All go through the signed-in user's session, so the database re-checks
@@ -17,6 +18,7 @@ export type AdminReservationRow = Fn["admin_list_reservations"]["Returns"][numbe
 export type AdminReservation = Fn["admin_get_reservation"]["Returns"][number] & SeriesLink;
 export type CalendarEntry = Fn["admin_calendar"]["Returns"][number] & SeriesLink;
 export type EmailLogRow = Fn["admin_reservation_emails"]["Returns"][number];
+export type CalendarReservationLink = Fn["calendar_reservation_link"]["Returns"][number];
 export type DashboardCounts = Fn["admin_dashboard"]["Returns"][number];
 export type ExportReservationRow = Fn["admin_export_reservations"]["Returns"][number];
 
@@ -36,6 +38,14 @@ export type ReservationSeriesDetail = {
 };
 
 type ServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+
+export async function getCalendarReservationLink(id: string): Promise<CalendarReservationLink | null> {
+  if (!PHASE6_APPROVAL_UI_ENABLED) return null;
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("calendar_reservation_link", { p_reservation:id });
+  if (error) throw error;
+  return data?.[0] ?? null;
+}
 
 async function seriesLinks(supabase: ServerClient, ids: string[]): Promise<Map<string, SeriesLink>> {
   if (!ids.length) return new Map();

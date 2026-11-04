@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { formatPhone } from "@/lib/format";
 import { toLocalParts } from "@/lib/datetime";
-import { getReservation } from "@/lib/data/admin";
+import { getCalendarReservationLink, getReservation } from "@/lib/data/admin";
 import { loadCatalog } from "@/lib/data/catalog";
 import { reserveContext } from "@/lib/reservations/reserve-context";
 import { OTHER_MINISTRY } from "@/lib/validation/reservation";
@@ -22,8 +22,11 @@ export const metadata: Metadata = {
 export default async function EditReservationPage({ params }: PageProps<"/admin/reservations/[id]/edit">) {
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
-  const [r, catalog] = await Promise.all([getReservation(id), loadCatalog()]);
+  const [r, catalog, calendarLink] = await Promise.all([getReservation(id), loadCatalog(), getCalendarReservationLink(id)]);
   if (!r) notFound();
+  if (calendarLink) return <EmptyState icon={Info} title="Managed by the church calendar" action={<Button asChild variant="outline"><Link href={`/admin/calendar-submissions/occurrences/${calendarLink.submission_id}`}>Review calendar dates</Link></Button>}>
+    Calendar-linked room holds can only be changed through the church calendar.
+  </EmptyState>;
   if (!catalog.ok) return <CatalogUnavailable reason={catalog.reason} />;
 
   if (r.status !== "pending" && r.status !== "approved") {

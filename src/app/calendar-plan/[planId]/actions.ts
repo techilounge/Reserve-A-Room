@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { hashPlannerBearer, newPlannerSession } from "@/lib/calendar-planning/token";
+import { scheduleSystemEmailDelivery } from "@/lib/email/schedule";
 import { clientIp } from "@/lib/security/request";
 import { rateLimitKey } from "@/lib/security/rate-limit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -87,6 +88,7 @@ export async function submitPlannerPlan(form: FormData) {
     if (error.message === "An occurrence resource override needs an event-wide default.") redirect(`/calendar-plan/${plan}?error=override`);
     redirect(`/calendar-plan/${plan}?error=${reason}`);
   }
+  scheduleSystemEmailDelivery();
   redirect(`/calendar-plan/${plan}?submitted=1`);
 }
 

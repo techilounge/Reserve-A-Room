@@ -218,7 +218,84 @@ Verification completed for that fix before commit:
 - Verification: typecheck and lint passed with no warnings; 33 unit-test files / 227 tests passed; 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 103/103. A restored-state check at 1000px, 320px and in dark mode showed no axe violations and no horizontal overflow.
 - Status: committed locally; not yet pushed or deployed.
 
-## Church Calendar Phase 5 checkpoint — 2026-11-03
+## Church Calendar Phase 6 checkpoint — 2026-11-03
+
+- Phase 5 approved at `ebe480dffd627c948b9408147fac2689dd562add`. Phase 6 is
+  authorized on `codex/church-calendar-phase1`; stop for functional review before
+  Phase 7. Do not merge, deploy, or apply hosted migrations.
+- The owner permits only a narrow authenticated calendar-transaction bypass of the
+  advance-booking horizon. Existing hour, grid, overnight, room, food, overlap,
+  resource and authorization rules remain mandatory. Use database-enforced,
+  transaction-bound capabilities; never trust caller-provided source or session
+  variables. Protect calendar-managed holds from ordinary mutation paths.
+- Required work: atomic current-revision approval with current conflict decisions,
+  approved-event exclusivity, ordered locks, complete room/resource commitments,
+  audit and idempotent branded notices; dedicated safe edits/cancellations that retain
+  history; real concurrent approval and capacity tests, rollback/guard tests, and
+  complete quality gates. Record actual implementation and verification below before
+  handing off. The previous Phase 5 stop instruction is historical.
+- Work in progress: `20261108100000_calendar_reservation_guards.sql`
+  adds a private transaction/reservation/occurrence/operation capability, links a hold
+  to a submitted occurrence, checks room, occupancy and food against the immutable
+  snapshot, and blocks ordinary mutation/deletion. The existing reservation validator
+  permits only a capability-backed insert to bypass the horizon. No API role can
+  write capabilities. The guard test in
+  `church-calendar-conflicts.test.ts` uses a test-only owner-written capability; it is
+  not an approval implementation. A real calendar transaction must create and remove
+  its capabilities in the same transaction. `20261108110000_calendar_commitment_ledger.sql`
+  adds an unexposed commitment ledger tied to the correct event/submission, at most
+  one active commitment per event, historical closure guards, and a linked-hold key.
+  Phase 6 is **not complete**.
+- `20261108120000_calendar_approval_core.sql` adds private, ungranted primitives
+  for first approval, replacement and event cancellation. They lock and check the
+  submitted revision, current conflicts and decisions, approved on-site exclusivity,
+  room/resource rows, and create or release linked holds and allocations atomically;
+  replacement preserves past commitments. Calendar holds suppress ordinary reservation
+  email. A private singleton revision is updated under the global advisory lock in
+  approval and both cancellation paths so transactions using an older Repeatable Read
+  snapshot fail with a serialization error. Native PostgreSQL races exercised this.
+  `20261108130000_calendar_approved_conflicts.sql` updates conflict and resource
+  calculations for approved and cancelled snapshots and excludes an edited event's own
+  prior commitments. `20261108125000` / `20261108160000` add private occurrence-level
+  cancellation and carry cancelled logical dates forward across replacement revisions.
+  `20261108140000` queues versioned branded event and plan notices transactionally;
+  the worker uses stable provider keys and refuses uncertain late retries. The local
+  tests exercise first approval, replacement, past history, event and occurrence
+  cancellation, stale decisions, privacy, multi-room rollback, outbox rollback and notice
+  deduplication. `20261108170000` serializes planner submission with approval before
+  taking cycle locks, closing a proposal-phantom race. `20261108180000` grants only
+  authenticated callers the staff mutation wrappers; the staff UI is enabled locally.
+  Database checks remain authoritative. Neither migration is applied to a hosted project.
+- On the uncommitted iteration, the native PostgreSQL room, resource and roomless
+  exclusive approval races passed at READ COMMITTED, REPEATABLE READ and SERIALIZABLE;
+  the earlier resource-allocation race also passed all three. The submission/approval
+  races passed in both orders at all three isolation levels. Their harnesses accept
+  only empty localhost `calendar_race_*` databases. Repeat every race on the final SHA.
+- Prior iteration checks: typecheck and lint passed; 36 unit files / 241 tests and
+  19 database files / 204 tests passed; the isolated production build passed; and the
+  focused mobile approval/revision/individual cancellation/event cancellation browser
+  workflow passed. The complete browser suite and complete checks have not yet been run
+  on the final commit. Never report prior-iteration checks as final-SHA verification.
+- Next commit the completed work, run typecheck, lint, unit, full DB, production build,
+  full Playwright and all native PostgreSQL races on that exact SHA, fix any failures
+  and repeat checks after any commit change. Then push only this review branch and stop
+  for Phase 6 review. No Phase 7, merge, hosted migration or production deployment.
+- Latest handoff: local commit `e685cceca3f51bf14c92f95acaf63f260dd60ae4` contains
+  the Phase 6 implementation; on that exact commit typecheck, lint, all 241 unit
+  tests and all 204 database tests passed. Native races, the production build and
+  full Playwright suite have not yet run on that exact SHA. Automatic approval
+  review rejected starting the exact-SHA native race matrix because of the account
+  usage limit (reported retry November 4 at 2:04 AM). Earlier native races and a
+  focused mobile browser workflow passed before that commit, not as final evidence.
+  The isolated PostgreSQL instance started in this session is listening on loopback
+  port 55439; stop it after the outstanding native tests when approval is available.
+  Run the entire required suite and real races on the candidate commit before pushing.
+- During the first complete Phase 6 browser run, the new approval workflow exposed an
+  ambiguous "Request changes" selector in an older calendar test because both tests
+  share a database. The selector is scoped to the intended plan. Re-run the complete
+  suite on the final commit; passing earlier iterations does not establish that result.
+
+## Church Calendar Phase 5 checkpoint — 2026-11-03 (historical)
 
 - Reviewer requested Phase 5 decision-model remediation at `ecda643`: append
   `20261107100000_calendar_conflict_decision_context.sql`, separate `advance`

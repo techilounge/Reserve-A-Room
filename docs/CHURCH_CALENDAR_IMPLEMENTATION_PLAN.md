@@ -1,6 +1,20 @@
 # Church Calendar — Phase 0 architecture and implementation plan
 
-**Checkpoint:** The reviewer requested Phase 5 decision-model remediation at `ecda643bfd800e9758a7d48cc396f99d3fbcea7e`. Work remains on `codex/church-calendar-phase1` based on `main` commit `1f287eecb0979f40339011a49ab3b99508ec6514`; the mixed `03b721c` security work remains separate. Stop for Phase 5 follow-up review. No Phase 6, merge or production rollout is authorized.
+**Checkpoint:** Phase 5 was approved at `ebe480dffd627c948b9408147fac2689dd562add`; Phase 6 is authorized on `codex/church-calendar-phase1`. Only the advance-booking horizon may be bypassed within the authenticated, transaction-bound calendar approval path; all other booking rules remain mandatory. Stop for Phase 6 functional review. No merge, hosted migration, or production rollout is authorized.
+
+**Phase 6 work in progress:** `20261108100000_calendar_reservation_guards.sql` adds
+the private reservation capability and a calendar-linked reservation guard; it exposes
+no approval or cancellation RPC. Snapshot room, occupancy and food are independently
+checked, and ordinary mutation is rejected. `20261108110000_calendar_commitment_ledger.sql`
+adds unexposed commitment identity and history guards. Private approval/replacement
+and cancellation prototypes, approved conflict handling, occurrence cancellation and
+transactional notices are in local migrations through `20261108160000`.
+`20261108170000` serializes planner submission with approval, and `20261108180000`
+grants staff mutation interfaces; the UI is enabled locally. Real PostgreSQL approval,
+resource and submission races passed on an uncommitted iteration, as did a focused
+mobile workflow. Complete verification must still run on the exact final commit before
+pushing for review. No hosted migration or production rollout is authorized.
+The complete and current handoff is in `AGENTS.md`.
 
 ### Phase 5 conflict foundations
 
@@ -324,4 +338,4 @@ These are recommendations and phase-specific decisions, not newly approved polic
 11. **Website sources:** determine whether the public website calendars share a source and verify plugin/API permissions before Phase 10.
 12. **Security workstream sequencing:** review its independent branch and preview/migration requirements before adopting it as a deployed calendar dependency; no production deploy is implied by this proposal.
 
-**Next action:** verify and push Phase 5, then stop for reviewer approval. Do not begin Phase 6, merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.
+**Next action:** implement and verify Phase 6, then push the review branch and stop for functional review. Do not begin Phase 7, merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.

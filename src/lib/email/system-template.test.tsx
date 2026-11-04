@@ -55,6 +55,48 @@ describe("church calendar planner invitation", () => {
   });
 });
 
+describe("church calendar event notices", () => {
+  it.each([
+    ["calendar_event_approved", "approved"],
+    ["calendar_event_replaced", "updated"],
+    ["calendar_event_cancelled", "cancelled"],
+    ["calendar_event_occurrence_cancelled", "cancelled"],
+  ] as const)("renders the branded %s notice", async (event, status) => {
+    const built = buildSystemEmail(event, {
+      appUrl: data.appUrl, appName: data.appName, churchName: data.churchName,
+      contactEmail: data.contactEmail, contactPhone: data.contactPhone,
+      eventTitle: "Youth <Night>", ministry: "Youth Ministry", cycle: "2027 Planning", revision: 2,
+      reason: event === "calendar_event_cancelled" || event === "calendar_event_occurrence_cancelled" ? "Schedule changed" : null,
+      ...(event === "calendar_event_occurrence_cancelled" ? { occurrenceRange:"Nov 10, 2027, 10 AM – 11 AM" } : {}),
+    });
+    const [html, text] = await Promise.all([render(built.element), render(built.element, { plainText: true })]);
+    expect(built.subject).toContain(status);
+    expect(html).toContain("Youth &lt;Night&gt;");
+    expect(text).toContain("Youth Ministry");
+    expect(text).toContain("2027 Planning");
+    if (event === "calendar_event_cancelled" || event === "calendar_event_occurrence_cancelled") expect(text).toContain("Schedule changed");
+    if (event === "calendar_event_occurrence_cancelled") expect(text).toContain("Other dates remain unchanged");
+  });
+});
+
+describe("church calendar plan notices", () => {
+  it.each([
+    ["calendar_plan_submitted", "submitted"],
+    ["calendar_plan_changes_requested", "Changes requested"],
+  ] as const)("renders %s in HTML and text", async (event, message) => {
+    const built = buildSystemEmail(event, {
+      appUrl: data.appUrl, appName: data.appName, churchName: data.churchName,
+      contactEmail: data.contactEmail, contactPhone: data.contactPhone,
+      ministry: "Youth <Ministry>", cycle: "2027 Planning", revision: 2,
+      reason: event === "calendar_plan_changes_requested" ? "Please revise the time" : null,
+    });
+    const [html, text] = await Promise.all([render(built.element), render(built.element, { plainText: true })]);
+    expect(html).toContain("Youth &lt;Ministry&gt;");
+    expect(text.toLowerCase()).toContain(message.toLowerCase());
+    if (event === "calendar_plan_changes_requested") expect(text).toContain("Please revise the time");
+  });
+});
+
 describe("recurring-request acknowledgement email", () => {
   it("makes the request status explicit and includes the submitted schedule", async () => {
     const request: RecurringRequestEmailData = {

@@ -147,6 +147,68 @@ export type Database = {
           },
         ];
       };
+      calendar_commitment_occurrence_cancellations: {
+        Row: {
+          id: string;
+          commitment_id: string;
+          submission_occurrence_id: string;
+          logical_occurrence_id: string;
+          reason: string;
+          cancelled_by: string;
+          cancelled_at: string;
+          copied_from: string | null;
+        };
+        Insert: {
+          id?: string;
+          commitment_id: string;
+          submission_occurrence_id: string;
+          logical_occurrence_id: string;
+          reason: string;
+          cancelled_by: string;
+          cancelled_at?: string;
+          copied_from?: string | null;
+        };
+        Update: {
+          id?: string;
+          commitment_id?: string;
+          submission_occurrence_id?: string;
+          logical_occurrence_id?: string;
+          reason?: string;
+          cancelled_by?: string;
+          cancelled_at?: string;
+          copied_from?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_commitment_occurrence_ca_submission_occurrence_id_fkey";
+            columns: ["submission_occurrence_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_submission_occurrences";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_commitment_occurrence_cancellations_cancelled_by_fkey";
+            columns: ["cancelled_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_commitment_occurrence_cancellations_commitment_id_fkey";
+            columns: ["commitment_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_event_commitments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_commitment_occurrence_cancellations_copied_from_fkey";
+            columns: ["copied_from"];
+            isOneToOne: false;
+            referencedRelation: "calendar_commitment_occurrence_cancellations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       calendar_conflict_decisions: {
         Row: {
           id: string;
@@ -261,6 +323,74 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_event_commitments: {
+        Row: {
+          id: string;
+          approval_order: number;
+          event_id: string;
+          submission_id: string;
+          state: string;
+          approved_by: string;
+          approved_at: string;
+          closed_by: string | null;
+          closed_at: string | null;
+          close_reason: string | null;
+        };
+        Insert: {
+          id?: string;
+          approval_order?: never;
+          event_id: string;
+          submission_id: string;
+          state?: string;
+          approved_by: string;
+          approved_at?: string;
+          closed_by?: string | null;
+          closed_at?: string | null;
+          close_reason?: string | null;
+        };
+        Update: {
+          id?: string;
+          approval_order?: never;
+          event_id?: string;
+          submission_id?: string;
+          state?: string;
+          approved_by?: string;
+          approved_at?: string;
+          closed_by?: string | null;
+          closed_at?: string | null;
+          close_reason?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_commitments_approved_by_fkey";
+            columns: ["approved_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_event_commitments_closed_by_fkey";
+            columns: ["closed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_event_commitments_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: true;
+            referencedRelation: "calendar_events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_event_commitments_event_id_submission_id_fkey";
+            columns: ["event_id", "submission_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_event_submissions";
+            referencedColumns: ["id", "event_id"];
           },
         ];
       };
@@ -2050,6 +2180,8 @@ export type Database = {
           privacy_version: string | null;
           terms_accepted_at: string | null;
           terms_version: string | null;
+          calendar_submission_occurrence_id: string | null;
+          calendar_commitment_id: string | null;
         };
         Insert: {
           id?: string;
@@ -2094,6 +2226,8 @@ export type Database = {
           privacy_version?: string | null;
           terms_accepted_at?: string | null;
           terms_version?: string | null;
+          calendar_submission_occurrence_id?: string | null;
+          calendar_commitment_id?: string | null;
         };
         Update: {
           id?: string;
@@ -2138,6 +2272,8 @@ export type Database = {
           privacy_version?: string | null;
           terms_accepted_at?: string | null;
           terms_version?: string | null;
+          calendar_submission_occurrence_id?: string | null;
+          calendar_commitment_id?: string | null;
         };
         Relationships: [
           {
@@ -2145,6 +2281,20 @@ export type Database = {
             columns: ["approved_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reservations_calendar_commitment_id_fkey";
+            columns: ["calendar_commitment_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_event_commitments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reservations_calendar_submission_occurrence_id_fkey";
+            columns: ["calendar_submission_occurrence_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_submission_occurrences";
             referencedColumns: ["id"];
           },
           {
@@ -2421,6 +2571,18 @@ export type Database = {
         Args: never;
         Returns: { id: string; name: string; category: string; description: string; available_quantity: number }[];
       };
+      calendar_approve_event: {
+        Args: { p_event_id: string; p_expected_revision: number; p_first_name: string; p_last_name: string; p_phone: string; p_expected_commitment?: string };
+        Returns: string;
+      };
+      calendar_cancel_event: {
+        Args: { p_event_id: string; p_expected_commitment: string; p_reason: string };
+        Returns: undefined;
+      };
+      calendar_cancel_event_occurrence: {
+        Args: { p_event_id: string; p_expected_commitment: string; p_occurrence: string; p_reason: string };
+        Returns: undefined;
+      };
       calendar_conflict_policy_get: {
         Args: never;
         Returns: { large_event_threshold: number; revision: number }[];
@@ -2485,6 +2647,10 @@ export type Database = {
         Args: { p_plan_id: string; p_reason: string };
         Returns: undefined;
       };
+      calendar_reservation_link: {
+        Args: { p_reservation: string };
+        Returns: { commitment_id: string; submission_id: string; event_id: string }[];
+      };
       calendar_resource_availability: {
         Args: { p_resource: string; p_start: string; p_end: string };
         Returns: { segment_start: string; segment_end: string; capacity: number; confirmed: number; provisional: number }[];
@@ -2496,6 +2662,14 @@ export type Database = {
       calendar_set_occurrence_exception: {
         Args: { p_plan_id: string; p_session_hash: string; p_occurrence_id: string; p_expected_version: number; p_kind: string; p_item_id: string; p_operation: string; p_quantity: number; p_notes: string };
         Returns: number;
+      };
+      calendar_staff_active_commitments: {
+        Args: never;
+        Returns: { id: string; event_id: string; submission_id: string; title: string; ministry: string; cycle: string; plan_active: boolean }[];
+      };
+      calendar_staff_latest_commitments: {
+        Args: never;
+        Returns: { id: string; event_id: string; submission_id: string; state: string }[];
       };
       calendar_staff_occurrences: {
         Args: { p_submission_id: string };

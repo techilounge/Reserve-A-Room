@@ -9,6 +9,12 @@ export const SYSTEM_EMAIL_EVENTS = [
   "recurring_request_received",
   "admin_first_login",
   "calendar_planner_invited",
+  "calendar_event_approved",
+  "calendar_event_replaced",
+  "calendar_event_cancelled",
+  "calendar_event_occurrence_cancelled",
+  "calendar_plan_submitted",
+  "calendar_plan_changes_requested",
 ] as const;
 export type SystemEmailEvent = (typeof SYSTEM_EMAIL_EVENTS)[number];
 
@@ -72,13 +78,60 @@ export type CalendarPlannerEmailData = EmailBrandData & {
   invitationUrl: string;
 };
 
+export type CalendarEventNoticeEmailData = EmailBrandData & {
+  eventTitle: string;
+  ministry: string;
+  cycle: string;
+  revision: number;
+  reason: string | null;
+  occurrenceRange?: string;
+};
+export type CalendarPlanNoticeEmailData = EmailBrandData & {
+  ministry: string;
+  cycle: string;
+  revision: number;
+  reason: string | null;
+};
+
 type Built = { subject: string; element: ReactElement };
 
 export function buildSystemEmail(
   event: SystemEmailEvent,
-  data: RecurringSeriesEmailData | RecurringSeriesStaffEmailData | RecurringRequestEmailData | AdminFirstLoginEmailData | CalendarPlannerEmailData,
+  data: RecurringSeriesEmailData | RecurringSeriesStaffEmailData | RecurringRequestEmailData | AdminFirstLoginEmailData | CalendarPlannerEmailData | CalendarEventNoticeEmailData | CalendarPlanNoticeEmailData,
 ): Built {
   switch (event) {
+    case "calendar_plan_submitted":
+    case "calendar_plan_changes_requested": {
+      const notice = data as CalendarPlanNoticeEmailData;
+      const changes = event === "calendar_plan_changes_requested";
+      return {
+        subject: changes ? `Church calendar changes requested: ${notice.ministry}` : `Church calendar plan submitted: ${notice.ministry}`,
+        element: <EmailLayout data={notice} preview={changes ? "The church office requested changes to your plan." : "A church calendar plan is ready for review."}
+          heading={changes ? "Changes requested to your calendar plan" : "A calendar plan was submitted"}>
+          <Paragraph>{changes ? "The church office requested changes to your submitted plan." : "A ministry submitted its calendar plan for review."}</Paragraph>
+          <DetailsTable rows={[["Ministry",notice.ministry],["Planning cycle",notice.cycle],["Submission",String(notice.revision)]]} />
+          {notice.reason ? <Paragraph>Requested changes: {notice.reason}</Paragraph> : null}
+          <Paragraph>{changes ? "Please use your personal planning link to revise and resubmit the plan." : "Sign in to the administration portal to review the plan."}</Paragraph>
+        </EmailLayout>,
+      };
+    }
+    case "calendar_event_approved":
+    case "calendar_event_replaced":
+    case "calendar_event_cancelled":
+    case "calendar_event_occurrence_cancelled": {
+      const notice = data as CalendarEventNoticeEmailData;
+      const occurrence = event === "calendar_event_occurrence_cancelled";
+      const status = event === "calendar_event_approved" ? "approved" : event === "calendar_event_replaced" ? "updated" : "cancelled";
+      return {
+        subject: `Church calendar ${occurrence ? "event date" : "event"} ${status}: ${notice.eventTitle}`,
+        element: <EmailLayout data={notice} preview={`${notice.eventTitle} was ${status}.`} heading={`Church calendar ${occurrence ? "event date" : "event"} ${status}`}>
+          <Paragraph>{occurrence ? "The church office cancelled one date of this event. Other dates remain unchanged." : `The church office has ${status} this event.`}</Paragraph>
+          <DetailsTable rows={[["Event",notice.eventTitle],["Ministry",notice.ministry],["Planning cycle",notice.cycle],["Submission",String(notice.revision)],["Date",notice.occurrenceRange ?? null]]} />
+          {notice.reason ? <Paragraph>Reason: {notice.reason}</Paragraph> : null}
+          <Paragraph>Please contact the church office if you have questions about this change.</Paragraph>
+        </EmailLayout>,
+      };
+    }
     case "calendar_planner_invited": {
       const planner = data as CalendarPlannerEmailData;
       return {

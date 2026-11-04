@@ -8,6 +8,8 @@ import {
   isSystemEmailEvent,
   type AdminFirstLoginEmailData,
   type CalendarPlannerEmailData,
+  type CalendarEventNoticeEmailData,
+  type CalendarPlanNoticeEmailData,
   type RecurringRequestEmailData,
   type RecurringSeriesEmailData,
   type RecurringSeriesStaffEmailData,
@@ -28,6 +30,7 @@ import type { MonthlyOrdinal, Weekday } from "@/lib/recurrence/types";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 import { formatFrom } from "./address";
+import { calendarNoticeIdempotencyKey, calendarNoticeRetrySafe } from "./calendar-notice-retry";
 
 type Outcome = "sent" | "failed" | "skipped";
 type Service = ReturnType<typeof createSupabaseServiceClient>;
@@ -37,7 +40,8 @@ type SystemEmailContext = {
   recipient: string;
   event_type: string;
   attempt_count: number;
-  payload: { accepted_at?: string };
+  payload: { accepted_at?: string; calendar_notice?: { action: string; event_title?: string; ministry: string; cycle: string; revision: number; reason: string | null; created_at: string;
+    occurrence_start?: string | null; occurrence_end?: string | null; occurrence_timezone?: string | null } };
   settings: {
     app_name: string;
     church_name: string;
@@ -148,7 +152,9 @@ async function send(supabase: Service, id: string, ctx: SystemEmailContext | nul
     | RecurringSeriesStaffEmailData
     | RecurringRequestEmailData
     | AdminFirstLoginEmailData
-    | CalendarPlannerEmailData;
+    | CalendarPlannerEmailData
+    | CalendarEventNoticeEmailData
+    | CalendarPlanNoticeEmailData;
   if (ctx.event_type === "calendar_planner_invited") {
     const { data: invitation, error: invitationError } = await supabase.rpc("calendar_invitation_context", { p_email_id: id });
     if (invitationError) throw invitationError;
@@ -169,6 +175,33 @@ async function send(supabase: Service, id: string, ctx: SystemEmailContext | nul
     emailData = { ...brand, contactName: details.contact_name, ministryName: details.ministry_name,
       cycleName: details.cycle_name, opensAt: formatInstant(details.opens_at, ctx.settings.timezone),
       deadline: formatInstant(details.deadline, ctx.settings.timezone), invitationUrl: url.toString() };
+  } else if (ctx.event_type === "calendar_event_approved" || ctx.event_type === "calendar_event_replaced" || ctx.event_type === "calendar_event_cancelled" || ctx.event_type === "calendar_event_occurrence_cancelled") {
+    const notice = ctx.payload.calendar_notice;
+    if (!notice || !notice.event_title || !notice.ministry || !notice.cycle || !Number.isInteger(notice.revision)
+      || !Number.isFinite(Date.parse(notice.created_at)) || ctx.event_type !== `calendar_event_${notice.action}`) {
+      return { status: "failed", error: "The calendar notification context is invalid." };
+    }
+    if (ctx.event_type === "calendar_event_occurrence_cancelled" && (!notice.occurrence_start || !notice.occurrence_end || !notice.occurrence_timezone)) {
+      return { status: "failed", error: "The cancelled date is unavailable." };
+    }
+    if (!calendarNoticeRetrySafe(notice.created_at,ctx.attempt_count)) {
+      return { status: "failed", error: "Delivery is too old to retry safely. Contact the church office." };
+    }
+    emailData = { ...brand,eventTitle:notice.event_title,ministry:notice.ministry,cycle:notice.cycle,
+      revision:notice.revision,reason:notice.reason,
+      ...(notice.occurrence_start && notice.occurrence_end && notice.occurrence_timezone ? {
+        occurrenceRange:`${formatInstant(notice.occurrence_start,notice.occurrence_timezone)} – ${formatInstant(notice.occurrence_end,notice.occurrence_timezone)} (${notice.occurrence_timezone})`,
+      } : {}) };
+  } else if (ctx.event_type === "calendar_plan_submitted" || ctx.event_type === "calendar_plan_changes_requested") {
+    const notice = ctx.payload.calendar_notice;
+    if (!notice || !notice.ministry || !notice.cycle || !Number.isInteger(notice.revision)
+      || !Number.isFinite(Date.parse(notice.created_at)) || ctx.event_type !== `calendar_plan_${notice.action}`) {
+      return { status: "failed", error: "The calendar plan notification context is invalid." };
+    }
+    if (!calendarNoticeRetrySafe(notice.created_at,ctx.attempt_count)) {
+      return { status: "failed", error: "Delivery is too old to retry safely. Contact the church office." };
+    }
+    emailData = { ...brand,ministry:notice.ministry,cycle:notice.cycle,revision:notice.revision,reason:notice.reason };
   } else if (ctx.event_type === "admin_first_login") {
     if (!ctx.user) return { status: "failed", error: "The administrator email context no longer exists." };
     emailData = {
@@ -266,7 +299,8 @@ async function send(supabase: Service, id: string, ctx: SystemEmailContext | nul
       text,
       replyTo: env.RESEND_REPLY_TO ?? ctx.settings.contact_email ?? undefined,
     },
-    { idempotencyKey: ctx.event_type === "calendar_planner_invited" ? `calendar-invitation-${id}` : `system-email-log-${id}-${ctx.attempt_count}` },
+    { idempotencyKey: ctx.event_type === "calendar_planner_invited" ? `calendar-invitation-${id}` :
+      (ctx.event_type.startsWith("calendar_event_") || ctx.event_type.startsWith("calendar_plan_")) ? calendarNoticeIdempotencyKey(id) : `system-email-log-${id}-${ctx.attempt_count}` },
   );
   if (sendError || !sent) return { status: "failed", error: ctx.event_type === "calendar_planner_invited"
     ? "The invitation could not be delivered. Check the email provider and replace the invitation if needed."

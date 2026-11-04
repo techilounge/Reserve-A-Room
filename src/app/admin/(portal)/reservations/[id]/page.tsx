@@ -13,7 +13,7 @@ import { DetailList } from "@/components/reservations/detail-list";
 import { StatusBadge } from "@/components/reservations/status-badge";
 import { Button } from "@/components/ui/button";
 import { formatInstant, formatLongDate, formatTimeRange, toLocalParts } from "@/lib/datetime";
-import { getReservation, getReservationEmails, type EmailLogRow } from "@/lib/data/admin";
+import { getCalendarReservationLink, getReservation, getReservationEmails, type EmailLogRow } from "@/lib/data/admin";
 import { loadCatalog } from "@/lib/data/catalog";
 import { formatPhone } from "@/lib/format";
 import { approvalLabel, EMAIL_EVENT_LABELS } from "@/lib/reservations/labels";
@@ -27,7 +27,7 @@ export default async function AdminReservationPage({ params, searchParams }: Pag
   const flags = await searchParams;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
 
-  const [r, emails, catalog] = await Promise.all([getReservation(id), getReservationEmails(id).catch(() => []), loadCatalog()]);
+  const [r, emails, catalog, calendarLink] = await Promise.all([getReservation(id), getReservationEmails(id).catch(() => []), loadCatalog(), getCalendarReservationLink(id)]);
   if (!r) notFound();
   const timeZone = catalog.ok ? catalog.catalog.settings.timeZone : "America/Chicago";
   const start = toLocalParts(r.start_at, timeZone);
@@ -71,7 +71,7 @@ export default async function AdminReservationPage({ params, searchParams }: Pag
             <span className="text-sm text-muted-foreground">{approvalLabel(r)}</span>
           </div>
         </div>
-        {active ? (
+        {active && !calendarLink ? (
           <div className="flex flex-wrap gap-2">
             <ReservationActions reservationId={r.id} reference={r.reference_code} status={r.status} />
             <Button asChild variant="outline">
@@ -83,6 +83,8 @@ export default async function AdminReservationPage({ params, searchParams }: Pag
           </div>
         ) : null}
       </div>
+
+      {calendarLink ? <p className="rounded-lg border bg-card p-4 text-sm">This room hold is managed by the church calendar. <Link className="underline" href={`/admin/calendar-submissions/occurrences/${calendarLink.submission_id}`}>Review the calendar dates</Link> to make changes.</p> : null}
 
       <CapacityWarning estimated={r.estimated_attendance} capacity={r.room_capacity} audience="staff" />
       {r.room_capacity !== r.room_capacity_at_submission ? (
@@ -131,7 +133,7 @@ export default async function AdminReservationPage({ params, searchParams }: Pag
               items={[
                 { label: "Purpose", value: r.purpose, wide: true },
                 { label: "Estimated attendance", value: `${r.estimated_attendance} (room holds ${r.room_capacity})` },
-                { label: "Source", value: r.source === "admin" ? "Created by staff" : "Guest request" },
+                { label: "Source", value: calendarLink ? "Church calendar" : r.source === "admin" ? "Created by staff" : "Guest request" },
                 r.setup_requirements ? { label: "Setup requirements", value: r.setup_requirements, wide: true } : null,
                 r.requester_notes ? { label: "Requester notes", value: r.requester_notes, wide: true } : null,
                 r.requester_message ? { label: "Message sent to requester", value: r.requester_message, wide: true } : null,
@@ -139,12 +141,12 @@ export default async function AdminReservationPage({ params, searchParams }: Pag
             />
           </section>
 
-          <section aria-labelledby="notes-heading" className="rounded-xl border bg-card p-5">
+          {!calendarLink ? <section aria-labelledby="notes-heading" className="rounded-xl border bg-card p-5">
             <h2 id="notes-heading" className="sr-only">
               Private notes
             </h2>
             <AdminNotesForm key={r.updated_at} reservationId={r.id} initial={r.admin_notes ?? ""} />
-          </section>
+          </section> : null}
         </div>
 
         <div className="flex flex-col gap-6">

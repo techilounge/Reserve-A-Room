@@ -1,7 +1,7 @@
 import type { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { asRole, createRoom, createStaff, createTestDb, insertReservation } from "./support/db";
+import { asRole, createRoom, createStaff, createTestDb, insertReservation, type Queryable } from "./support/db";
 
 let db: PGlite;
 let superAdmin: string, admin: string, room: string, resource: string, cycle: string, date: string;
@@ -66,6 +66,403 @@ it("preserves pre-remediation decisions as untrusted legacy history during upgra
 afterAll(async () => { await db.close(); });
 
 describe("Church Calendar conflicts", () => {
+  it("atomically creates a private first approval and a matching long-range room hold", async () => {
+    const rollback = new Error("rollback private approval fixture");
+    const initialNotices = (await db.query<{ n: number }>("select count(*)::int as n from public.system_email_logs where event_type like 'calendar_event_%'")).rows[0].n;
+    await expect(db.transaction(async tx => {
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role: "service_role" })]);
+      const portal = (await tx.query<{ value: { events: Record<string, unknown>[] } }>("select public.calendar_planner_portal($1,$2) as value", [refs[2],sessions[2]])).rows[0].value;
+      const event = portal.events.find(row => row.id === events[3])!;
+      const schedule = event.schedule as Record<string, unknown>;
+      await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)", [refs[2],sessions[2],events[3],JSON.stringify({ ...event, setup_minutes: 0, cleanup_minutes: 0, schedule: { ...schedule,start_time:"15:00",end_time:"16:00" } })]);
+      await tx.query("select public.calendar_submit_plan($1,$2,'',false)", [refs[2],sessions[2]]);
+      await tx.query("update public.rooms set max_advance_value=1,max_advance_unit='day' where id=$1", [room]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"authenticated",sub:admin })]);
+      const commitment = (await tx.query<{ id: string }>("select private.calendar_approve_initial($1,1,'Test','Planner','+15125550123') as id", [events[3]])).rows[0].id;
+      const rows = await tx.query<{ status: string; calendar_commitment_id: string }>("select status,calendar_commitment_id from public.reservations where calendar_commitment_id=$1", [commitment]);
+      expect(rows.rows).toEqual([{ status:"approved",calendar_commitment_id:commitment }]);
+      const hold = (await tx.query<{ id: string }>("select id from public.reservations where calendar_commitment_id=$1", [commitment])).rows[0].id;
+      expect((await tx.query<{ commitment_id: string; event_id: string }>("select * from public.calendar_reservation_link($1)", [hold])).rows[0]).toMatchObject({ commitment_id:commitment,event_id:events[3] });
+      await tx.exec("savepoint ordinary_mutation");
+      await expect(tx.query("select public.cancel_reservation($1,'Ordinary cancellation')", [hold])).rejects.toMatchObject({ code:"RAR09" });
+      await tx.exec("rollback to savepoint ordinary_mutation");
+      await expect(tx.query("select public.update_admin_notes($1,'Ordinary edit')", [hold])).rejects.toMatchObject({ code:"RAR09" });
+      await tx.exec("rollback to savepoint ordinary_mutation");
+      await expect(tx.query("select private.queue_email($1,'planner@example.org','reservation_confirmed')", [hold])).rejects.toMatchObject({ code:"RAR09" });
+      await tx.exec("rollback to savepoint ordinary_mutation");
+      expect((await tx.query<{ n: number }>(`select count(*)::int as n from public.calendar_resource_allocations a
+        join public.calendar_submission_occurrences o on o.id=a.submission_occurrence_id
+        join public.calendar_event_commitments c on c.submission_id=o.submission_id
+        where c.id=$1 and a.status='confirmed'`, [commitment])).rows[0].n).toBe(1);
+      expect((await tx.query<{ n: number }>("select count(*)::int as n from public.email_logs where reservation_id in (select id from public.reservations where calendar_commitment_id=$1)", [commitment])).rows[0].n).toBe(0);
+      const emailsBefore = (await tx.query<{ n: number }>("select count(*)::int as n from public.system_email_logs where event_type='calendar_event_approved'")).rows[0].n;
+      const notificationsBefore = (await tx.query<{ n: number }>("select count(*)::int as n from public.notifications where type='calendar_event'")).rows[0].n;
+      expect(emailsBefore).toBeGreaterThan(0);
+      expect((await tx.query<{ id: string }>("select private.calendar_approve_initial($1,1,'Test','Planner','+15125550123') as id", [events[3]])).rows[0].id).toBe(commitment);
+      expect((await tx.query<{ n: number }>("select count(*)::int as n from public.reservations where calendar_commitment_id=$1", [commitment])).rows[0].n).toBe(1);
+      await tx.query("select private.queue_calendar_event_notice($1,'approved',$2,null)", [commitment,admin]);
+      expect((await tx.query<{ n: number }>("select count(*)::int as n from public.system_email_logs where event_type='calendar_event_approved'")).rows[0].n).toBe(emailsBefore);
+      expect((await tx.query<{ n: number }>("select count(*)::int as n from public.notifications where type='calendar_event'")).rows[0].n).toBe(notificationsBefore);
+      const emailId = (await tx.query<{ id: string }>("select id from public.system_email_logs where event_type='calendar_event_approved' limit 1")).rows[0].id;
+      await tx.query("select public.complete_system_email($1,'failed',null,'Simulated delivery failure')", [emailId]);
+      const failureAlerts = (await tx.query<{ n: number }>("select count(*)::int as n from public.notifications where type='email_failed'")).rows[0].n;
+      await tx.query("select public.complete_system_email($1,'failed',null,'Simulated retry failure')", [emailId]);
+      expect((await tx.query<{ n: number }>("select count(*)::int as n from public.notifications where type='email_failed'")).rows[0].n).toBe(failureAlerts);
+      expect((await tx.query<{ n: number }>("select count(*)::int as n from private.calendar_reservation_capabilities where transaction_id=txid_current()")).rows[0].n).toBe(0);
+      // A historical occurrence is inserted as fixture data; its existing allocation
+      // must survive reapproval and cancellation of future dates.
+      const pastOccurrence = (await tx.query<{ id: string }>(`insert into public.calendar_event_occurrences(event_id,source_key,schedule_revision,
+        local_start,local_end,timezone,all_day,start_at,end_at,occupancy_start,occupancy_end)
+        select $1,'historical-fixture',1,(current_date-1)+time '10:00',(current_date-1)+time '11:00','America/Chicago',false,
+          ((current_date-1)+time '10:00') at time zone 'America/Chicago',((current_date-1)+time '11:00') at time zone 'America/Chicago',
+          ((current_date-1)+time '10:00') at time zone 'America/Chicago',((current_date-1)+time '11:00') at time zone 'America/Chicago' returning id`, [events[3]])).rows[0].id;
+      const pastSnapshot = (await tx.query<{ id: string }>(`insert into public.calendar_submission_occurrences(submission_id,occurrence_id,logical_occurrence_id,
+        local_start,local_end,timezone,all_day,start_at,end_at,occupancy_start,occupancy_end)
+        select c.submission_id,o.id,o.logical_occurrence_id,o.local_start,o.local_end,o.timezone,o.all_day,o.start_at,o.end_at,o.occupancy_start,o.occupancy_end
+        from public.calendar_event_commitments c cross join public.calendar_event_occurrences o where c.id=$1 and o.id=$2 returning public.calendar_submission_occurrences.id`, [commitment,pastOccurrence])).rows[0].id;
+      await tx.query("insert into public.calendar_submission_resource_requests values($1,$2,'template',1,null)", [pastSnapshot,resource]);
+      const pastAllocation = (await tx.query<{ id: string }>(`insert into public.calendar_resource_allocations(submission_occurrence_id,resource_id,quantity,occupancy_start,occupancy_end,created_by)
+        select id,$2,1,occupancy_start,occupancy_end,$3 from public.calendar_submission_occurrences where id=$1 returning id`, [pastSnapshot,resource,admin])).rows[0].id;
+      await tx.query("select public.calendar_request_plan_changes($1,'Revise details')", [plans[2]]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"service_role" })]);
+      const revisedPortal = (await tx.query<{ value: { events: Record<string, unknown>[] } }>("select public.calendar_planner_portal($1,$2) as value", [refs[2],sessions[2]])).rows[0].value;
+      const revised = revisedPortal.events.find(row => row.id === events[3])!;
+      await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)", [refs[2],sessions[2],events[3],JSON.stringify({ ...revised,title:"Updated details" })]);
+      await tx.query("select public.calendar_submit_plan($1,$2,'',false)", [refs[2],sessions[2]]);
+      const revisedPast = (await tx.query<{ id: string }>(`insert into public.calendar_submission_occurrences(submission_id,occurrence_id,logical_occurrence_id,
+        local_start,local_end,timezone,all_day,start_at,end_at,occupancy_start,occupancy_end)
+        select s.id,o.occurrence_id,o.logical_occurrence_id,o.local_start,o.local_end,o.timezone,o.all_day,o.start_at,o.end_at,o.occupancy_start,o.occupancy_end
+        from public.calendar_event_submissions s cross join public.calendar_submission_occurrences o
+        where s.event_id=$1 and s.plan_revision=2 and o.id=$2 returning public.calendar_submission_occurrences.id`, [events[3],pastSnapshot])).rows[0].id;
+      await tx.query("insert into public.calendar_submission_resource_requests values($1,$2,'template',1,null)", [revisedPast,resource]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"authenticated",sub:admin })]);
+      await tx.exec("savepoint historical_tamper");
+      await tx.query("insert into public.calendar_submission_room_requests values($1,$2,'template')", [revisedPast,room]);
+      await expect(tx.query("select private.calendar_approve_initial($1,2,'Test','Planner','+15125550123',$2)", [events[3],commitment])).rejects.toMatchObject({ code:"RAR03" });
+      await tx.exec("rollback to savepoint historical_tamper");
+      const revisedConflicts = (await tx.query<{ conflict_type: string; event_id: string }>("select * from private.calendar_current_conflicts() where event_id=$1", [events[3]])).rows;
+      expect(revisedConflicts.some(c => ["room_reservation","resource_capacity","resource_planning"].includes(c.conflict_type))).toBe(false);
+      await tx.query("select public.calendar_request_plan_changes($1,'Coordinate events')", [plans[1]]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"service_role" })]);
+      const otherPortal = (await tx.query<{ value: { events: Record<string, unknown>[] } }>("select public.calendar_planner_portal($1,$2) as value", [refs[1],sessions[1]])).rows[0].value;
+      const other = otherPortal.events.find(row => row.id === events[1])!;
+      const otherSchedule = other.schedule as Record<string, unknown>;
+      await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)", [refs[1],sessions[1],events[1],JSON.stringify({ ...other,setup_minutes:0,cleanup_minutes:0,schedule:{ ...otherSchedule,start_time:"15:00",end_time:"16:00" } })]);
+      await tx.query("select public.calendar_submit_plan($1,$2,'',false)", [refs[1],sessions[1]]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"authenticated",sub:admin })]);
+      const toResolve = (await tx.query<{ fingerprint: string; classification: string; conflict_type: string }>(`select c.* from private.calendar_current_conflicts() c
+        where c.event_id=$1 or c.other_event_id=$1 or (c.conflict_type='resource_planning' and exists
+          (select 1 from jsonb_array_elements(coalesce(c.details->'participants','[]'::jsonb)) p where p->>'event_id'=$1::text))`, [events[3]])).rows;
+      expect(toResolve.map(c => c.conflict_type)).toEqual(expect.arrayContaining(["room_planning","resource_planning","church_wide_overlap"]));
+      expect(toResolve.some(c => c.classification==="hard")).toBe(false);
+      for (const conflict of toResolve) {
+        await tx.query("select public.calendar_record_conflict_decision($1,$2,'Reviewed',$3)",
+          [conflict.fingerprint,conflict.classification==="planning" ? "advance" : "acknowledge",conflict.classification==="planning" ? events[3] : null]);
+      }
+      const replacement = (await tx.query<{ id: string }>("select private.calendar_approve_initial($1,2,'Test','Planner','+15125550123',$2) as id", [events[3],commitment])).rows[0].id;
+      expect((await tx.query<{ status: string }>("select status from public.calendar_resource_allocations where id=$1", [pastAllocation])).rows[0].status).toBe("confirmed");
+      expect((await tx.query<{ state: string }>("select state from public.calendar_event_commitments where id=$1", [commitment])).rows[0].state).toBe("replaced");
+      expect((await tx.query<{ status: string }>("select status from public.reservations where calendar_commitment_id=$1", [commitment])).rows[0].status).toBe("cancelled");
+      expect((await tx.query<{ status: string }>("select status from public.reservations where calendar_commitment_id=$1", [replacement])).rows[0].status).toBe("approved");
+      await tx.exec("savepoint notification_failure");
+      await tx.exec(`create function private.test_calendar_notice_failure() returns trigger language plpgsql as $$
+        begin if new.event_type='calendar_event_cancelled' then raise exception 'Simulated outbox failure'; end if; return new; end; $$;
+        create trigger test_calendar_notice_failure before insert on public.system_email_logs for each row execute function private.test_calendar_notice_failure()`);
+      await expect(tx.query("select private.calendar_cancel_commitment($1,$2,'Schedule cancelled')", [events[3],replacement])).rejects.toMatchObject({ code:"P0001" });
+      await tx.exec("rollback to savepoint notification_failure");
+      expect((await tx.query<{ state: string }>("select state from public.calendar_event_commitments where id=$1", [replacement])).rows[0].state).toBe("active");
+      expect((await tx.query<{ status: string }>("select status from public.reservations where calendar_commitment_id=$1", [replacement])).rows[0].status).toBe("approved");
+      expect((await tx.query<{ n: number }>(`select count(*)::int as n from public.calendar_resource_allocations a
+        join public.calendar_submission_occurrences o on o.id=a.submission_occurrence_id join public.calendar_event_commitments c on c.submission_id=o.submission_id
+        where c.id=$1 and a.status='confirmed'`, [replacement])).rows[0].n).toBe(1);
+      await tx.query("select private.calendar_cancel_commitment($1,$2,'Schedule cancelled')", [events[3],replacement]);
+      expect((await tx.query<{ status: string }>("select status from public.calendar_resource_allocations where id=$1", [pastAllocation])).rows[0].status).toBe("confirmed");
+      expect((await tx.query<{ event_type: string }>("select distinct event_type from public.system_email_logs where event_type like 'calendar_event_%' order by event_type")).rows.map(row => row.event_type)).toEqual(["calendar_event_approved","calendar_event_cancelled","calendar_event_replaced"]);
+      expect((await tx.query<{ state: string }>("select state from public.calendar_event_commitments where id=$1", [replacement])).rows[0].state).toBe("cancelled");
+      expect((await tx.query<{ id: string; state: string }>("select * from public.calendar_staff_latest_commitments() where event_id=$1", [events[3]])).rows[0]).toMatchObject({ id:replacement,state:"cancelled" });
+      expect((await tx.query<{ status: string }>("select status from public.reservations where calendar_commitment_id=$1", [replacement])).rows[0].status).toBe("cancelled");
+      expect((await tx.query<{ n: number }>(`select count(*)::int as n from public.calendar_resource_allocations a
+        join public.calendar_submission_occurrences o on o.id=a.submission_occurrence_id
+        join public.calendar_event_commitments c on c.submission_id=o.submission_id
+        where c.id=$1 and a.status='confirmed'`, [replacement])).rows[0].n).toBe(0);
+      expect((await tx.query<{ n: number }>("select count(*)::int as n from private.calendar_reservation_capabilities where transaction_id=txid_current()")).rows[0].n).toBe(0);
+      throw rollback;
+    })).rejects.toBe(rollback);
+    expect((await db.query<{ n: number }>("select count(*)::int as n from public.system_email_logs where event_type like 'calendar_event_%'")).rows[0].n).toBe(initialNotices);
+    expect((await db.query<{ n: number }>("select count(*)::int as n from public.calendar_event_commitments where event_id=$1", [events[3]])).rows[0].n).toBe(0);
+  });
+
+  it("queues one changes-request notice per planner and preserves it transactionally", async () => {
+    const rollback = new Error("rollback plan notice fixture");
+    await expect(db.transaction(async tx => {
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"authenticated",sub:admin })]);
+      await tx.query("select public.calendar_request_plan_changes($1,'Please adjust the time')", [plans[0]]);
+      const notices = (await tx.query<{ payload: { calendar_notice: { reason: string } } }>("select payload from public.system_email_logs where event_type='calendar_plan_changes_requested'")).rows;
+      expect(notices).toHaveLength(1);
+      expect(notices[0].payload.calendar_notice.reason).toBe("Please adjust the time");
+      await tx.query("update public.ministry_calendar_plans set submission_status='changes_requested' where id=$1", [plans[0]]);
+      expect((await tx.query<{ n: number }>("select count(*)::int as n from public.system_email_logs where event_type='calendar_plan_changes_requested'")).rows[0].n).toBe(1);
+      throw rollback;
+    })).rejects.toBe(rollback);
+  });
+
+  it("rolls back every hold and allocation if the third room insert fails", async () => {
+    const rollback = new Error("rollback multi-room fixture");
+    await expect(db.transaction(async tx => {
+      const secondRoom = await createRoom(tx);
+      const thirdRoom = await createRoom(tx);
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"service_role" })]);
+      const portal = (await tx.query<{ value: { events: Record<string, unknown>[] } }>("select public.calendar_planner_portal($1,$2) as value", [refs[2],sessions[2]])).rows[0].value;
+      const event = portal.events.find(row => row.id===events[3])!;
+      const schedule = event.schedule as Record<string, unknown>;
+      await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)", [refs[2],sessions[2],events[3],JSON.stringify({ ...event,rooms:[room,secondRoom,thirdRoom],setup_minutes:0,cleanup_minutes:0,schedule:{ ...schedule,start_time:"15:00",end_time:"16:00" } })]);
+      await tx.query("select public.calendar_submit_plan($1,$2,'',false)", [refs[2],sessions[2]]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"authenticated",sub:admin })]);
+      await tx.exec(`create function private.test_calendar_third_hold_failure() returns trigger language plpgsql as $$
+        begin if new.calendar_commitment_id is not null and (select count(*) from public.reservations where calendar_commitment_id=new.calendar_commitment_id)=2
+          then raise exception 'Simulated third hold failure'; end if; return new; end; $$;
+        create trigger reservations_99_test_failure before insert on public.reservations for each row execute function private.test_calendar_third_hold_failure()`);
+      await tx.exec("savepoint failed_approval");
+      await expect(tx.query("select private.calendar_approve_initial($1,1,'Test','Planner','+15125550123')", [events[3]])).rejects.toMatchObject({ code:"P0001" });
+      await tx.exec("rollback to savepoint failed_approval");
+      expect((await tx.query<{ n: number }>("select count(*)::int as n from public.calendar_event_commitments where event_id=$1", [events[3]])).rows[0].n).toBe(0);
+      expect((await tx.query<{ n: number }>("select count(*)::int as n from public.reservations where calendar_commitment_id is not null")).rows[0].n).toBe(0);
+      expect((await tx.query<{ n: number }>("select count(*)::int as n from public.calendar_resource_allocations")).rows[0].n).toBe(0);
+      expect((await tx.query<{ n: number }>("select count(*)::int as n from public.system_email_logs where event_type='calendar_event_approved'")).rows[0].n).toBe(0);
+      expect((await tx.query<{ n: number }>("select count(*)::int as n from private.calendar_reservation_capabilities where transaction_id=txid_current()")).rows[0].n).toBe(0);
+      throw rollback;
+    })).rejects.toBe(rollback);
+  });
+
+  it("rejects missing and stale conflict decisions before creating commitments", async () => {
+    const rollback = new Error("rollback decision fixture");
+    await expect(db.transaction(async tx => {
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"service_role" })]);
+      await tx.query("select public.calendar_submit_plan($1,$2,'',false)", [refs[2],sessions[2]]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"authenticated",sub:admin })]);
+      await tx.exec("savepoint missing_decisions");
+      await expect(tx.query("select private.calendar_approve_initial($1,1,'Test','Planner','+15125550123')", [events[3]])).rejects.toMatchObject({ code:"RAR09" });
+      await tx.exec("rollback to savepoint missing_decisions");
+      const current = (await tx.query<{ fingerprint: string; classification: string }>(`select c.* from private.calendar_current_conflicts() c
+        where c.event_id=$1 or c.other_event_id=$1 or (c.conflict_type='resource_planning' and exists
+          (select 1 from jsonb_array_elements(coalesce(c.details->'participants','[]'::jsonb)) p where p->>'event_id'=$1::text))`, [events[3]])).rows;
+      expect(current.length).toBeGreaterThan(0);
+      for (const c of current) await tx.query("select public.calendar_record_conflict_decision($1,$2,'Reviewed',$3)",
+        [c.fingerprint,c.classification==="planning" ? "advance" : "acknowledge",c.classification==="planning" ? events[3] : null]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"authenticated",sub:superAdmin })]);
+      await tx.query("select public.calendar_conflict_policy_save(101)");
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"authenticated",sub:admin })]);
+      await tx.exec("savepoint stale_decisions");
+      await expect(tx.query("select private.calendar_approve_initial($1,1,'Test','Planner','+15125550123')", [events[3]])).rejects.toMatchObject({ code:"RAR09" });
+      await tx.exec("rollback to savepoint stale_decisions");
+      expect((await tx.query<{ n: number }>("select count(*)::int as n from public.calendar_event_commitments where event_id=$1", [events[3]])).rows[0].n).toBe(0);
+      throw rollback;
+    })).rejects.toBe(rollback);
+  });
+
+  it("enforces staff authorization through the proposed approval and cancellation interfaces", async () => {
+    const rollback = new Error("rollback interface fixture");
+    const inactive = await createStaff(db, "admin", { active:false });
+    await expect(db.transaction(async tx => {
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"service_role" })]);
+      const portal = (await tx.query<{ value: { events: Record<string, unknown>[] } }>("select public.calendar_planner_portal($1,$2) as value", [refs[2],sessions[2]])).rows[0].value;
+      const event = portal.events.find(row => row.id===events[3])!;
+      const schedule = event.schedule as Record<string, unknown>;
+      await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)", [refs[2],sessions[2],events[3],JSON.stringify({ ...event,setup_minutes:0,cleanup_minutes:0,schedule:{ ...schedule,start_time:"15:00",end_time:"16:00" } })]);
+      await tx.query("select public.calendar_submit_plan($1,$2,'',false)", [refs[2],sessions[2]]);
+      await tx.exec("savepoint role_test");
+      await tx.exec("set local role anon");
+      await expect(tx.query("select public.calendar_approve_event($1,1,'Test','Planner','+15125550123')", [events[3]])).rejects.toMatchObject({ code:"42501" });
+      await tx.exec("rollback to savepoint role_test");
+      await tx.exec("set local role authenticated");
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"authenticated",sub:inactive })]);
+      await expect(tx.query("select public.calendar_approve_event($1,1,'Test','Planner','+15125550123')", [events[3]])).rejects.toMatchObject({ code:"RAR09" });
+      await tx.exec("rollback to savepoint role_test");
+      await tx.exec("set local role authenticated");
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"authenticated",sub:admin })]);
+      const result = await tx.query<{ id: string }>("select public.calendar_approve_event($1,1,'Test','Planner','+15125550123') as id", [events[3]]);
+      await tx.query("select public.calendar_cancel_event($1,$2,'Testing cancellation')", [events[3],result.rows[0].id]);
+      await tx.exec("reset role");
+      expect((await tx.query<{ state: string }>("select state from public.calendar_event_commitments where id=$1", [result.rows[0].id])).rows[0].state).toBe("cancelled");
+      throw rollback;
+    })).rejects.toBe(rollback);
+  });
+
+  it("keeps approved commitments visible and cancellable after a ministry is removed", async () => {
+    const rollback = new Error("rollback removed-ministry fixture");
+    await expect(db.transaction(async tx => {
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"service_role" })]);
+      const portal = (await tx.query<{ value: { events: Record<string, unknown>[] } }>("select public.calendar_planner_portal($1,$2) as value", [refs[2],sessions[2]])).rows[0].value;
+      const event = portal.events.find(row => row.id===events[3])!;
+      const schedule = event.schedule as Record<string, unknown>;
+      await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)", [refs[2],sessions[2],events[3],JSON.stringify({ ...event,setup_minutes:0,cleanup_minutes:0,schedule:{ ...schedule,start_time:"15:00",end_time:"16:00" } })]);
+      await tx.query("select public.calendar_submit_plan($1,$2,'',false)", [refs[2],sessions[2]]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"authenticated",sub:admin })]);
+      const commitment = (await tx.query<{ id: string }>("select private.calendar_approve_initial($1,1,'Test','Planner','+15125550123') as id", [events[3]])).rows[0].id;
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"authenticated",sub:superAdmin })]);
+      await tx.query("select public.remove_calendar_ministry($1)", [plans[2]]);
+      const active = (await tx.query<{ id: string; plan_active: boolean }>("select * from public.calendar_staff_active_commitments() where id=$1", [commitment])).rows[0];
+      expect(active).toMatchObject({ id:commitment,plan_active:false });
+      await tx.query("select private.calendar_cancel_commitment($1,$2,'Ministry withdrew')", [events[3],commitment]);
+      expect((await tx.query<{ state: string }>("select state from public.calendar_event_commitments where id=$1", [commitment])).rows[0].state).toBe("cancelled");
+      throw rollback;
+    })).rejects.toBe(rollback);
+  });
+
+  it("treats an overlapping approved exclusive event as a hard on-site conflict", async () => {
+    const rollback = new Error("rollback exclusive fixture");
+    await expect(db.transaction(async tx => {
+      const commitment = (await tx.query<{ id: string }>(`insert into public.calendar_event_commitments(event_id,submission_id,approved_by)
+        select event_id,id,$2 from public.calendar_event_submissions where event_id=$1 limit 1 returning id`, [events[0],admin])).rows[0].id;
+      const rows = (await tx.query<{ classification: string; conflict_type: string; event_id: string }>("select * from private.calendar_current_conflicts()" )).rows;
+      expect(rows.some(row => row.event_id===events[1] && row.conflict_type==="approved_exclusive" && row.classification==="hard")).toBe(true);
+      expect(rows.some(row => row.event_id===events[2] && row.conflict_type==="approved_exclusive")).toBe(false);
+      expect(rows.some(row => row.event_id===events[0])).toBe(false);
+      await tx.query(`insert into public.calendar_commitment_occurrence_cancellations(commitment_id,submission_occurrence_id,logical_occurrence_id,reason,cancelled_by)
+        select $1,o.id,o.logical_occurrence_id,'Cancelled date',$2 from public.calendar_submission_occurrences o
+        join public.calendar_event_commitments c on c.submission_id=o.submission_id where c.id=$1`, [commitment,admin]);
+      expect((await tx.query<{ conflict_type: string; event_id: string }>("select * from private.calendar_current_conflicts()" )).rows
+        .some(row => row.event_id===events[1] && row.conflict_type==="approved_exclusive")).toBe(false);
+      throw rollback;
+    })).rejects.toBe(rollback);
+  });
+
+  it("cancels one future date, retains the others, and preserves that cancellation on replacement", async () => {
+    const rollback = new Error("rollback occurrence cancellation fixture");
+    await expect(db.transaction(async tx => {
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"service_role" })]);
+      const portal = (await tx.query<{ value: { events: Record<string, unknown>[] } }>("select public.calendar_planner_portal($1,$2) as value", [refs[2],sessions[2]])).rows[0].value;
+      const event = portal.events.find(row => row.id===events[3])!;
+      const schedule = event.schedule as Record<string, unknown>;
+      const nextDate = (await tx.query<{ date: string }>("select ($1::date+1)::text as date", [date])).rows[0].date;
+      await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)", [refs[2],sessions[2],events[3],JSON.stringify({ ...event,setup_minutes:0,cleanup_minutes:0,
+        schedule:{ ...schedule,kind:"recurring",frequency:"daily",interval_count:1,start_date:date,end_date:nextDate,start_time:"15:00",end_time:"16:00" } })]);
+      await tx.query("select public.calendar_submit_plan($1,$2,'',false)", [refs[2],sessions[2]]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"authenticated",sub:admin })]);
+      const commitment = (await tx.query<{ id: string }>("select private.calendar_approve_initial($1,1,'Test','Planner','+15125550123') as id", [events[3]])).rows[0].id;
+      const occurrences = (await tx.query<{ id: string; logical_occurrence_id: string }>(`select o.id,o.logical_occurrence_id from public.calendar_submission_occurrences o
+        join public.calendar_event_commitments c on c.submission_id=o.submission_id where c.id=$1 order by o.start_at`, [commitment])).rows;
+      expect(occurrences).toHaveLength(2);
+      await tx.query("select private.calendar_cancel_occurrence($1,$2,$3,'One date cancelled')", [events[3],commitment,occurrences[0].id]);
+      const holds = (await tx.query<{ status: string }>("select status from public.reservations where calendar_commitment_id=$1 order by start_at", [commitment])).rows;
+      expect(holds.map(r => r.status)).toEqual(["cancelled","approved"]);
+      const submission = (await tx.query<{ submission_id: string }>("select submission_id from public.calendar_event_commitments where id=$1", [commitment])).rows[0].submission_id;
+      const staffDates = (await tx.query<{ value: { id: string; cancelled: boolean; can_cancel: boolean; commitment_id: string }[] }>("select public.calendar_staff_occurrences($1) as value", [submission])).rows[0].value;
+      expect(staffDates.find(o => o.id===occurrences[0].id)).toMatchObject({ cancelled:true,can_cancel:false,commitment_id:commitment });
+      expect(staffDates.find(o => o.id===occurrences[1].id)).toMatchObject({ cancelled:false,can_cancel:true,commitment_id:commitment });
+      const cancellationEmails = (await tx.query<{ n: number }>("select count(*)::int as n from public.system_email_logs where event_type='calendar_event_occurrence_cancelled'")).rows[0].n;
+      expect(cancellationEmails).toBeGreaterThan(0);
+      await tx.exec("savepoint repeated_cancel");
+      await expect(tx.query("select private.calendar_cancel_occurrence($1,$2,$3,'Repeat')", [events[3],commitment,occurrences[0].id])).rejects.toMatchObject({ code:"RAR09" });
+      await tx.exec("rollback to savepoint repeated_cancel");
+      await expect(tx.query("select private.calendar_cancel_occurrence($1,$2,$3,'Wrong event')", [events[0],commitment,occurrences[1].id])).rejects.toMatchObject({ code:"RAR09" });
+      await tx.exec("rollback to savepoint repeated_cancel");
+      await expect(tx.query("delete from public.calendar_commitment_occurrence_cancellations where commitment_id=$1", [commitment])).rejects.toMatchObject({ code:"RAR09" });
+      await tx.exec("rollback to savepoint repeated_cancel");
+      expect((await tx.query<{ n: number }>("select count(*)::int as n from public.system_email_logs where event_type='calendar_event_occurrence_cancelled'")).rows[0].n).toBe(cancellationEmails);
+      await tx.query("select public.calendar_request_plan_changes($1,'Revise event')", [plans[2]]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"service_role" })]);
+      const revisedPortal = (await tx.query<{ value: { events: Record<string, unknown>[] } }>("select public.calendar_planner_portal($1,$2) as value", [refs[2],sessions[2]])).rows[0].value;
+      const revised = revisedPortal.events.find(row => row.id===events[3])!;
+      await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)", [refs[2],sessions[2],events[3],JSON.stringify({ ...revised,title:"Revised recurring event" })]);
+      await tx.query("select public.calendar_submit_plan($1,$2,'',false)", [refs[2],sessions[2]]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"authenticated",sub:admin })]);
+      const replacement = (await tx.query<{ id: string }>("select private.calendar_approve_initial($1,2,'Test','Planner','+15125550123',$2) as id", [events[3],commitment])).rows[0].id;
+      expect((await tx.query<{ n: number }>("select count(*)::int as n from public.reservations where calendar_commitment_id=$1 and status='approved'", [replacement])).rows[0].n).toBe(1);
+      expect((await tx.query<{ logical_occurrence_id: string }>("select logical_occurrence_id from public.calendar_commitment_occurrence_cancellations where commitment_id=$1", [replacement])).rows[0].logical_occurrence_id).toBe(occurrences[0].logical_occurrence_id);
+      throw rollback;
+    })).rejects.toBe(rollback);
+  });
+
+  it("keeps calendar reservation capabilities private and scopes the horizon exception to their transaction", async () => {
+    const snapshot = (await db.query<{ id: string }>(`select o.id from public.calendar_submission_occurrences o
+      join public.calendar_event_submissions s on s.id=o.submission_id where s.event_id=$1 limit 1`, [events[0]])).rows[0].id;
+    const id = crypto.randomUUID();
+    const starts = (await db.query<{ start_at: string; end_at: string }>(`select
+      (((now() at time zone 'America/Chicago')::date+300)+time '10:00') at time zone 'America/Chicago' as start_at,
+      (((now() at time zone 'America/Chicago')::date+300)+time '11:00') at time zone 'America/Chicago' as end_at`)).rows[0];
+    const insert = `insert into public.reservations(id,reference_code,status,source,room_id,start_at,end_at,
+      requester_first_name,requester_last_name,requester_email,requester_phone,other_ministry_name,purpose,estimated_attendance,
+      approval_required_at_submission,food_drinks_allowed_at_submission,room_capacity_at_submission,guest_token_hash,guest_token_seed,
+      calendar_submission_occurrence_id,calendar_commitment_id) values ($1,private.generate_reference_code(),'approved','admin',$2,$3,$4,
+      'Test','Planner','planner@example.org','+15125550123','Test','Calendar',10,false,false,0,
+      sha256(convert_to(gen_random_uuid()::text,'UTF8')),uuid_send(gen_random_uuid()),$5,$6)`;
+    const makeSnapshot = async (tx: Queryable, startAt: string, endAt: string) => {
+      const logical = crypto.randomUUID();
+      const occurrence = (await tx.query<{ id: string }>(`insert into public.calendar_event_occurrences(event_id,logical_occurrence_id,source_key,schedule_revision,
+        local_start,local_end,timezone,all_day,start_at,end_at,occupancy_start,occupancy_end)
+        values ($1,$2::uuid,$2::uuid::text,1,$3::timestamptz at time zone 'America/Chicago',$4::timestamptz at time zone 'America/Chicago',
+          'America/Chicago',false,$3,$4,$3,$4) returning id`, [events[1],logical,startAt,endAt])).rows[0].id;
+      const result = (await tx.query<{ id: string }>(`insert into public.calendar_submission_occurrences(submission_id,occurrence_id,logical_occurrence_id,
+        local_start,local_end,timezone,all_day,start_at,end_at,occupancy_start,occupancy_end)
+        select s.id,$2,$3,$4::timestamptz at time zone 'America/Chicago',$5::timestamptz at time zone 'America/Chicago',
+          'America/Chicago',false,$4,$5,$4,$5 from public.calendar_event_submissions s where s.event_id=$1 limit 1 returning id`,
+        [events[1],occurrence,logical,startAt,endAt])).rows[0].id;
+      await tx.query("insert into public.calendar_submission_room_requests(submission_occurrence_id,room_id,origin) values ($1,$2,'template')", [result,room]);
+      const commitment = (await tx.query<{ id: string }>(`insert into public.calendar_event_commitments(event_id,submission_id,approved_by)
+        select s.event_id,s.id,$2 from public.calendar_event_submissions s where s.event_id=$1 limit 1 returning id`, [events[1],admin])).rows[0].id;
+      return { snapshot: result, commitment };
+    };
+    await expect(asRole(db, "authenticated", tx => tx.query("insert into private.calendar_reservation_capabilities values (txid_current(),$1,$2,'create')", [id,snapshot]), admin)).rejects.toMatchObject({ code: "42501" });
+    await expect(asRole(db, "service_role", tx => tx.query("insert into private.calendar_reservation_capabilities values (txid_current(),$1,$2,'create')", [id,snapshot]))).rejects.toMatchObject({ code: "42501" });
+    await expect(asRole(db, "authenticated", tx => tx.query("update private.calendar_commitment_serialization set revision=0"), admin)).rejects.toMatchObject({ code: "42501" });
+    await expect(asRole(db, "service_role", tx => tx.query("update private.calendar_commitment_serialization set revision=0"))).rejects.toMatchObject({ code: "42501" });
+    await expect(asRole(db, "service_role", tx => tx.query("select private.calendar_submit_plan($1,$2,'',false)", [refs[2],sessions[2]]))).rejects.toMatchObject({ code: "42501" });
+    await expect(db.query(insert, [id,room,starts.start_at,starts.end_at,snapshot,null])).rejects.toMatchObject({ code: "RAR09" });
+    await expect(insertReservation(db, { roomId: room, startAt: starts.start_at, endAt: starts.end_at })).rejects.toMatchObject({ code: "RAR02" });
+    const foodTimes = (await db.query<{ start_at: string; end_at: string }>("select occupancy_start as start_at,occupancy_end as end_at from public.calendar_submission_occurrences where id=$1", [snapshot])).rows[0];
+    await expect(db.transaction(async tx => {
+      const commitment = (await tx.query<{ id: string }>(`insert into public.calendar_event_commitments(event_id,submission_id,approved_by)
+        select event_id,id,$2 from public.calendar_event_submissions where event_id=$1 limit 1 returning id`, [events[0],admin])).rows[0].id;
+      await tx.query("insert into private.calendar_reservation_capabilities values (txid_current(),$1,$2,'create')", [id,snapshot]);
+      await tx.query(insert, [id,room,foodTimes.start_at,foodTimes.end_at,snapshot,commitment]);
+    })).rejects.toMatchObject({ code: "RAR09" });
+    const rollback = new Error("rollback test reservation");
+    await expect(db.transaction(async tx => {
+      const matchingSnapshot = await makeSnapshot(tx, starts.start_at, starts.end_at);
+      await tx.exec("savepoint ledger_test");
+      await expect(tx.query("insert into public.calendar_event_commitments(event_id,submission_id,approved_by) select event_id,submission_id,approved_by from public.calendar_event_commitments where id=$1", [matchingSnapshot.commitment])).rejects.toMatchObject({ code: "23505" });
+      await tx.exec("rollback to savepoint ledger_test");
+      await expect(tx.query("update public.calendar_event_commitments set event_id=$2 where id=$1", [matchingSnapshot.commitment,events[0]])).rejects.toMatchObject({ code: "RAR09" });
+      await tx.exec("rollback to savepoint ledger_test");
+      await expect(tx.query("delete from public.calendar_event_commitments where id=$1", [matchingSnapshot.commitment])).rejects.toMatchObject({ code: "RAR09" });
+      await tx.exec("rollback to savepoint ledger_test");
+      await tx.query("insert into private.calendar_reservation_capabilities values (txid_current(),$1,$2,'create')", [id,matchingSnapshot.snapshot]);
+      await tx.exec("savepoint snapshot_test");
+      await expect(tx.query(insert, [id,room,starts.start_at,new Date(new Date(starts.end_at).getTime() + 30 * 60 * 1000).toISOString(),matchingSnapshot.snapshot,matchingSnapshot.commitment])).rejects.toMatchObject({ code: "RAR09" });
+      await tx.exec("rollback to savepoint snapshot_test");
+      await tx.query(insert, [id,room,starts.start_at,starts.end_at,matchingSnapshot.snapshot,matchingSnapshot.commitment]);
+      await tx.query("delete from private.calendar_reservation_capabilities where reservation_id=$1", [id]);
+      await tx.exec("savepoint guard_test");
+      await expect(tx.query("update public.calendar_event_commitments set state='cancelled',closed_by=$2,closed_at=now(),close_reason='Cancelled' where id=$1", [matchingSnapshot.commitment,admin])).rejects.toMatchObject({ code: "RAR09" });
+      await tx.exec("rollback to savepoint guard_test");
+      await expect(tx.query("update public.reservations set admin_notes='ordinary edit' where id=$1", [id])).rejects.toMatchObject({ code: "RAR09" });
+      await tx.exec("rollback to savepoint guard_test");
+      await expect(tx.query("delete from public.reservations where id=$1", [id])).rejects.toMatchObject({ code: "RAR09" });
+      await tx.exec("rollback to savepoint guard_test");
+      await tx.query("insert into private.calendar_reservation_capabilities values (txid_current(),$1,$2,'cancel')", [id,matchingSnapshot.snapshot]);
+      await expect(tx.query("update public.reservations set status='cancelled',purpose='tampered' where id=$1", [id])).rejects.toMatchObject({ code: "RAR09" });
+      await tx.exec("rollback to savepoint guard_test");
+      await tx.query("insert into private.calendar_reservation_capabilities values (txid_current(),$1,$2,'cancel')", [id,matchingSnapshot.snapshot]);
+      await tx.query("update public.reservations set status='cancelled',cancelled_by_user_id=$2 where id=$1", [id,admin]);
+      expect((await tx.query<{ status: string }>("select status from public.reservations where id=$1", [id])).rows[0].status).toBe("cancelled");
+      await tx.query("update public.calendar_event_commitments set state='cancelled',closed_by=$2,closed_at=now(),close_reason='Cancelled' where id=$1", [matchingSnapshot.commitment,admin]);
+      await tx.exec("savepoint closed_test");
+      await expect(tx.query("update public.calendar_event_commitments set state='active',closed_by=null,closed_at=null,close_reason=null where id=$1", [matchingSnapshot.commitment])).rejects.toMatchObject({ code: "RAR09" });
+      throw rollback;
+    })).rejects.toBe(rollback);
+    for (const [startTime,endTime] of [["02:00","03:00"],["10:07","11:00"],["23:00","01:00"]]) {
+      const invalid = (await db.query<{ start_at: string; end_at: string }>(`select
+        (((now() at time zone 'America/Chicago')::date+300)+$1::time) at time zone 'America/Chicago' as start_at,
+        (((now() at time zone 'America/Chicago')::date+300+case when $2::time<$1::time then 1 else 0 end)+$2::time) at time zone 'America/Chicago' as end_at`, [startTime,endTime])).rows[0];
+      await expect(db.transaction(async tx => {
+        const matchingSnapshot = await makeSnapshot(tx, invalid.start_at, invalid.end_at);
+        await tx.query("insert into private.calendar_reservation_capabilities values (txid_current(),$1,$2,'create')", [id,matchingSnapshot.snapshot]);
+        await tx.query(insert, [id,room,invalid.start_at,invalid.end_at,matchingSnapshot.snapshot,matchingSnapshot.commitment]);
+      })).rejects.toMatchObject({ code: "RAR04" });
+    }
+  });
+
   it("compares submitted snapshots, keeps hard blocks separate, and applies on-site exclusivity", async () => {
     const rows = (await conflicts()).rows;
     const kinds = rows.map(row => row.conflict_type);
@@ -89,6 +486,10 @@ describe("Church Calendar conflicts", () => {
 
   it("requires staff, hides other ministries from planners, and blocks hard overrides", async () => {
     await expect(asRole(db, "anon", tx => tx.query("select * from public.calendar_list_conflicts()"))).rejects.toMatchObject({ code: "42501" });
+    await expect(asRole(db, "anon", tx => tx.query("select public.calendar_approve_event($1,1,'A','B','+15125550123')", [events[0]]))).rejects.toMatchObject({ code: "42501" });
+    await expect(asRole(db, "anon", tx => tx.query("select public.calendar_cancel_event($1,$2,'Reason')", [events[0],crypto.randomUUID()]))).rejects.toMatchObject({ code: "42501" });
+    const disabled = await createStaff(db, "admin", { active:false });
+    await expect(asRole(db, "authenticated", tx => tx.query("select public.calendar_cancel_event($1,$2,'Reason')", [events[0],crypto.randomUUID()]), disabled)).rejects.toMatchObject({ code: "RAR09" });
     await expect(asRole(db, "authenticated", tx => tx.query("select public.calendar_conflict_policy_save(60)"), admin)).rejects.toMatchObject({ code: "RAR09" });
     const planner = await asRole(db, "service_role", tx => tx.query("select * from public.calendar_planner_conflicts($1,$2)", [refs[0], sessions[0]]));
     expect(planner.rows.length).toBeGreaterThan(0);

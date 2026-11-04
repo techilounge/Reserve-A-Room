@@ -14,6 +14,9 @@ type Detail = { event?: string; ministry?: string; other_event?: string; other_m
   participants?: { event_id: string; title: string; ministry: string }[] };
 const labels: Record<string, string> = {
   room_planning: "Room requested by more than one event", exclusive_planning: "Exclusive on-site events overlap",
+  approved_exclusive: "An approved exclusive on-site event overlaps",
+  approved_same_ministry: "An approved event from the same ministry overlaps",
+  approved_church_wide_overlap: "An approved church-wide event overlaps",
   same_ministry: "Events from the same ministry overlap", church_wide_overlap: "Church-wide events overlap",
   room_reservation: "Room has an existing reservation", room_unavailable: "Room is unavailable",
   food_policy: "Food is not allowed in this room", room_capacity: "Attendance exceeds room capacity",

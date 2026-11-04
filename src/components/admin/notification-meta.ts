@@ -7,11 +7,14 @@ export const NOTIFICATION_ICONS: Record<string, LucideIcon> = {
   reservation_modified: Pencil,
   email_failed: MailWarning,
   recurring_request_received: CalendarClock,
+  calendar_event: CalendarClock,
+  calendar_plan: CalendarClock,
 };
 
-export function notificationHref(notification: { reservation_id: string | null; recurring_request_id: string | null }): string {
+export function notificationHref(notification: { reservation_id: string | null; recurring_request_id: string | null; type?: string }): string {
   if (notification.reservation_id) return `/admin/reservations/${notification.reservation_id}`;
   if (notification.recurring_request_id) return "/admin/recurring-requests";
+  if (notification.type === "calendar_event" || notification.type === "calendar_plan") return "/admin/calendar-submissions";
   return "/admin/notifications";
 }
 
