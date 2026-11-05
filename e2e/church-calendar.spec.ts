@@ -56,10 +56,27 @@ test("staff can approve, revise and cancel calendar commitments", async ({ brows
     await editor.getByRole("checkbox", { name: "Conference Room" }).check();
     await editor.getByRole("button", { name: "Save event" }).click();
     await expect(planner.getByText(/Approval browser event · CAL-/)).toBeVisible();
+    await planner.getByText("Add an event").click();
+    await editor.getByLabel("Event title").fill("Roomless browser event");
+    await editor.locator('select[name="location_type"]').selectOption("virtual");
+    await editor.getByLabel("Start date", { exact: true }).first().fill(day(64));
+    await editor.getByLabel("End date (same as start for one day)").fill(day(64));
+    await editor.getByLabel("Start time", { exact: true }).fill("14:00");
+    await editor.getByLabel("End time", { exact: true }).fill("15:00");
+    await editor.getByRole("button", { name: "Save event" }).click();
+    await expect(planner.getByText(/Roomless browser event · CAL-/)).toBeVisible();
     await planner.getByRole("button", { name: "Submit plan" }).click();
     await expect(planner.getByRole("status")).toContainText("submitted");
 
     await page.goto("/admin/calendar-submissions");
+    const roomless = page.locator("details").filter({ has: page.locator("summary").filter({ hasText: "Roomless browser event" }) });
+    await roomless.locator("summary").click();
+    await roomless.getByRole("button", { name: "Review event approval" }).click();
+    const roomlessDialog = page.getByRole("alertdialog");
+    await expect(roomlessDialog.getByLabel("Contact first name")).toHaveCount(0);
+    await expect(roomlessDialog.getByLabel("Contact phone, including country code")).toHaveCount(0);
+    await roomlessDialog.getByRole("button", { name: "Approve event", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("approval was recorded");
     const event = page.locator("details").filter({ has: page.locator("summary").filter({ hasText: "Approval browser event" }) });
     await event.locator("summary").click();
     await event.getByRole("button", { name: "Review event approval" }).click();

@@ -414,6 +414,7 @@ describe("function privileges (catalog-wide allowlist)", () => {
       "public.calendar_staff_latest_commitments",
       "public.calendar_staff_occurrences",
       "public.calendar_staff_plan_list",
+      "public.calendar_staff_room_contact_requirements",
       "public.cancel_reservation",
       "public.complete_staff_password_setup",
       "public.create_recurring_reservation_series",

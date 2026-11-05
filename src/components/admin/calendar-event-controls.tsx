@@ -5,19 +5,19 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
   AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 
-export function CalendarApprovalControl({ eventId,revision,commitmentId }: { eventId:string; revision:number; commitmentId?:string }) {
+export function CalendarApprovalControl({ eventId,revision,commitmentId,requiresRoomContact }: { eventId:string; revision:number; commitmentId?:string; requiresRoomContact:boolean }) {
   const replacing = Boolean(commitmentId);
   return <AlertDialog>
     <AlertDialogTrigger asChild><Button type="button" variant="outline">{replacing ? "Review replacement approval" : "Review event approval"}</Button></AlertDialogTrigger>
     <AlertDialogContent>
       <AlertDialogHeader><AlertDialogTitle>{replacing ? "Approve this revision?" : "Approve this event?"}</AlertDialogTitle>
-        <AlertDialogDescription>{replacing ? "Future room and resource commitments will be replaced together if all checks pass." : "Requested rooms and resources will be confirmed together if all checks pass."} Enter the planner&apos;s contact details for the room holds.</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogDescription>{replacing ? "Future room and resource commitments will be replaced together if all checks pass." : "Requested rooms and resources will be confirmed together if all checks pass."}{requiresRoomContact ? " Enter the planner’s contact details for the room holds." : ""}</AlertDialogDescription></AlertDialogHeader>
       <form action={approveCalendarEvent} className="space-y-3">
         <input type="hidden" name="event" value={eventId} /><input type="hidden" name="revision" value={revision} />
         {commitmentId ? <input type="hidden" name="commitment" value={commitmentId} /> : null}
-        <label className="block text-sm font-medium">Contact first name<input className="mt-1 block w-full rounded border bg-background p-2" name="firstName" maxLength={80} required /></label>
+        {requiresRoomContact ? <><label className="block text-sm font-medium">Contact first name<input className="mt-1 block w-full rounded border bg-background p-2" name="firstName" maxLength={80} required /></label>
         <label className="block text-sm font-medium">Contact last name<input className="mt-1 block w-full rounded border bg-background p-2" name="lastName" maxLength={80} required /></label>
-        <label className="block text-sm font-medium">Contact phone, including country code<input className="mt-1 block w-full rounded border bg-background p-2" name="phone" type="tel" placeholder="+15125550123" pattern="\+[1-9][0-9]{6,14}" required /></label>
+        <label className="block text-sm font-medium">Contact phone, including country code<input className="mt-1 block w-full rounded border bg-background p-2" name="phone" type="tel" placeholder="+15125550123" pattern="\+[1-9][0-9]{6,14}" required /></label></> : null}
         <AlertDialogFooter><AlertDialogCancel type="button">Keep reviewing</AlertDialogCancel><Button type="submit">{replacing ? "Approve revision" : "Approve event"}</Button></AlertDialogFooter>
       </form>
     </AlertDialogContent>

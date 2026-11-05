@@ -28,6 +28,7 @@ export default async function CalendarSubmissions({ searchParams }: { searchPara
   const { data, error } = await supabase.rpc("calendar_staff_plan_list");
   const activeResult = PHASE6_APPROVAL_UI_ENABLED ? await supabase.rpc("calendar_staff_active_commitments") : null;
   const latestResult = PHASE6_APPROVAL_UI_ENABLED ? await supabase.rpc("calendar_staff_latest_commitments") : null;
+  const contactResult = PHASE6_APPROVAL_UI_ENABLED ? await supabase.rpc("calendar_staff_room_contact_requirements") : null;
   const activeCommitments = activeResult?.data ?? [];
   const latestCommitments = latestResult?.data ?? [];
   const plans = (data ?? []) as Plan[];
@@ -40,7 +41,7 @@ export default async function CalendarSubmissions({ searchParams }: { searchPara
   return <div className="space-y-6">
     <PageHeader title="Church Calendar Plans" description={PHASE6_APPROVAL_UI_ENABLED ? "Review submitted plans and their approved commitments." : "Submitted ministry plans are proposals; no room or resource has been reserved."} />
     {params.updated ? <p role="status">{params.updated === "approval" ? "The event approval was recorded." : params.updated === "cancel" ? "The event was cancelled and future commitments were released." : "The planner can now revise this plan while its cycle is open."}</p> : null}
-    {params.error || error || activeResult?.error || latestResult?.error ? <p role="alert">{errorMessage}</p> : null}
+    {params.error || error || activeResult?.error || latestResult?.error || contactResult?.error ? <p role="alert">{errorMessage}</p> : null}
     {PHASE6_APPROVAL_UI_ENABLED && activeCommitments.length ? <section className="space-y-3"><h2 className="text-xl font-semibold">Approved events</h2>
       <ul className="space-y-2">{activeCommitments.map(commitment => <li key={commitment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
         <div><p className="font-semibold">{commitment.title}</p><p className="text-sm text-muted-foreground">{commitment.ministry} · {commitment.cycle}{commitment.plan_active ? "" : " · Ministry removed from planning"}</p></div>
@@ -79,7 +80,7 @@ export default async function CalendarSubmissions({ searchParams }: { searchPara
             <p>Resources requested: {event.resources.map(resource => `${resource.name} (${resource.quantity})${resource.notes ? `: ${resource.notes}` : ""}`).join(", ") || "None"}</p>
             <Link className="underline" href={`/admin/calendar-submissions/occurrences/${event.id}`}>View submitted dates and requests</Link>
             {PHASE6_APPROVAL_UI_ENABLED ? <div className="pt-2">{commitment?.submission_id===event.id ? <p>Approved with confirmed commitments.</p> : latest?.submission_id===event.id && latest.state==="cancelled" ? <p>Cancelled. Request changes and submit a fresh revision to seek approval again.</p> :
-              plan.status === "submitted" ? <CalendarApprovalControl eventId={event.event_id} revision={plan.revision} commitmentId={commitment?.id} /> : <p>This submission cannot be approved while changes are being prepared.</p>}</div> : null}
+              plan.status === "submitted" ? <CalendarApprovalControl eventId={event.event_id} revision={plan.revision} commitmentId={commitment?.id} requiresRoomContact={contactResult?.data?.find(item => item.submission_id===event.id)?.requires_room_contact ?? true} /> : <p>This submission cannot be approved while changes are being prepared.</p>}</div> : null}
           </div>
         </details>
       </li>; })}</ul> : <p>No events were submitted.</p>}

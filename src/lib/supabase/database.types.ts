@@ -2679,6 +2679,10 @@ export type Database = {
         Args: never;
         Returns: Json;
       };
+      calendar_staff_room_contact_requirements: {
+        Args: never;
+        Returns: { submission_id: string; requires_room_contact: boolean }[];
+      };
       calendar_submit_plan: {
         Args: { p_plan_id: string; p_session_hash: string; p_message: string; p_confirm_empty: boolean };
         Returns: number;

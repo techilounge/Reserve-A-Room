@@ -29,14 +29,14 @@ export async function approveCalendarEvent(form: FormData) {
   const lastName = String(form.get("lastName") ?? "").trim();
   const phone = String(form.get("phone") ?? "").trim();
   if (!UUID.test(event) || !Number.isSafeInteger(revision) || revision < 1 || (commitment && !UUID.test(commitment)) ||
-    firstName.length < 1 || firstName.length > 80 || lastName.length < 1 || lastName.length > 80 || !/^\+[1-9][0-9]{6,14}$/.test(phone)) {
+    firstName.length > 80 || lastName.length > 80 || phone.length > 16) {
     redirect("/admin/calendar-submissions?error=contact");
   }
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc("calendar_approve_event", { p_event_id:event,p_expected_revision:revision,
     p_first_name:firstName,p_last_name:lastName,p_phone:phone,...(commitment ? { p_expected_commitment:commitment } : {}) });
   if (error) {
-    const reason = error.code === "RAR04" ? "schedule" : error.code === "RAR03" ? "past" : "approval";
+    const reason = error.code === "RAR04" ? "schedule" : error.code === "RAR03" ? "past" : error.code === "RAR11" ? "contact" : "approval";
     redirect(`/admin/calendar-submissions?error=${reason}`);
   }
   scheduleSystemEmailDelivery();

@@ -66,6 +66,68 @@ it("preserves pre-remediation decisions as untrusted legacy history during upgra
 afterAll(async () => { await db.close(); });
 
 describe("Church Calendar conflicts", () => {
+  it.each([
+    { name:"virtual", location:"virtual", resources:[] },
+    { name:"offsite", location:"offsite", resources:[] },
+    { name:"resource-only", location:"church", resources:[{ id:resource, quantity:1 }] },
+  ])("approves a $name event without room-contact information", async ({ location, resources }) => {
+    // The resource fixture is initialized in beforeAll, after the parameter list.
+    const rollback = new Error("rollback roomless approval");
+    await expect(db.transaction(async tx => {
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"service_role" })]);
+      const portal = (await tx.query<{ value:{ events:Record<string,unknown>[] } }>("select public.calendar_planner_portal($1,$2) as value", [refs[2],sessions[2]])).rows[0].value;
+      const event=portal.events.find(row => row.id===events[3])!;
+      const requested = location === "church" ? [{ id:resource,quantity:1 }] : resources;
+      await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)", [refs[2],sessions[2],events[3],JSON.stringify({ ...event,location_type:location,scope:"ministry",rooms:[],resources:requested,setup_minutes:0,cleanup_minutes:0,schedule:{ ...(event.schedule as object),start_time:"15:00",end_time:"16:00" } })]);
+      await tx.query("select public.calendar_submit_plan($1,$2,'',false)", [refs[2],sessions[2]]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"authenticated",sub:admin })]);
+      const hint = (await tx.query<{ requires_room_contact:boolean }>("select * from public.calendar_staff_room_contact_requirements() where submission_id=(select id from public.calendar_event_submissions where event_id=$1 and plan_revision=1)", [events[3]])).rows[0];
+      expect(hint.requires_room_contact).toBe(false);
+      const commitment=(await tx.query<{ id:string }>("select public.calendar_approve_event($1,1,null,null,null) as id", [events[3]])).rows[0].id;
+      expect((await tx.query<{ n:number }>("select count(*)::int as n from public.reservations where calendar_commitment_id=$1", [commitment])).rows[0].n).toBe(0);
+      const audit=(await tx.query<{ metadata:{ bypass_advance_horizon_used:boolean } }>("select metadata from public.audit_logs where action='calendar_event.approved' and entity_id=$1 order by created_at desc limit 1", [events[3]])).rows[0];
+      expect(audit.metadata.bypass_advance_horizon_used).toBe(false);
+      if (location === "church") expect((await tx.query<{ n:number }>("select count(*)::int as n from public.calendar_resource_allocations where status='confirmed'")).rows[0].n).toBe(1);
+      if (location === "virtual") {
+        await tx.query("select public.calendar_request_plan_changes($1,'Revise details')",[plans[2]]);
+        await tx.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({ role:"service_role" })]);
+        const updated=(await tx.query<{ value:{ events:Record<string,unknown>[] } }>("select public.calendar_planner_portal($1,$2) as value",[refs[2],sessions[2]])).rows[0].value.events.find(row => row.id===events[3])!;
+        await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)",[refs[2],sessions[2],events[3],JSON.stringify({ ...updated,title:"Revised virtual event" })]);
+        await tx.query("select public.calendar_submit_plan($1,$2,'',false)",[refs[2],sessions[2]]);
+        await tx.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({ role:"authenticated",sub:admin })]);
+        const replacement=(await tx.query<{ id:string }>("select public.calendar_approve_event($1,2,'','','',$2) as id",[events[3],commitment])).rows[0].id;
+        expect((await tx.query<{ n:number }>("select count(*)::int as n from public.reservations where calendar_commitment_id=$1",[replacement])).rows[0].n).toBe(0);
+        expect((await tx.query<{ metadata:{ bypass_advance_horizon_used:boolean } }>("select metadata from public.audit_logs where action='calendar_event.approved' and entity_id=$1 and metadata->>'commitment_id'=$2",[events[3],replacement])).rows[0].metadata.bypass_advance_horizon_used).toBe(false);
+      }
+      throw rollback;
+    })).rejects.toBe(rollback);
+  });
+
+  it("requires contact for effective future room requests and records an in-horizon approval accurately", async () => {
+    const rollback = new Error("rollback in-horizon approval");
+    await expect(db.transaction(async tx => {
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"service_role" })]);
+      const portal=(await tx.query<{ value:{ events:Record<string,unknown>[] } }>("select public.calendar_planner_portal($1,$2) as value",[refs[2],sessions[2]])).rows[0].value;
+      const event=portal.events.find(row => row.id===events[3])!;
+      await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)",[refs[2],sessions[2],events[3],JSON.stringify({ ...event,scope:"ministry",rooms:[],setup_minutes:0,cleanup_minutes:0,schedule:{ ...(event.schedule as object),start_time:"15:00",end_time:"16:00" } })]);
+      await tx.query("select public.calendar_submit_plan($1,$2,'',false)",[refs[2],sessions[2]]);
+      // Model an occurrence-specific room addition with no event-wide room template.
+      await tx.query(`insert into public.calendar_submission_room_requests(submission_occurrence_id,room_id,origin)
+        select o.id,$2,'exception' from public.calendar_submission_occurrences o join public.calendar_event_submissions s on s.id=o.submission_id
+        where s.event_id=$1 and s.plan_revision=1`,[events[3],room]);
+      await tx.query("update public.rooms set max_advance_value=30,max_advance_unit='day' where id=$1",[room]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({ role:"authenticated",sub:admin })]);
+      expect((await tx.query<{ requires_room_contact:boolean }>("select * from public.calendar_staff_room_contact_requirements() where submission_id=(select id from public.calendar_event_submissions where event_id=$1 and plan_revision=1)",[events[3]])).rows[0].requires_room_contact).toBe(true);
+      await tx.exec("savepoint missing_contact");
+      await expect(tx.query("select public.calendar_approve_event($1,1,null,null,null)",[events[3]])).rejects.toMatchObject({ code:"RAR11" });
+      await tx.exec("rollback to savepoint missing_contact");
+      await tx.query("select public.calendar_approve_event($1,1,'Test','Planner','+15125550123')",[events[3]]);
+      const audit=(await tx.query<{ metadata:{ bypass_advance_horizon_used:boolean } }>("select metadata from public.audit_logs where action='calendar_event.approved' and entity_id=$1 order by created_at desc limit 1",[events[3]])).rows[0];
+      expect(audit.metadata.bypass_advance_horizon_used).toBe(false);
+      throw rollback;
+    })).rejects.toBe(rollback);
+  });
+
   it("atomically creates a private first approval and a matching long-range room hold", async () => {
     const rollback = new Error("rollback private approval fixture");
     const initialNotices = (await db.query<{ n: number }>("select count(*)::int as n from public.system_email_logs where event_type like 'calendar_event_%'")).rows[0].n;
@@ -79,6 +141,7 @@ describe("Church Calendar conflicts", () => {
       await tx.query("update public.rooms set max_advance_value=1,max_advance_unit='day' where id=$1", [room]);
       await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"authenticated",sub:admin })]);
       const commitment = (await tx.query<{ id: string }>("select private.calendar_approve_initial($1,1,'Test','Planner','+15125550123') as id", [events[3]])).rows[0].id;
+      expect((await tx.query<{ metadata:{ bypass_advance_horizon_used:boolean } }>("select metadata from public.audit_logs where action='calendar_event.approved' and entity_id=$1 order by created_at desc limit 1",[events[3]])).rows[0].metadata.bypass_advance_horizon_used).toBe(true);
       const rows = await tx.query<{ status: string; calendar_commitment_id: string }>("select status,calendar_commitment_id from public.reservations where calendar_commitment_id=$1", [commitment]);
       expect(rows.rows).toEqual([{ status:"approved",calendar_commitment_id:commitment }]);
       const hold = (await tx.query<{ id: string }>("select id from public.reservations where calendar_commitment_id=$1", [commitment])).rows[0].id;
@@ -364,11 +427,11 @@ describe("Church Calendar conflicts", () => {
       await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"service_role" })]);
       const revisedPortal = (await tx.query<{ value: { events: Record<string, unknown>[] } }>("select public.calendar_planner_portal($1,$2) as value", [refs[2],sessions[2]])).rows[0].value;
       const revised = revisedPortal.events.find(row => row.id===events[3])!;
-      await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)", [refs[2],sessions[2],events[3],JSON.stringify({ ...revised,title:"Revised recurring event" })]);
+      await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)", [refs[2],sessions[2],events[3],JSON.stringify({ ...revised,title:"Revised recurring event",rooms:[] })]);
       await tx.query("select public.calendar_submit_plan($1,$2,'',false)", [refs[2],sessions[2]]);
       await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"authenticated",sub:admin })]);
-      const replacement = (await tx.query<{ id: string }>("select private.calendar_approve_initial($1,2,'Test','Planner','+15125550123',$2) as id", [events[3],commitment])).rows[0].id;
-      expect((await tx.query<{ n: number }>("select count(*)::int as n from public.reservations where calendar_commitment_id=$1 and status='approved'", [replacement])).rows[0].n).toBe(1);
+      const replacement = (await tx.query<{ id: string }>("select private.calendar_approve_initial($1,2,null,null,null,$2) as id", [events[3],commitment])).rows[0].id;
+      expect((await tx.query<{ n: number }>("select count(*)::int as n from public.reservations where calendar_commitment_id=$1 and status='approved'", [replacement])).rows[0].n).toBe(0);
       expect((await tx.query<{ logical_occurrence_id: string }>("select logical_occurrence_id from public.calendar_commitment_occurrence_cancellations where commitment_id=$1", [replacement])).rows[0].logical_occurrence_id).toBe(occurrences[0].logical_occurrence_id);
       throw rollback;
     })).rejects.toBe(rollback);
