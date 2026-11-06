@@ -218,7 +218,17 @@ Verification completed for that fix before commit:
 - Verification: typecheck and lint passed with no warnings; 33 unit-test files / 227 tests passed; 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 103/103. A restored-state check at 1000px, 320px and in dark mode showed no axe violations and no horizontal overflow.
 - Status: committed locally; not yet pushed or deployed.
 
-## Church Calendar Phase 8 checkpoint — current
+## Church Calendar Phase 9 checkpoint — current
+
+- Phase 8 is **APPROVED** at `f1af1276cd34896d90eab71d8b9426d14d296e86`.
+  Exact-SHA verification passed typecheck, lint, 245 unit tests, 215 database tests,
+  production build and 119/119 Playwright tests without skips; Vercel passed.
+- Phase 9 is **authorized** for an accessible public calendar and privacy-safe ICS
+  and JSON feeds from approved immutable commitments, stable occurrence identity,
+  timezone/all-day correctness and caching. Cancellation tombstones are not yet
+  authorized: owner policy and retention remain open. Stop for Phase 9 review. Do not
+  merge to main, deploy production, apply hosted migrations or start Phase 10. Real
+  provider delivery verification and realistic-scale conflict profiling remain release gates.
 
 - Phase 7 is **APPROVED** at `7b46d46a97e0cb262adf578db72fd581e70e7fd2`.
   The reviewer accepted exact-SHA typecheck, lint, 243 unit tests, 210 database

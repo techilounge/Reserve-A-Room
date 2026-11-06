@@ -1,5 +1,16 @@
 # Church Calendar — Phase 0 architecture and implementation plan
 
+**Current authorization:** Phase 8 is **approved** at
+`f1af1276cd34896d90eab71d8b9426d14d296e86`. Exact-SHA typecheck, lint,
+245 unit tests, 215 database tests, production build and 119/119 Playwright tests
+passed without skips; Vercel passed. **Phase 9 is authorized** for an accessible
+public calendar and privacy-safe ICS/JSON feeds of approved public commitments,
+stable identities, timezone/all-day correctness and caching. Do not finalize or expose
+cancellation tombstones before the owner decides cancellation behavior and retention.
+Do not merge, deploy production, apply hosted migrations or start Phase 10 without
+authorization. Real-provider email checks and conflict-engine scale profiling remain
+pre-release requirements.
+
 **Current authorization:** Phase 7 is **approved** at
 `7b46d46a97e0cb262adf578db72fd581e70e7fd2`. Exact-SHA verification passed
 typecheck, lint, 243 unit tests, 210 database tests, production build, and 117/117
