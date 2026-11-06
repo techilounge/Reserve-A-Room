@@ -1,6 +1,6 @@
 # Church Calendar — Phase 0 architecture and implementation plan
 
-**Checkpoint:** Phase 5 was approved at `ebe480dffd627c948b9408147fac2689dd562add`. Phase 6 at `2c020f1a60a5caf128f7b30cd29e6251bce09c2b` passed architectural review with two required fixes: room contacts only when future room holds are created, and accurate audit of actual advance-horizon bypass use. Verification at `2c020f1` passed typecheck, lint, 241 unit tests, 204 database tests, production build, 114/114 Playwright tests without skips, and all native PostgreSQL approval, proposal and allocation race matrices. Vercel reported success. Complete the narrow remediation and rerun all checks on its exact commit, then push the branch for reviewer approval. Phase 7 remains blocked pending that approval. No merge, hosted migration or production rollout is authorized.
+**Checkpoint:** Phase 6 is approved at `38d7ca381d2cd30bea9b55a68e089b10e135b3ad`. Exact-SHA verification passed typecheck, lint, **241 unit tests**, **208 database tests**, production build, **114/114 Playwright tests** with no skips, and the complete native PostgreSQL room, resource and exclusive-event approval, submission/approval and resource-allocation race matrices at all three isolation levels. Vercel reported success. **Phase 7 is authorized:** implement the Church Calendar view, filters/layers, year view, mobile agenda and accessible keyboard controls; rename the existing `/admin/calendar` to Room Schedule. No new schema unless a measured read-model/index requirement justifies an append-only migration. No merge, hosted migration or production rollout is authorized.
 
 **Phase 6 implementation and review remediation:** `20261108100000_calendar_reservation_guards.sql` adds
 the private reservation capability and a calendar-linked reservation guard; it exposes
@@ -12,7 +12,7 @@ transactional notices are in local migrations through `20261108160000`.
 `20261108170000` serializes planner submission with approval, and `20261108180000`
 grants staff mutation interfaces; the UI is enabled locally. The two required review
 fixes use `20261109100000_calendar_approval_contact_and_audit.sql`. Complete verification
-must run on the exact remediation commit before pushing for re-review. No hosted migration
+ran on the exact remediation commit and the reviewer approved it. No hosted migration
 or production rollout is authorized.
 The complete and current handoff is in `AGENTS.md`.
 
@@ -338,4 +338,4 @@ These are recommendations and phase-specific decisions, not newly approved polic
 11. **Website sources:** determine whether the public website calendars share a source and verify plugin/API permissions before Phase 10.
 12. **Security workstream sequencing:** review its independent branch and preview/migration requirements before adopting it as a deployed calendar dependency; no production deploy is implied by this proposal.
 
-**Next action:** finish and verify the Phase 6 review remediation, push only the review branch, and stop for reviewer approval. Do not begin Phase 7, merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.
+**Next action:** implement and verify Phase 7, push only the review branch, and stop for review. Do not merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.

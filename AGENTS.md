@@ -218,14 +218,28 @@ Verification completed for that fix before commit:
 - Verification: typecheck and lint passed with no warnings; 33 unit-test files / 227 tests passed; 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 103/103. A restored-state check at 1000px, 320px and in dark mode showed no axe violations and no horizontal overflow.
 - Status: committed locally; not yet pushed or deployed.
 
-## Church Calendar Phase 6 review remediation — current
+## Church Calendar Phase 7 checkpoint — current
+
+- Phase 6 is **approved** at `38d7ca381d2cd30bea9b55a68e089b10e135b3ad`.
+  The reviewer accepted exact-SHA typecheck, lint, 241 unit tests, 208 database
+  tests, production build, 114/114 Playwright tests with no skips, and the complete
+  real PostgreSQL approval, submission/approval, resource allocation, room,
+  resource and exclusivity race matrices. Vercel reported success.
+- Phase 7 is **authorized**: implement the Church Calendar view with filters/layers,
+  year view, mobile agenda and accessible keyboard controls; relabel the existing
+  `/admin/calendar` as Room Schedule. Avoid schema additions unless a measured
+  read-model/index requirement justifies an append-only migration. Stop for review
+  after Phase 7. Do not merge, deploy production or apply hosted migrations.
+
+## Church Calendar Phase 6 review remediation — historical
 
 - Phase 5 was approved at `ebe480dffd627c948b9408147fac2689dd562add`.
   Phase 6 was implemented and pushed at `2c020f1a60a5caf128f7b30cd29e6251bce09c2b`.
   The reviewer approved its core architecture but requires two narrow fixes before
   final Phase 6 approval: room-contact fields only for effective future room holds,
   and accurate recording of actual advance-horizon bypass use. Phase 7 is blocked
-  only pending the reviewer's final approval of this remediation. Do not merge to
+  only pending the reviewer's final approval of this remediation, which has since
+  been granted at `38d7ca3`. Do not merge to
   main, deploy production, or apply hosted migrations.
 - Exact-SHA verification of `2c020f1`: typecheck and lint passed; 241 unit tests,
   204 database tests, the production build and 114/114 Playwright tests passed with
