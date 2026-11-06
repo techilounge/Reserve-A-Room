@@ -1,5 +1,18 @@
 # Reserve-A-Room — Architecture & Decisions
 
+## Church Calendar planning dashboard and automation (Phase 8 review branch)
+
+The staff planning dashboard aggregates active ministry progress and existing conflict
+results without exposing planner contacts. Super Admins can queue due reminders; the
+protected cron also generates them in bounded batches. Reminder identity includes
+grant/version, cycle deadline revision and milestone, with delivery status in the
+existing system-email outbox. The worker rechecks that the grant, cycle and plan remain
+eligible before sending. Dates are approximate because the cron is scheduled daily.
+Copies of prior submitted plans create only new drafts in a later cycle for the same
+ministry; dates, room/resource requests and commitments are never copied. A planner
+must explicitly confirm saved dates, tied to the current draft version, before the
+database permits submission. No hosted migration or production rollout is implied.
+
 ## Church Calendar master view (Phase 7 review branch)
 
 `/admin/church-calendar` is the staff master view; the existing room-reservation

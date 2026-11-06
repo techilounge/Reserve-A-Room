@@ -9,7 +9,7 @@ import { calendarInstantToLocal, calendarLocalToInstant } from "@/lib/calendar-p
 import { formatInstant } from "@/lib/datetime";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-import { addMinistry, invitePlanner, removeMinistry, revokePlanner, rotatePlanner, saveCycle, saveResource, transitionCycle } from "../actions";
+import { addMinistry, copyPriorPlan, invitePlanner, removeMinistry, revokePlanner, rotatePlanner, saveCycle, saveResource, transitionCycle } from "../actions";
 
 export const metadata: Metadata = { title: "Calendar Setup" };
 const selectStyle = "min-h-10 w-full rounded-lg border border-input bg-background px-3 text-sm";
@@ -109,6 +109,16 @@ export default async function ChurchCalendarPage({ searchParams }: { searchParam
             const ministry = ministries.find((m) => m.id === plan.ministry_id);
             return <div key={plan.id} className="space-y-3 rounded-lg border p-4">
               <h4 className="font-semibold">{ministry?.name ?? "Ministry"}</h4>
+              {editable && plan.submission_revision === 0 && plans.some(source => source.id !== plan.id && source.ministry_id === plan.ministry_id && source.submission_revision > 0 && cycles.some(previous => previous.id === source.cycle_id && previous.start_date < cycle.start_date)) ? <details>
+                <summary className="cursor-pointer text-sm font-medium">Copy events from an earlier plan</summary>
+                <p className="mt-2 text-sm">Only event details are copied as drafts. Dates, rooms, resources and approvals must be reviewed for this cycle.</p>
+                <form action={copyPriorPlan} className="mt-2 flex flex-wrap items-end gap-2"><input type="hidden" name="target" value={plan.id} />
+                  <label className={field}>Earlier plan<select name="source" className={selectStyle} required defaultValue=""><option value="" disabled>Choose a prior cycle</option>
+                    {plans.filter(source => source.id !== plan.id && source.ministry_id === plan.ministry_id && source.submission_revision > 0).flatMap(source => {
+                      const previous=cycles.find(item => item.id===source.cycle_id && item.start_date<cycle.start_date);
+                      return previous ? [<option key={source.id} value={source.id}>{previous.name}</option>] : [];
+                    })}</select></label><Button type="submit" variant="outline">Copy drafts</Button></form>
+              </details> : null}
               {plan.submission_revision > 0 && plan.submission_revision <= plan.resource_submission_floor ? <p className="text-sm text-muted-foreground">This restored ministry’s previous submission is retained for history but excluded from resource demand. Invite a planner and {plan.submission_status === "submitted" ? "request changes so they can " : "ask them to "}submit a new revision.</p> : null}
               {editable ? <form id={`remove-${plan.id}`} action={removeMinistry}>
                 <input type="hidden" name="plan" value={plan.id} />

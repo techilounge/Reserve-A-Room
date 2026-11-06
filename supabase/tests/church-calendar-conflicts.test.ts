@@ -66,6 +66,94 @@ it("preserves pre-remediation decisions as untrusted legacy history during upgra
 afterAll(async () => { await db.close(); });
 
 describe("Church Calendar conflicts", () => {
+  it("copies only prior submitted event details and requires an explicit current date review", async () => {
+    await expect(asRole(db,"authenticated",tx => tx.query("select public.calendar_copy_prior_plan($1,$2)",[plans[0],plans[2]]),admin)).rejects.toMatchObject({code:"RAR09"});
+    const rollback=new Error("rollback copy fixture");
+    await expect(db.transaction(async tx => {
+      const targetCycle=(await tx.query<{id:string}>(`insert into public.calendar_cycles(name,start_date,end_date,submission_opens_at,submission_deadline)
+        values ('Next cycle',current_date+70,current_date+120,now()-interval '1 day',now()+interval '20 days') returning id`)).rows[0].id;
+      const target=(await tx.query<{id:string;reference_code:string}>(`insert into public.ministry_calendar_plans(cycle_id,ministry_id)
+        select $1,ministry_id from public.ministry_calendar_plans where id=$2 returning id,reference_code`,[targetCycle,plans[0]])).rows[0];
+      await tx.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({role:"authenticated",sub:superAdmin})]);
+      expect((await tx.query<{n:number}>("select public.calendar_copy_prior_plan($1,$2) n",[plans[0],target.id])).rows[0].n).toBe(1);
+      expect((await tx.query<{n:number}>("select public.calendar_copy_prior_plan($1,$2) n",[plans[0],target.id])).rows[0].n).toBe(0);
+      const event=(await tx.query<{id:string;draft_version:number}>("select id,draft_version from public.calendar_events where plan_id=$1",[target.id])).rows[0];
+      const saved=(await tx.query<{start_date:string|null}>("select start_date from public.calendar_event_schedules where event_id=$1",[event.id])).rows[0];
+      expect(saved.start_date).toBeNull();
+      for (const table of ["calendar_event_room_templates","calendar_event_resource_templates"]) {
+        expect((await tx.query<{n:number}>(`select count(*)::int n from public.${table} where event_id=$1`,[event.id])).rows[0].n).toBe(0);
+      }
+      const grant=crypto.randomUUID(), token="b".repeat(64), session="b".repeat(64);
+      await tx.query("select public.transition_calendar_cycle($1,'open',null)",[targetCycle]);
+      await tx.query("select public.invite_calendar_planner($1,$2,'New planner','new-planner@example.org',null,'additional',$3,$4)",[target.id,grant,token,"c".repeat(32)]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({role:"service_role"})]);
+      await tx.query("select public.exchange_calendar_planner_session($1,$2,$3,$4)",[target.reference_code,grant,token,session]);
+      await tx.query("select public.calendar_accept_planner_policies($1,$2,'p1','t1')",[target.reference_code,session]);
+      const portal=(await tx.query<{v:{events:Record<string,unknown>[]}}>("select public.calendar_planner_portal($1,$2) v",[target.reference_code,session])).rows[0].v;
+      const draft=portal.events[0];
+      const date=(await tx.query<{d:string}>("select (current_date+75)::text d")).rows[0].d;
+      await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)",[target.reference_code,session,event.id,JSON.stringify({...draft,schedule:{kind:"one_time",timezone:"America/Chicago",start_date:date,end_date:date,start_time:"14:00",end_time:"15:00"}})]);
+      await tx.exec("savepoint copied_submit");
+      await expect(tx.query("select public.calendar_submit_plan($1,$2,'',false)",[target.reference_code,session])).rejects.toMatchObject({code:"RAR09"});
+      await tx.exec("rollback to savepoint copied_submit");
+      const version=(await tx.query<{draft_version:number}>("select draft_version from public.calendar_events where id=$1",[event.id])).rows[0].draft_version;
+      await tx.query("select public.calendar_confirm_copied_date_review($1,$2,$3,$4)",[target.reference_code,session,event.id,version]);
+      const reviewed=(await tx.query<{v:{events:Record<string,unknown>[]}}>("select public.calendar_planner_portal($1,$2) v",[target.reference_code,session])).rows[0].v.events[0];
+      await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)",[target.reference_code,session,event.id,JSON.stringify(reviewed)]);
+      await tx.exec("savepoint changed_after_review");
+      await expect(tx.query("select public.calendar_submit_plan($1,$2,'',false)",[target.reference_code,session])).rejects.toMatchObject({code:"RAR09"});
+      await tx.exec("rollback to savepoint changed_after_review");
+      const changedVersion=(await tx.query<{draft_version:number}>("select draft_version from public.calendar_events where id=$1",[event.id])).rows[0].draft_version;
+      await tx.query("select public.calendar_confirm_copied_date_review($1,$2,$3,$4)",[target.reference_code,session,event.id,changedVersion]);
+      const duplicate=(await tx.query<{id:string}>("select public.calendar_duplicate_event_draft($1,$2,$3) id",[target.reference_code,session,event.id])).rows[0].id;
+      expect((await tx.query<{v:boolean}>("select copied_date_review_required v from public.calendar_events where id=$1",[duplicate])).rows[0].v).toBe(true);
+      await tx.exec("savepoint duplicated_copy");
+      await expect(tx.query("select public.calendar_submit_plan($1,$2,'',false)",[target.reference_code,session])).rejects.toMatchObject({code:"RAR09"});
+      await tx.exec("rollback to savepoint duplicated_copy");
+      const duplicateVersion=(await tx.query<{draft_version:number}>("select draft_version from public.calendar_events where id=$1",[duplicate])).rows[0].draft_version;
+      await tx.query("select public.calendar_remove_event_draft($1,$2,$3,$4)",[target.reference_code,session,duplicate,duplicateVersion]);
+      expect((await tx.query<{revision:number}>("select public.calendar_submit_plan($1,$2,'',false) revision",[target.reference_code,session])).rows[0].revision).toBe(1);
+      expect((await tx.query<{n:number}>("select count(*)::int n from public.calendar_event_commitments where event_id=$1",[event.id])).rows[0].n).toBe(0);
+      throw rollback;
+    })).rejects.toBe(rollback);
+  });
+
+  it("queues reminders idempotently and invalidates stale deliveries after a deadline change", async () => {
+    await expect(asRole(db,"anon",tx => tx.query("select public.calendar_queue_due_reminders(50)"))).rejects.toMatchObject({code:"42501"});
+    await expect(asRole(db,"authenticated",tx => tx.query("select public.calendar_queue_due_reminders(50)"),admin)).rejects.toMatchObject({code:"42501"});
+    const rollback=new Error("rollback reminder fixture");
+    await expect(db.transaction(async tx => {
+      await tx.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({role:"service_role"})]);
+      const first=(await tx.query<{n:number}>("select public.calendar_queue_due_reminders(50) n")).rows[0].n;
+      expect(first).toBe(1);
+      expect((await tx.query<{n:number}>("select public.calendar_queue_due_reminders(50) n")).rows[0].n).toBe(0);
+      const email=(await tx.query<{id:string}>("select id from public.system_email_logs where event_type='calendar_plan_reminder'")).rows[0].id;
+      expect((await tx.query<{v:unknown}>("select public.calendar_reminder_context($1) v",[email])).rows[0].v).toBeTruthy();
+      await tx.query("update public.calendar_cycles set submission_deadline=submission_deadline+interval '1 day' where id=$1",[cycle]);
+      expect((await tx.query<{v:unknown}>("select public.calendar_reminder_context($1) v",[email])).rows[0].v).toBeNull();
+      expect((await tx.query<{n:number}>("select public.calendar_queue_due_reminders(50) n")).rows[0].n).toBe(1);
+      expect((await tx.query<{n:number}>("select count(*)::int n from public.calendar_plan_reminders where plan_id=$1",[plans[2]])).rows[0].n).toBe(2);
+      const fresh=(await tx.query<{id:string}>("select e.id from public.system_email_logs e join public.calendar_plan_reminders r on r.id=e.entity_id where r.plan_id=$1 order by r.deadline_revision desc limit 1",[plans[2]])).rows[0].id;
+      await tx.query("update public.ministry_calendar_plans set submission_status='submitted' where id=$1",[plans[2]]);
+      expect((await tx.query<{v:unknown}>("select public.calendar_reminder_context($1) v",[fresh])).rows[0].v).toBeNull();
+      throw rollback;
+    })).rejects.toBe(rollback);
+  });
+
+  it("reports staff-only cycle and ministry progress without exposing planner data", async () => {
+    await expect(asRole(db,"anon",tx => tx.query("select public.calendar_planning_dashboard()"))).rejects.toMatchObject({code:"42501"});
+    await expect(asRole(db,"service_role",tx => tx.query("select public.calendar_planning_dashboard()"))).rejects.toMatchObject({code:"42501"});
+    const disabled=await createStaff(db,"admin",{active:false});
+    await expect(asRole(db,"authenticated",tx => tx.query("select public.calendar_planning_dashboard()"),disabled)).rejects.toMatchObject({code:"RAR09"});
+    const result=await asRole(db,"authenticated",tx => tx.query<{value:{id:string;submitted:number;outstanding:number;events:number;ministries:{id:string;events:number;invited:boolean}[]}[]}>("select public.calendar_planning_dashboard() as value"),admin);
+    const row=result.rows[0].value.find(item => item.id===cycle)!;
+    expect(row.submitted).toBe(2);
+    expect(row.outstanding).toBe(1);
+    expect(row.events).toBe(4);
+    expect(row.ministries.find(item => item.id===plans[2])).toMatchObject({events:1,invited:true});
+    expect(JSON.stringify(row)).not.toContain("conflict-0@example.org");
+  });
+
   it("returns bounded staff calendar entries and respects room and resource filters", async () => {
     await expect(asRole(db,"anon",tx => tx.query("select * from public.calendar_master_entries($1,$1)",[date]))).rejects.toMatchObject({ code:"42501" });
     await expect(asRole(db,"service_role",tx => tx.query("select * from public.calendar_master_entries($1,$1)",[date]))).rejects.toMatchObject({ code:"42501" });

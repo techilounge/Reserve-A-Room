@@ -55,6 +55,21 @@ describe("church calendar planner invitation", () => {
   });
 });
 
+describe("church calendar reminders", () => {
+  it.each([false,true])("renders safe branded reminder with overdue=%s", async overdue => {
+    const built=buildSystemEmail("calendar_plan_reminder",{
+      appUrl:data.appUrl,appName:data.appName,churchName:data.churchName,contactEmail:data.contactEmail,contactPhone:data.contactPhone,
+      contactName:"Ada <Planner>",ministry:"Music Ministry",cycle:"2027 Planning",deadline:"Dec 1, 2026",overdue,
+    });
+    const [html,text]=await Promise.all([render(built.element),render(built.element,{plainText:true})]);
+    expect(html).toContain("Ada &lt;Planner&gt;");
+    expect(text).toContain("Music Ministry");
+    expect(text).toContain("Dec 1, 2026");
+    expect(text).toContain(overdue ? "deadline has passed" : "personal planning invitation");
+    expect(text).not.toContain("token=");
+  });
+});
+
 describe("church calendar event notices", () => {
   it.each([
     ["calendar_event_approved", "approved"],

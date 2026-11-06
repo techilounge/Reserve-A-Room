@@ -17,6 +17,10 @@ Production: https://reservearoom.stonehillchurch.org
   twice in the room layer. Super Admins manage cycles, invitations and resources at
   `/admin/church-calendar/setup`. The existing `/admin/calendar` is **Room Schedule**.
   These Church Calendar changes are on the review branch and are not deployed.
+- The review-branch **Planning Dashboard** shows ministry progress and conflicts.
+  Due reminders use the branded email outbox; Super Admins can queue them manually.
+  Earlier submitted plans can be copied as drafts with new dates explicitly reviewed
+  by a planner. These Phase 8 changes also require review before production use.
 - Church members and guests reserve rooms **without creating an account**.
 - Each room has its own rules:
   - capacity

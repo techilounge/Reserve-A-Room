@@ -218,7 +218,7 @@ Verification completed for that fix before commit:
 - Verification: typecheck and lint passed with no warnings; 33 unit-test files / 227 tests passed; 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 103/103. A restored-state check at 1000px, 320px and in dark mode showed no axe violations and no horizontal overflow.
 - Status: committed locally; not yet pushed or deployed.
 
-## Church Calendar Phase 7 checkpoint — current
+## Church Calendar Phase 8 checkpoint — current
 
 - Phase 7 is **APPROVED** at `7b46d46a97e0cb262adf578db72fd581e70e7fd2`.
   The reviewer accepted exact-SHA typecheck, lint, 243 unit tests, 210 database
@@ -228,16 +228,30 @@ Verification completed for that fix before commit:
   deploy production, apply hosted migrations, or begin Phase 9 without authorization.
   Profile the existing full-set conflict engine at realistic scale before release.
 
+- Phase 8 work in progress on `codex/church-calendar-phase1`: the planning dashboard
+  and staff-only aggregate RPC are in `20261112100000_calendar_planning_dashboard.sql`;
+  reminders, deadline revisions and a service-only idempotent outbox queue are in
+  `20261112110000_calendar_plan_reminders.sql`; safe prior-plan draft copies and a
+  database-enforced date-review gate are in `20261112120000_calendar_copy_prior_drafts.sql`.
+  Copies start without dates, rooms or resources; duplication also preserves the review
+  requirement. The cron queues due reminders before its existing email sweep and
+  continues the sweep even if the reminder queue fails. Planner emails use Resend.
+  No hosted migrations, production rollout, or Phase 9 work is authorized.
+- The isolated dashboard browser flow, focused database and authorization checks,
+  typecheck and lint have passed during development. Run complete checks on the final
+  committed SHA and record exact results in the handoff response. Phase 8 is not yet
+  approved; push the review branch only after the full gates pass, then stop for review.
+
 - Phase 6 is **approved** at `38d7ca381d2cd30bea9b55a68e089b10e135b3ad`.
   The reviewer accepted exact-SHA typecheck, lint, 241 unit tests, 208 database
   tests, production build, 114/114 Playwright tests with no skips, and the complete
   real PostgreSQL approval, submission/approval, resource allocation, room,
   resource and exclusivity race matrices. Vercel reported success.
-- Phase 7 is **authorized**: implement the Church Calendar view with filters/layers,
+- The former Phase 7 authorization covered the Church Calendar view with filters/layers,
   year view, mobile agenda and accessible keyboard controls; relabel the existing
   `/admin/calendar` as Room Schedule. Avoid schema additions unless a measured
   read-model/index requirement justifies an append-only migration. Stop for review
-  after Phase 7. Do not merge, deploy production or apply hosted migrations.
+  after Phase 7. That review is complete; do not merge, deploy production or apply hosted migrations.
 - Phase 7 implementation: the staff master view is `/admin/church-calendar` and
   the existing `/admin/calendar` is labelled Room Schedule. Super Admin cycle and
   resource configuration moved to `/admin/church-calendar/setup`; its actions and
@@ -254,9 +268,9 @@ Verification completed for that fix before commit:
   verification passed typecheck, lint, 241 unit tests, 210 database tests, production
   build and 116/116 Playwright tests with no skips. The reviewer required one fix:
   associate conflict indicators and filters using each immutable occurrence's full
-  setup/event/cleanup occupancy, not its displayed event times. Phase 8 is blocked.
-- The remediation is the commit containing this checkpoint (see `git log -1` for its
-  exact SHA). Append-only migration `20261111100000_calendar_master_occupancy.sql`
+  setup/event/cleanup occupancy, not its displayed event times. That review gate is resolved.
+- The remediation was approved at `7b46d46a97e0cb262adf578db72fd581e70e7fd2`.
+  Append-only migration `20261111100000_calendar_master_occupancy.sql`
   exposes immutable occupancy in a staff-only bounded read, retains the earlier RPC,
   and expands the conflict lookup for setup/cleanup across date boundaries. The
   calendar continues displaying event times. Profile the existing whole-set conflict
@@ -264,8 +278,9 @@ Verification completed for that fix before commit:
 - The first full browser run exposed an existing dark-mode unread notification badge
   contrast failure once the new fixture raised the count to ten. The badge now uses a
   dark text color in dark mode; the full suite must pass with that fixture present.
-- Run typecheck, lint, unit and DB suites, production build and full Playwright
-  on the final remediation commit. Push only `codex/church-calendar-phase1` and stop for
+- The complete gates passed on the approved Phase 7 remediation. For Phase 8, run
+  typecheck, lint, unit and DB suites, production build and full Playwright on the
+  final commit. Push only `codex/church-calendar-phase1` and stop for
   review. Never report earlier-iteration checks as exact-SHA evidence.
 
 ## Church Calendar Phase 6 review remediation — historical

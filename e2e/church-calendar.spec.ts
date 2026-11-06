@@ -23,7 +23,7 @@ test("staff can approve, revise and cancel calendar commitments", async ({ brows
     await create.getByLabel("Planning opens (America/Chicago)").fill(new Date(now - 86400000).toISOString().slice(0, 16));
     await create.getByLabel("Planning deadline (America/Chicago)").fill(new Date(now + 30 * 86400000).toISOString().slice(0, 16));
     await create.getByRole("button", { name: "Create draft cycle" }).click();
-    const cycle = page.getByRole("article").filter({ hasText: "Approval browser cycle" });
+    const cycle = page.getByRole("article").filter({ has:page.getByRole("heading",{name:"Approval browser cycle",exact:true}) });
     await cycle.getByRole("button", { name: "Open cycle" }).click();
     await cycle.getByLabel("Participating ministry").selectOption({ index: 1 });
     await cycle.getByRole("button", { name: "Add ministry" }).click();
@@ -195,7 +195,7 @@ test("a Super Admin configures a cycle and independently rotates one planner's a
   await create.getByLabel("Planning deadline (America/Chicago)").fill(new Date(now + 30 * 86400000).toISOString().slice(0, 16));
   await create.getByRole("button", { name: "Create draft cycle" }).click();
   await expect(page.getByRole("status")).toContainText("saved");
-  const cycle = page.getByRole("article").filter({ hasText: "Browser test cycle" });
+  const cycle = page.getByRole("article").filter({ has:page.getByRole("heading",{name:"Browser test cycle",exact:true}) });
   await cycle.getByRole("button", { name: "Open cycle" }).click();
   const ministryName = await cycle.getByLabel("Participating ministry").locator("option").nth(1).textContent();
   if (!ministryName) throw new Error("Expected a ministry fixture");
@@ -450,7 +450,7 @@ test("cycle times use the configured timezone for saving and display", async ({ 
     const saved = await (await fetch(`${mockUrl}/qa/calendar-cycle?name=Timezone%20review%20cycle`)).json() as { submission_opens_at: string; submission_deadline: string };
     expect(new Date(saved.submission_opens_at).toISOString()).toBe("2027-01-15T13:30:00.000Z");
     expect(new Date(saved.submission_deadline).toISOString()).toBe("2027-02-15T22:00:00.000Z");
-    const cycle = page.getByRole("article").filter({ hasText: "Timezone review cycle" });
+    const cycle = page.getByRole("article").filter({ has:page.getByRole("heading",{name:"Timezone review cycle",exact:true}) });
     await expect(cycle).toContainText("Jan 15, 2027, 8:30 AM");
     await expect(cycle).toContainText("Feb 15, 2027, 5:00 PM");
     await cycle.getByText("Edit cycle").click();

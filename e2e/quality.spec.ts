@@ -38,6 +38,7 @@ const ADMIN_PAGES = [
   "/admin/rooms/new",
   "/admin/ministries",
   "/admin/church-calendar",
+  "/admin/church-calendar/planning",
   "/admin/church-calendar/setup",
   "/admin/users",
   "/admin/settings",

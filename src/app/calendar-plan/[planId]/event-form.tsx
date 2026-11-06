@@ -5,7 +5,7 @@ import { useActionState, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
-import { duplicatePlannerDraft, removePlannerDraft, savePlannerDraft } from "./actions";
+import { confirmCopiedDates, duplicatePlannerDraft, removePlannerDraft, savePlannerDraft } from "./actions";
 
 type Option = { id: string; name: string; active: boolean };
 type Schedule = { kind: string; timezone: string; all_day: boolean; start_date: string | null; end_date: string | null; start_time: string | null; end_time: string | null;
@@ -16,6 +16,7 @@ export type PlannerEvent = { id: string; title: string; reference_code: string; 
   category: string; scope: string; protection: string; visibility: string; location_type: string; offsite_location: string | null;
   virtual_url: string | null; estimated_attendance: number; food_drinks_planned: boolean; setup_minutes: number; cleanup_minutes: number;
   public_contact_name: string | null; public_contact_email: string | null; requester_notes: string | null; revision: number; draft_version: number;
+  copied_from_submission_id:string | null; copied_date_review_required:boolean; copied_date_reviewed_version:number | null;
   schedule: Schedule; dates: DateEntry[]; rooms: string[]; ministries: string[]; resources: { id: string; quantity: number; notes: string | null }[] };
 export type PlannerCatalog = { rooms: Option[]; ministries: Option[]; resources: Option[] };
 
@@ -105,6 +106,12 @@ export function EventForm({ plan, timezone, catalog, event }: { plan: string; ti
       {state.error ? <p role="alert">{state.error}</p> : null}
       <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save event"}</Button>
     </form>
+    {event?.copied_date_review_required && event.copied_date_reviewed_version !== event.draft_version ? <form action={confirmCopiedDates} className="space-y-2 rounded border p-3">
+      <p>Copied event: save the new dates, then review its schedule, rooms and resources before confirming.</p>
+      <input type="hidden" name="plan" value={plan} /><input type="hidden" name="event" value={event.id} /><input type="hidden" name="draft_version" value={event.draft_version} />
+      <label className="flex gap-2"><input type="checkbox" name="confirm" value="yes" required /> I reviewed these dates for this planning cycle.</label>
+      <Button type="submit" variant="outline">Confirm dates reviewed</Button>
+    </form> : null}
     {event ? <form action={duplicatePlannerDraft}><input type="hidden" name="plan" value={plan} /><input type="hidden" name="event" value={event.id} /><Button variant="outline" type="submit">Duplicate event</Button></form> : null}
     {event ? <ConfirmationDialog
       trigger={<Button variant="outline" type="button">{event.revision ? "Withdraw event" : "Delete draft"}</Button>}

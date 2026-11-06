@@ -19,6 +19,7 @@ type Context = { contact_name: string; ministry_name: string; cycle_name: string
 type Policy = { enabled: boolean; accepted: boolean; privacy_version: string | null; terms_version: string | null };
 type Portal = PlannerCatalog & { status: string; revision: number; changes_requested_reason: string | null; events: PlannerEvent[] };
 function isReady(event: PlannerEvent) {
+  if (event.copied_date_review_required && event.copied_date_reviewed_version !== event.draft_version) return false;
   const s = event.schedule;
   if (!s?.start_date || !s.end_date) return false;
   if (s.kind === "specific_dates" && (!event.dates.length || event.dates.some(date => !date.start_date || !date.end_date || (!s.all_day && (!date.start_time || !date.end_time))))) return false;
@@ -104,7 +105,7 @@ export default async function PlannerInvitationPage({ params, searchParams }: {
             {portal.changes_requested_reason ? <p>Changes requested: {portal.changes_requested_reason}</p> : null}
             {search.submitted ? <p role="status">Your plan was submitted to the church office.</p> : null}
             {portal.events.length ? <ul className="space-y-3">{portal.events.map(event => <li key={event.id}>
-              <details><summary>{event.title} · {event.reference_code} · {isReady(event) ? "Ready" : "Needs attention"} · {event.schedule.start_date ?? "Date needed"}{event.schedule.all_day ? " · All day" : event.schedule.kind === "specific_dates" ? " · Times vary" : ` ${event.schedule.start_time?.slice(0, 5) ?? ""}–${event.schedule.end_time?.slice(0, 5) ?? ""}`}</summary>
+              <details><summary>{event.title} · {event.reference_code} · {isReady(event) ? "Ready" : "Needs attention"}{event.copied_date_review_required && event.copied_date_reviewed_version !== event.draft_version ? " · Date needs confirmation" : ""} · {event.schedule.start_date ?? "Date needed"}{event.schedule.all_day ? " · All day" : event.schedule.kind === "specific_dates" ? " · Times vary" : ` ${event.schedule.start_time?.slice(0, 5) ?? ""}–${event.schedule.end_time?.slice(0, 5) ?? ""}`}</summary>
                 {conflictEvents?.has(event.id) ? <p>Some dates or requests need church office review. Contact the office for help.</p> : null}
                 <p>Requested rooms: {event.rooms.map(id => portal.rooms.find(room => room.id === id)?.name ?? "Unavailable room").join(", ") || "None"}</p>
                 <Link className="underline" href={`/calendar-plan/${planId}/occurrences/${event.id}`}>View dates and requests</Link>
@@ -121,6 +122,7 @@ export default async function PlannerInvitationPage({ params, searchParams }: {
           </section> : <p role="alert">Planning is temporarily unavailable. Please try again.</p>}
         {search.error === "consent" || search.error === "submit" || search.error === "save" ? <p role="alert">We could not complete that action. Please try again or contact the church office.</p> : null}
         {search.error === "notready" ? <p role="alert">Complete the dates, times, and repeat details for each event before submitting your plan.</p> : null}
+        {search.error === "copyreview" ? <p role="alert">Open each copied event, save its new dates, then confirm that you reviewed them before submitting.</p> : null}
         {search.error === "unavailableSelection" ? <p role="alert">A selected room, resource, or ministry is unavailable. Edit the event and remove that selection before submitting.</p> : null}
         {search.error === "stale" ? <p role="alert">This event changed or is no longer editable. Review the latest version before trying again.</p> : null}
         {search.error === "dst" ? <p role="alert">A selected local time does not exist because the clocks move forward. Change that time before submitting.</p> : null}

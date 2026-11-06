@@ -80,7 +80,8 @@ export async function submitPlannerPlan(form: FormData) {
     p_confirm_empty: form.get("confirmEmpty") === "yes",
   });
   if (error) {
-    const reason = error.message === "Every event needs a complete schedule." ? "notready"
+    const reason = error.message === "Review and confirm dates for every copied event before submitting." ? "copyreview"
+      : error.message === "Every event needs a complete schedule." ? "notready"
       : error.message === "An event contains an unavailable room, resource, or ministry." ? "unavailableSelection"
       : error.message === "A calendar event uses a nonexistent local time." ? "dst"
       : error.message === "A calendar event may have at most 1200 occurrences." ? "occurrenceLimit"
@@ -90,6 +91,16 @@ export async function submitPlannerPlan(form: FormData) {
   }
   scheduleSystemEmailDelivery();
   redirect(`/calendar-plan/${plan}?submitted=1`);
+}
+
+export async function confirmCopiedDates(form: FormData) {
+  const {plan,hash}=await plannerCredentials(form);
+  const event=String(form.get("event") ?? ""); const version=Number(form.get("draft_version"));
+  if (!UUID.test(event) || !Number.isSafeInteger(version) || version<1 || form.get("confirm")!=="yes") redirect(`/calendar-plan/${plan}?error=save`);
+  const {error}=await createSupabaseServiceClient().rpc("calendar_confirm_copied_date_review",{
+    p_plan_id:plan,p_session_hash:hash,p_event_id:event,p_expected_version:version,
+  });
+  redirect(`/calendar-plan/${plan}${error ? "?error=save" : ""}`);
 }
 
 export async function setOccurrenceException(form: FormData) {

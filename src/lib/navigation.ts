@@ -42,6 +42,7 @@ export const ADMIN_NAV: readonly NavGroup[] = [
       { href: "/admin/recurring-requests", label: "Recurring Requests", icon: CalendarClock, permission: "reservations.viewAll" },
       { href: "/admin/calendar", label: "Room Schedule", icon: CalendarDays, permission: "calendar.view" },
       { href: "/admin/church-calendar", label: "Church Calendar", icon: CalendarDays, permission: "calendar.view" },
+      { href: "/admin/church-calendar/planning", label: "Planning Dashboard", icon: LayoutDashboard, permission: "calendar.view" },
       { href: "/admin/calendar-submissions", label: "Calendar Plans", icon: ClipboardList, permission: "calendar.view" },
       { href: "/admin/calendar-conflicts", label: "Conflict Center", icon: AlertTriangle, permission: "calendar.view" },
       { href: "/admin/notifications", label: "Notifications", icon: Bell, permission: "notifications.receive" },

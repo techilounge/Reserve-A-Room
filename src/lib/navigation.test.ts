@@ -12,6 +12,7 @@ describe("navigationFor", () => {
     expect(navigationFor(actor).map((g) => g.label)).toEqual(["Manage"]);
     expect(hrefs(actor)).toContain("/admin/recurring-guide");
     expect(hrefs(actor)).toContain("/admin/church-calendar");
+    expect(hrefs(actor)).toContain("/admin/church-calendar/planning");
     expect(hrefs(actor)).not.toContain("/admin/church-calendar/setup");
     expect(hrefs(actor)).not.toContain("/admin/rooms");
     expect(hrefs(actor)).not.toContain("/admin/audit");
@@ -23,6 +24,7 @@ describe("navigationFor", () => {
     expect(hrefs(actor)).toContain("/admin/recurring-guide");
     expect(hrefs(actor)).toContain("/admin/users");
     expect(hrefs(actor)).toContain("/admin/church-calendar/setup");
+    expect(hrefs(actor)).toContain("/admin/church-calendar/planning");
   });
 
   it("shows guests and disabled staff nothing", () => {
@@ -42,5 +44,6 @@ describe("isActivePath", () => {
     expect(isActivePath("/admin/reservations/123", "/admin/reservations")).toBe(true);
     expect(isActivePath("/admin/rooms-archive", "/admin/rooms")).toBe(false);
     expect(isActivePath("/admin/church-calendar/setup", "/admin/church-calendar")).toBe(false);
+    expect(isActivePath("/admin/church-calendar/planning", "/admin/church-calendar")).toBe(false);
   });
 });

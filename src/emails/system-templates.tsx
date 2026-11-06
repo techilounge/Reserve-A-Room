@@ -9,6 +9,7 @@ export const SYSTEM_EMAIL_EVENTS = [
   "recurring_request_received",
   "admin_first_login",
   "calendar_planner_invited",
+  "calendar_plan_reminder",
   "calendar_event_approved",
   "calendar_event_replaced",
   "calendar_event_cancelled",
@@ -92,14 +93,27 @@ export type CalendarPlanNoticeEmailData = EmailBrandData & {
   revision: number;
   reason: string | null;
 };
+export type CalendarReminderEmailData = EmailBrandData & {
+  contactName:string; ministry:string; cycle:string; deadline:string; overdue:boolean;
+};
 
 type Built = { subject: string; element: ReactElement };
 
 export function buildSystemEmail(
   event: SystemEmailEvent,
-  data: RecurringSeriesEmailData | RecurringSeriesStaffEmailData | RecurringRequestEmailData | AdminFirstLoginEmailData | CalendarPlannerEmailData | CalendarEventNoticeEmailData | CalendarPlanNoticeEmailData,
+  data: RecurringSeriesEmailData | RecurringSeriesStaffEmailData | RecurringRequestEmailData | AdminFirstLoginEmailData | CalendarPlannerEmailData | CalendarEventNoticeEmailData | CalendarPlanNoticeEmailData | CalendarReminderEmailData,
 ): Built {
   switch (event) {
+    case "calendar_plan_reminder": {
+      const reminder=data as CalendarReminderEmailData;
+      return { subject:`Church calendar planning reminder: ${reminder.ministry}`,
+        element:<EmailLayout data={reminder} preview="A ministry calendar plan needs your attention." heading="Calendar planning reminder">
+          <Paragraph>Hi {reminder.contactName},</Paragraph>
+          <Paragraph>{reminder.overdue ? "The planning deadline has passed and your ministry plan has not been submitted." : "Your ministry calendar plan has not yet been submitted."}</Paragraph>
+          <DetailsTable rows={[["Ministry",reminder.ministry],["Planning cycle",reminder.cycle],["Deadline",reminder.deadline]]} />
+          <Paragraph>{reminder.overdue ? "Please contact the church office for help." : "Please use your personal planning invitation to finish and submit your plan. Contact the church office if you need a new invitation."}</Paragraph>
+        </EmailLayout> };
+    }
     case "calendar_plan_submitted":
     case "calendar_plan_changes_requested": {
       const notice = data as CalendarPlanNoticeEmailData;

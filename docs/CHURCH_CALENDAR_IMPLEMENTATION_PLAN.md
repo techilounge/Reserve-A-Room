@@ -10,6 +10,18 @@ carry approvals, conflict decisions, reservations, or allocations. Do not merge,
 deploy production, apply hosted migrations, or begin Phase 9 without authorization.
 Realistic-scale conflict-engine profiling remains required before release.
 
+**Phase 8 work in progress:** the planning dashboard uses an active-staff aggregate
+RPC and exposes cycle/ministry progress, hard/planning conflict counts and warnings.
+`20261112110000_calendar_plan_reminders.sql` records one reminder identity per
+planner grant/version, deadline revision and milestone; the protected cron queues
+due notices through the existing branded system-email outbox. Deadline edits and
+reopenings advance the revision, and delivery rechecks current plan and grant state.
+`20261112120000_calendar_copy_prior_drafts.sql` copies submitted event details only
+into an earlier-unsubmitted plan for the same ministry. Copied events start without
+dates, room/resource requests or commitments; an explicit planner date review tied to
+the current draft version is required by the database before submission, including
+duplicates. Full exact-SHA verification and reviewer approval remain outstanding.
+
 **Checkpoint:** Phase 6 is approved at `38d7ca381d2cd30bea9b55a68e089b10e135b3ad`. Exact-SHA verification passed typecheck, lint, **241 unit tests**, **208 database tests**, production build, **114/114 Playwright tests** with no skips, and the complete native PostgreSQL room, resource and exclusive-event approval, submission/approval and resource-allocation race matrices at all three isolation levels. Vercel reported success. **Phase 7 is authorized:** implement the Church Calendar view, filters/layers, year view, mobile agenda and accessible keyboard controls; rename the existing `/admin/calendar` to Room Schedule. No new schema unless a measured read-model/index requirement justifies an append-only migration. No merge, hosted migration or production rollout is authorized.
 
 **Phase 7 implementation for review:** `/admin/church-calendar` is the staff master
@@ -30,8 +42,7 @@ SHA); append-only migration `20261111100000_calendar_master_occupancy.sql` expos
 immutable occupancy to staff and covers conflicts across displayed date boundaries.
 The initial full browser run exposed and prompted correction of an existing dark-mode
 notification-badge contrast failure when the new fixture brought unread notices to ten.
-Run all quality gates and the full browser suite on the final remediation SHA and
-push only the review branch. Do not start Phase 8 without authorization.
+The remediation passed the full gates and was approved at `7b46d46a97e0cb262adf578db72fd581e70e7fd2`.
 
 **Phase 6 implementation and review remediation:** `20261108100000_calendar_reservation_guards.sql` adds
 the private reservation capability and a calendar-linked reservation guard; it exposes
@@ -369,4 +380,4 @@ These are recommendations and phase-specific decisions, not newly approved polic
 11. **Website sources:** determine whether the public website calendars share a source and verify plugin/API permissions before Phase 10.
 12. **Security workstream sequencing:** review its independent branch and preview/migration requirements before adopting it as a deployed calendar dependency; no production deploy is implied by this proposal.
 
-**Next action:** implement and verify Phase 7, push only the review branch, and stop for review. Do not merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.
+**Next action:** finish and verify Phase 8, push only the review branch, and stop for review. Do not start Phase 9, merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.

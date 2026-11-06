@@ -24,11 +24,17 @@ export async function GET(request: Request) {
   }
   try {
     const series = await materializeDueReservationSeries(20);
+    const { createSupabaseServiceClient } = await import("@/lib/supabase/service");
+    const { data: reminders, error: reminderError } = await createSupabaseServiceClient().rpc("calendar_queue_due_reminders", { p_limit: 50 });
     const [reservations, system] = await Promise.all([
       deliverQueuedEmails({ limit: 50 }),
       deliverQueuedSystemEmails({ limit: 50 }),
     ]);
-    return Response.json({ ok: true, series, reservations, system });
+    if (reminderError) {
+      console.error("[cron] calendar reminder queue failed", reminderError);
+      return Response.json({ ok:false, series, reminders:null, reservations, system }, { status:500 });
+    }
+    return Response.json({ ok: true, series, reminders, reservations, system });
   } catch (error) {
     console.error("[cron] email outbox sweep failed", error);
     return Response.json({ ok: false }, { status: 500 });

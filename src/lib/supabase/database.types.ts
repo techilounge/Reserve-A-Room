@@ -278,6 +278,7 @@ export type Database = {
           finalized_at: string | null;
           created_at: string;
           updated_at: string;
+          reminder_revision: number;
         };
         Insert: {
           id?: string;
@@ -293,6 +294,7 @@ export type Database = {
           finalized_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          reminder_revision?: number;
         };
         Update: {
           id?: string;
@@ -308,6 +310,7 @@ export type Database = {
           finalized_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          reminder_revision?: number;
         };
         Relationships: [
           {
@@ -867,6 +870,9 @@ export type Database = {
           deleted_at: string | null;
           created_at: string;
           updated_at: string;
+          copied_from_submission_id: string | null;
+          copied_date_review_required: boolean;
+          copied_date_reviewed_version: number | null;
         };
         Insert: {
           id?: string;
@@ -895,6 +901,9 @@ export type Database = {
           deleted_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          copied_from_submission_id?: string | null;
+          copied_date_review_required?: boolean;
+          copied_date_reviewed_version?: number | null;
         };
         Update: {
           id?: string;
@@ -923,8 +932,18 @@ export type Database = {
           deleted_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          copied_from_submission_id?: string | null;
+          copied_date_review_required?: boolean;
+          copied_date_reviewed_version?: number | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "calendar_events_copied_from_submission_id_fkey";
+            columns: ["copied_from_submission_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_event_submissions";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "calendar_events_plan_id_fkey";
             columns: ["plan_id"];
@@ -1061,6 +1080,54 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "calendar_plan_access_plan_id_fkey";
+            columns: ["plan_id"];
+            isOneToOne: false;
+            referencedRelation: "ministry_calendar_plans";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calendar_plan_reminders: {
+        Row: {
+          id: string;
+          plan_id: string;
+          grant_id: string;
+          grant_version: number;
+          deadline_revision: number;
+          kind: string;
+          deadline: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          plan_id: string;
+          grant_id: string;
+          grant_version: number;
+          deadline_revision: number;
+          kind: string;
+          deadline: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          plan_id?: string;
+          grant_id?: string;
+          grant_version?: number;
+          deadline_revision?: number;
+          kind?: string;
+          deadline?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_plan_reminders_grant_id_fkey";
+            columns: ["grant_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_plan_access";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calendar_plan_reminders_plan_id_fkey";
             columns: ["plan_id"];
             isOneToOne: false;
             referencedRelation: "ministry_calendar_plans";
@@ -2583,6 +2650,10 @@ export type Database = {
         Args: { p_event_id: string; p_expected_commitment: string; p_occurrence: string; p_reason: string };
         Returns: undefined;
       };
+      calendar_confirm_copied_date_review: {
+        Args: { p_plan_id: string; p_session_hash: string; p_event_id: string; p_expected_version: number };
+        Returns: undefined;
+      };
       calendar_conflict_policy_get: {
         Args: never;
         Returns: { large_event_threshold: number; revision: number }[];
@@ -2590,6 +2661,14 @@ export type Database = {
       calendar_conflict_policy_save: {
         Args: { p_threshold: number };
         Returns: undefined;
+      };
+      calendar_copy_prior_plan: {
+        Args: { p_source: string; p_target: string };
+        Returns: number;
+      };
+      calendar_duplicate_event_before_copy_review: {
+        Args: { p_plan_id: string; p_session_hash: string; p_event_id: string };
+        Returns: string;
       };
       calendar_duplicate_event_draft: {
         Args: { p_plan_id: string; p_session_hash: string; p_event_id: string };
@@ -2651,9 +2730,21 @@ export type Database = {
         Args: { p_plan_id: string; p_session_hash: string };
         Returns: Json;
       };
+      calendar_planning_dashboard: {
+        Args: never;
+        Returns: Json;
+      };
+      calendar_queue_due_reminders: {
+        Args: { p_limit?: number };
+        Returns: number;
+      };
       calendar_record_conflict_decision: {
         Args: { p_fingerprint: string; p_decision_type: string; p_reason: string; p_selected_event?: string };
         Returns: undefined;
+      };
+      calendar_reminder_context: {
+        Args: { p_email_id: string };
+        Returns: Json;
       };
       calendar_remove_event_draft: {
         Args: { p_plan_id: string; p_session_hash: string; p_event_id: string; p_expected_version: number };
@@ -2700,6 +2791,10 @@ export type Database = {
         Returns: { submission_id: string; requires_room_contact: boolean }[];
       };
       calendar_submit_plan: {
+        Args: { p_plan_id: string; p_session_hash: string; p_message: string; p_confirm_empty: boolean };
+        Returns: number;
+      };
+      calendar_submit_plan_before_copy_review: {
         Args: { p_plan_id: string; p_session_hash: string; p_message: string; p_confirm_empty: boolean };
         Returns: number;
       };

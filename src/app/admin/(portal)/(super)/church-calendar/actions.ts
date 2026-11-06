@@ -64,6 +64,15 @@ export async function addMinistry(form: FormData) {
   finish("Ministry added to the cycle.");
 }
 
+export async function copyPriorPlan(form: FormData) {
+  await assertPermission("churchCalendar.manage");
+  const source=str(form,"source"); const target=str(form,"target");
+  if (!uuid.test(source) || !uuid.test(target)) finish("Choose valid source and destination plans.",true);
+  const {data,error}=await (await createSupabaseServerClient()).rpc("calendar_copy_prior_plan",{p_source:source,p_target:target});
+  if (error) finish("Could not copy the prior plan. Check the ministry, cycle dates, and destination status.",true);
+  finish(`${data} event(s) copied as drafts. Planners must enter and confirm dates and review rooms and resources.`);
+}
+
 export async function removeMinistry(form: FormData) {
   await assertPermission("churchCalendar.manage");
   const plan = str(form, "plan");

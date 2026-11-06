@@ -10,6 +10,7 @@ import {
   type CalendarPlannerEmailData,
   type CalendarEventNoticeEmailData,
   type CalendarPlanNoticeEmailData,
+  type CalendarReminderEmailData,
   type RecurringRequestEmailData,
   type RecurringSeriesEmailData,
   type RecurringSeriesStaffEmailData,
@@ -154,7 +155,8 @@ async function send(supabase: Service, id: string, ctx: SystemEmailContext | nul
     | AdminFirstLoginEmailData
     | CalendarPlannerEmailData
     | CalendarEventNoticeEmailData
-    | CalendarPlanNoticeEmailData;
+    | CalendarPlanNoticeEmailData
+    | CalendarReminderEmailData;
   if (ctx.event_type === "calendar_planner_invited") {
     const { data: invitation, error: invitationError } = await supabase.rpc("calendar_invitation_context", { p_email_id: id });
     if (invitationError) throw invitationError;
@@ -175,6 +177,14 @@ async function send(supabase: Service, id: string, ctx: SystemEmailContext | nul
     emailData = { ...brand, contactName: details.contact_name, ministryName: details.ministry_name,
       cycleName: details.cycle_name, opensAt: formatInstant(details.opens_at, ctx.settings.timezone),
       deadline: formatInstant(details.deadline, ctx.settings.timezone), invitationUrl: url.toString() };
+  } else if (ctx.event_type === "calendar_plan_reminder") {
+    const {data,error}=await supabase.rpc("calendar_reminder_context", {p_email_id:id});
+    if (error) throw error;
+    if (!data) return {status:"skipped",error:"This planning reminder is no longer current."};
+    const reminder=data as {contact_name:string;ministry:string;cycle:string;deadline:string;kind:string;created_at:string};
+    if (!calendarNoticeRetrySafe(reminder.created_at,ctx.attempt_count)) return {status:"failed",error:"Delivery is too old to retry safely."};
+    emailData={...brand,contactName:reminder.contact_name,ministry:reminder.ministry,cycle:reminder.cycle,
+      deadline:formatInstant(reminder.deadline,ctx.settings.timezone),overdue:reminder.kind === "overdue"};
   } else if (ctx.event_type === "calendar_event_approved" || ctx.event_type === "calendar_event_replaced" || ctx.event_type === "calendar_event_cancelled" || ctx.event_type === "calendar_event_occurrence_cancelled") {
     const notice = ctx.payload.calendar_notice;
     if (!notice || !notice.event_title || !notice.ministry || !notice.cycle || !Number.isInteger(notice.revision)
