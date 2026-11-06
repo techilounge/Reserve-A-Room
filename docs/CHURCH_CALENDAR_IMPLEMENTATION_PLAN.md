@@ -1,5 +1,15 @@
 # Church Calendar — Phase 0 architecture and implementation plan
 
+**Current authorization:** Phase 7 is **approved** at
+`7b46d46a97e0cb262adf578db72fd581e70e7fd2`. Exact-SHA verification passed
+typecheck, lint, 243 unit tests, 210 database tests, production build, and 117/117
+Playwright tests without skips; Vercel passed. **Phase 8 is authorized** for the
+planning dashboard and automation: progress and conflict metrics, durable idempotent
+reminders, and copying prior plans as drafts with explicit date review. Copies must not
+carry approvals, conflict decisions, reservations, or allocations. Do not merge,
+deploy production, apply hosted migrations, or begin Phase 9 without authorization.
+Realistic-scale conflict-engine profiling remains required before release.
+
 **Checkpoint:** Phase 6 is approved at `38d7ca381d2cd30bea9b55a68e089b10e135b3ad`. Exact-SHA verification passed typecheck, lint, **241 unit tests**, **208 database tests**, production build, **114/114 Playwright tests** with no skips, and the complete native PostgreSQL room, resource and exclusive-event approval, submission/approval and resource-allocation race matrices at all three isolation levels. Vercel reported success. **Phase 7 is authorized:** implement the Church Calendar view, filters/layers, year view, mobile agenda and accessible keyboard controls; rename the existing `/admin/calendar` to Room Schedule. No new schema unless a measured read-model/index requirement justifies an append-only migration. No merge, hosted migration or production rollout is authorized.
 
 **Phase 7 implementation for review:** `/admin/church-calendar` is the staff master

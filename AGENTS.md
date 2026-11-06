@@ -220,6 +220,14 @@ Verification completed for that fix before commit:
 
 ## Church Calendar Phase 7 checkpoint — current
 
+- Phase 7 is **APPROVED** at `7b46d46a97e0cb262adf578db72fd581e70e7fd2`.
+  The reviewer accepted exact-SHA typecheck, lint, 243 unit tests, 210 database
+  tests, production build, and 117/117 Playwright tests with no skips; Vercel passed.
+  **Phase 8 is authorized** for the planning dashboard, durable idempotent reminders,
+  and prior-plan copies as drafts with mandatory date review. Do not merge to main,
+  deploy production, apply hosted migrations, or begin Phase 9 without authorization.
+  Profile the existing full-set conflict engine at realistic scale before release.
+
 - Phase 6 is **approved** at `38d7ca381d2cd30bea9b55a68e089b10e135b3ad`.
   The reviewer accepted exact-SHA typecheck, lint, 241 unit tests, 208 database
   tests, production build, 114/114 Playwright tests with no skips, and the complete
