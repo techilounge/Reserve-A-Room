@@ -32,6 +32,7 @@ const PUBLIC_ITEMS: readonly BottomNavItem[] = [
   { href: "/rooms", label: "Rooms", icon: UsersRound },
   { href: "/reserve", label: "Reserve", icon: CalendarPlus, prominent: true },
   { href: "/availability", label: "Availability", icon: Search },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
 ];
 
 const ADMIN_ITEMS: readonly BottomNavItem[] = [
@@ -91,7 +92,7 @@ export function PublicMobileBottomNav() {
     : PUBLIC_ITEMS;
 
   return (
-    <NavSurface label="Mobile navigation" className={cn(hasStaffAccess ? "grid-cols-5" : "grid-cols-4", "md:hidden")}>
+    <NavSurface label="Mobile navigation" className={cn(hasStaffAccess ? "grid-cols-6" : "grid-cols-5", "md:hidden")}>
       {items.map((item) => (
         <BottomNavLink key={item.href} item={item} />
       ))}

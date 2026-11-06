@@ -20,7 +20,12 @@ Production: https://reservearoom.stonehillchurch.org
 - The review-branch **Planning Dashboard** shows ministry progress and conflicts.
   Due reminders use the branded email outbox; Super Admins can queue them manually.
   Earlier submitted plans can be copied as drafts with new dates explicitly reviewed
-  by a planner. These Phase 8 changes also require review before production use.
+  by a planner. These review-branch changes are not deployed.
+- The review-branch public Church Calendar at `/calendar` lists approved public
+  occurrences. It offers a subscription feed at `/api/calendar/public.ics` and a
+  paginated JSON feed at `/api/calendar/public.json`. Feed date bounds use `from`
+  and `to` in `YYYY-MM-DD`; JSON also accepts `limit` and `offset`. Cancellation
+  subscription behavior remains subject to the owner's policy decision.
 - Church members and guests reserve rooms **without creating an account**.
 - Each room has its own rules:
   - capacity

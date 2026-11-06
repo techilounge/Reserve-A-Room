@@ -12,6 +12,7 @@ const PUBLIC_PAGES = [
   `/rooms/${ROOMS.conference.slug}`,
   `/rooms/${ROOMS.hall.slug}`,
   "/availability",
+  "/calendar",
   "/reserve",
   "/recurring-request",
   "/privacy",

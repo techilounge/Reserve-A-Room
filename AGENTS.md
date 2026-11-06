@@ -230,18 +230,29 @@ Verification completed for that fix before commit:
   merge to main, deploy production, apply hosted migrations or start Phase 10. Real
   provider delivery verification and realistic-scale conflict profiling remain release gates.
 
-- Phase 7 is **APPROVED** at `7b46d46a97e0cb262adf578db72fd581e70e7fd2`.
+- Phase 9 implementation for review: `20261114100000_calendar_public_feed.sql`
+  exposes only current approved, public, uncancelled occurrence snapshots through
+  allowlisted anonymous RPCs. `/calendar` provides a responsive monthly agenda and
+  stable occurrence details; `/api/calendar/public.json` and `/api/calendar/public.ics`
+  provide bounded feeds. UIDs combine event and logical occurrence identities.
+  Responses revalidate against the database with ETags, and the ICS feed fails rather
+  than silently truncating beyond 5,000 entries. Cancellation tombstones and their
+  retention are not implemented pending the owner's policy decision. Run all quality
+  gates on the final commit, push only this branch, and stop for Phase 9 review. No
+  hosted migration, production deployment, merge, WordPress integration or Phase 10.
+
+- Historical: Phase 7 is **APPROVED** at `7b46d46a97e0cb262adf578db72fd581e70e7fd2`.
   The reviewer accepted exact-SHA typecheck, lint, 243 unit tests, 210 database
   tests, production build, and 117/117 Playwright tests with no skips; Vercel passed.
   **Phase 8 is authorized** for the planning dashboard, durable idempotent reminders,
   and prior-plan copies as drafts with mandatory date review. Do not merge to main,
-  deploy production, apply hosted migrations, or begin Phase 9 without authorization.
+  deploy production or apply hosted migrations; Phase 9 has since been authorized.
   Profile the existing full-set conflict engine at realistic scale before release.
 
 - Phase 8 was reviewed at `e58768a93f69a398c323c11f7d30c5e0380259a3`; the reviewer
   accepted exact-SHA typecheck, lint, 245 unit tests, 213 database tests, production
-  build and 119/119 Playwright tests with no skips. Phase 8 is **approve with one
-  required fix**; Phase 9 is not authorized. Old queued reminder milestones must not
+  build and 119/119 Playwright tests with no skips. The initial review required one
+  reminder fix, subsequently approved at `f1af1276`. Old queued milestones must not
   be delivered after the current milestone or the seven-day overdue window changes.
 - Phase 8 implementation on `codex/church-calendar-phase1`: the planning dashboard
   and staff-only aggregate RPC are in `20261112100000_calendar_planning_dashboard.sql`;
@@ -251,12 +262,11 @@ Verification completed for that fix before commit:
   Copies start without dates, rooms or resources; duplication also preserves the review
   requirement. The cron queues due reminders before its existing email sweep and
   continues the sweep even if the reminder queue fails. Planner emails use Resend.
-  No hosted migrations, production rollout, or Phase 9 work is authorized.
+  No hosted migrations or production rollout is authorized.
 - Remediation migration `20261113100000_calendar_reminder_milestones.sql` uses one
   private milestone helper for queueing and delivery. The context rejects stale
   milestones and overdue messages at or beyond seven days, including first attempts.
-  Run complete checks on the final committed SHA and report exact results with the
-  SHA; push the review branch only after all gates pass, then stop for re-review.
+  The exact-SHA checks and review were subsequently completed as recorded above.
 
 - Phase 6 is **approved** at `38d7ca381d2cd30bea9b55a68e089b10e135b3ad`.
   The reviewer accepted exact-SHA typecheck, lint, 241 unit tests, 208 database

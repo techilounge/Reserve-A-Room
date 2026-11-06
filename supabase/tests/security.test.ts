@@ -369,7 +369,7 @@ describe("first Super Admin bootstrap", () => {
 describe("function privileges (catalog-wide allowlist)", () => {
   // Every function callable by an API role must be listed here on purpose.
   const EXPECTED: Record<"anon" | "authenticated", string[]> = {
-    anon: ["private.is_staff", "private.is_super_admin", "public.booking_horizon_date", "public.get_public_busy_blocks"],
+    anon: ["private.is_staff", "private.is_super_admin", "public.booking_horizon_date", "public.calendar_public_occurrence", "public.calendar_public_occurrences", "public.get_public_busy_blocks"],
     // Staff functions re-check the caller's role inside (RAR09 for non-staff).
     authenticated: [
       "private.is_staff",
@@ -412,6 +412,8 @@ describe("function privileges (catalog-wide allowlist)", () => {
       "public.calendar_master_entries_with_occupancy",
       "public.calendar_master_filter_options",
       "public.calendar_planning_dashboard",
+      "public.calendar_public_occurrence",
+      "public.calendar_public_occurrences",
       "public.calendar_record_conflict_decision",
       "public.calendar_request_plan_changes",
       "public.calendar_reservation_link",

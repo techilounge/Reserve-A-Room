@@ -11,7 +11,8 @@ test("public mobile navigation keeps the main destinations within reach", async 
 
   const navigation = page.getByRole("navigation", { name: "Mobile navigation" });
   await expect(navigation).toBeVisible();
-  await expect(navigation.getByRole("link")).toHaveCount(4);
+  await expect(navigation.getByRole("link")).toHaveCount(5);
+  await expect(navigation.getByRole("link", { name:"Calendar" })).toHaveAttribute("href","/calendar");
   await expect(navigation.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page");
 
   await navigation.getByRole("link", { name: "Reserve" }).click();

@@ -1,5 +1,19 @@
 # Reserve-A-Room — Architecture & Decisions
 
+## Public Church Calendar (Phase 9 review branch)
+
+The anonymous `/calendar` agenda and stable event-detail URLs use a dedicated,
+explicitly allowlisted PostgreSQL read over active approved public commitments.
+The JSON and ICS feeds expose public descriptions and generic locations, never
+planner identities, internal notes, resources or private meeting links. Event and
+logical occurrence IDs form a stable UID across ordinary approved edits. Timed ICS
+events are UTC; all-day events use exclusive local end dates. Range and page limits
+are enforced in PostgreSQL and the ICS feed rejects results exceeding 5,000 events.
+ETags are computed after an uncached database read so approval, cancellation and
+visibility changes invalidate stored representations. Cancellation tombstones are
+not implemented pending an owner decision on policy, retention and unpublishing.
+No hosted migration, production rollout or WordPress integration is implied.
+
 ## Church Calendar planning dashboard and automation (Phase 8 review branch)
 
 The staff planning dashboard aggregates active ministry progress and existing conflict

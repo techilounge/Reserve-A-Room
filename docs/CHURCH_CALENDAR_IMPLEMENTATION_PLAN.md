@@ -11,20 +11,30 @@ Do not merge, deploy production, apply hosted migrations or start Phase 10 witho
 authorization. Real-provider email checks and conflict-engine scale profiling remain
 pre-release requirements.
 
-**Current authorization:** Phase 7 is **approved** at
+**Phase 9 implementation for review:** `20261114100000_calendar_public_feed.sql`
+adds anonymous allowlisted reads over current approved public commitments. The
+responsive `/calendar` agenda links to stable logical occurrences; bounded JSON and
+ICS feeds use UTC timed events, exclusive all-day end dates, stable UIDs and sequence
+numbers. ETags revalidate against live database state; ICS fails explicitly above
+5,000 events rather than truncating. No cancellation tombstones are emitted pending the
+owner's decision about cancellation/unpublishing and retention. Full quality gates
+must run on the final commit before pushing only the review branch for Phase 9 review.
+This change has not been applied to any hosted database.
+
+**Historical authorization:** Phase 7 is **approved** at
 `7b46d46a97e0cb262adf578db72fd581e70e7fd2`. Exact-SHA verification passed
 typecheck, lint, 243 unit tests, 210 database tests, production build, and 117/117
 Playwright tests without skips; Vercel passed. **Phase 8 is authorized** for the
 planning dashboard and automation: progress and conflict metrics, durable idempotent
 reminders, and copying prior plans as drafts with explicit date review. Copies must not
 carry approvals, conflict decisions, reservations, or allocations. Do not merge,
-deploy production, apply hosted migrations, or begin Phase 9 without authorization.
+deploy production or apply hosted migrations. Phase 9 was subsequently authorized.
 Realistic-scale conflict-engine profiling remains required before release.
 
 **Phase 8 review checkpoint:** reviewed at `e58768a93f69a398c323c11f7d30c5e0380259a3`.
 Exact-SHA typecheck, lint, 245 unit tests, 213 database tests, production build and
 119/119 Playwright tests passed without skips. The reviewer approved the architecture
-with one required reminder-delivery fix; Phase 9 is not authorized. The planning dashboard uses an active-staff aggregate
+with one required reminder-delivery fix, subsequently approved at `f1af1276`. The planning dashboard uses an active-staff aggregate
 RPC and exposes cycle/ministry progress, hard/planning conflict counts and warnings.
 `20261112110000_calendar_plan_reminders.sql` records one reminder identity per
 planner grant/version, deadline revision and milestone; the protected cron queues
@@ -37,8 +47,8 @@ the current draft version is required by the database before submission, includi
 duplicates. Append-only remediation `20261113100000_calendar_reminder_milestones.sql`
 shares milestone calculation between queueing and delivery, rejects queued messages
 from an earlier milestone, and applies the seven-day overdue window on delivery, even
-on a first attempt. Full exact-SHA remediation verification and final Phase 8 reviewer
-approval remain outstanding; do not begin Phase 9.
+on a first attempt. Exact-SHA remediation verification and final Phase 8 review are
+complete, as recorded above.
 
 **Checkpoint:** Phase 6 is approved at `38d7ca381d2cd30bea9b55a68e089b10e135b3ad`. Exact-SHA verification passed typecheck, lint, **241 unit tests**, **208 database tests**, production build, **114/114 Playwright tests** with no skips, and the complete native PostgreSQL room, resource and exclusive-event approval, submission/approval and resource-allocation race matrices at all three isolation levels. Vercel reported success. **Phase 7 is authorized:** implement the Church Calendar view, filters/layers, year view, mobile agenda and accessible keyboard controls; rename the existing `/admin/calendar` to Room Schedule. No new schema unless a measured read-model/index requirement justifies an append-only migration. No merge, hosted migration or production rollout is authorized.
 
@@ -392,10 +402,10 @@ These are recommendations and phase-specific decisions, not newly approved polic
 5. **Overnight occupancy:** owner chose disabled by default; decide whether an authorized exception exists and how continuous holds work before Phase 6.
 6. **Outside normal hours and non-grid times:** disabled by default; distinguish public booking hours from building access, and decide whether a separate override/actor/reason is required before Phase 6.
 7. **Planner contacts:** owner approved independent primary, secondary and additional grants, up to five active planners per plan; revoked or expired grants do not count.
-8. **Public cancellations:** remove from listings versus privacy-safe ICS cancellation tombstones, retention and public-to-internal behavior; decide before Phase 9.
+8. **Public cancellations:** remove from listings versus privacy-safe ICS cancellation tombstones, retention and public-to-internal behavior; decide before Phase 9 approval.
 9. **Cycle reopening:** owner approved Super Admin only with a required reason and audit.
 10. **Planner Privacy/Terms:** owner approved the per-grant/per-version first-access acknowledgment design; obtain legal review and approval of draft terms before Phase 2 release.
 11. **Website sources:** determine whether the public website calendars share a source and verify plugin/API permissions before Phase 10.
 12. **Security workstream sequencing:** review its independent branch and preview/migration requirements before adopting it as a deployed calendar dependency; no production deploy is implied by this proposal.
 
-**Next action:** finish and verify Phase 8, push only the review branch, and stop for review. Do not start Phase 9, merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.
+**Next action:** verify the Phase 9 implementation on the exact final SHA, push only the review branch, and stop for review and the public cancellation policy decision. Do not start Phase 10, merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.

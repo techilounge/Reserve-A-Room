@@ -2734,6 +2734,14 @@ export type Database = {
         Args: never;
         Returns: Json;
       };
+      calendar_public_occurrence: {
+        Args: { p_event: string; p_occurrence: string };
+        Returns: Json;
+      };
+      calendar_public_occurrences: {
+        Args: { p_from: string; p_to: string; p_limit?: number; p_offset?: number };
+        Returns: Json;
+      };
       calendar_queue_due_reminders: {
         Args: { p_limit?: number };
         Returns: number;

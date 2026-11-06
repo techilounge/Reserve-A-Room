@@ -31,6 +31,7 @@ export type NavGroup = {
 export const PUBLIC_NAV: readonly NavItem[] = [
   { href: "/rooms", label: "Rooms" },
   { href: "/availability", label: "Availability" },
+  { href: "/calendar", label: "Church Calendar" },
 ];
 
 export const ADMIN_NAV: readonly NavGroup[] = [
