@@ -2619,6 +2619,10 @@ export type Database = {
         Args: { p_from: string; p_to: string; p_cycle?: string; p_ministry?: string; p_room?: string; p_resource?: string; p_scope?: string; p_visibility?: string; p_layer?: string };
         Returns: { entry_id: string; event_id: string; submission_id: string; kind: string; status: string; title: string; starts_at: string; ends_at: string; all_day: boolean; timezone: string; cycle_id: string; cycle_name: string; ministry_id: string; ministry_name: string; scope: string; visibility: string; location_type: string; rooms: Json; resources: Json }[];
       };
+      calendar_master_entries_with_occupancy: {
+        Args: { p_from: string; p_to: string; p_cycle?: string; p_ministry?: string; p_room?: string; p_resource?: string; p_scope?: string; p_visibility?: string; p_layer?: string };
+        Returns: { entry_id: string; event_id: string; submission_id: string; kind: string; status: string; title: string; starts_at: string; ends_at: string; all_day: boolean; timezone: string; cycle_id: string; cycle_name: string; ministry_id: string; ministry_name: string; scope: string; visibility: string; location_type: string; rooms: Json; resources: Json; occupancy_start: string; occupancy_end: string }[];
+      };
       calendar_master_filter_options: {
         Args: never;
         Returns: Json;

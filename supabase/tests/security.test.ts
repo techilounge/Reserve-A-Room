@@ -408,6 +408,7 @@ describe("function privileges (catalog-wide allowlist)", () => {
       "public.calendar_list_conflicts",
       "public.calendar_master_conflicts",
       "public.calendar_master_entries",
+      "public.calendar_master_entries_with_occupancy",
       "public.calendar_master_filter_options",
       "public.calendar_record_conflict_decision",
       "public.calendar_request_plan_changes",

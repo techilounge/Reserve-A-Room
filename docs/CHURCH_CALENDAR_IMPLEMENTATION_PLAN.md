@@ -11,9 +11,17 @@ new tables or indexes: an isolated 1,200-occurrence fixture showed the old RPC
 returned 1,200 rows / 615,601 JSON bytes for a 30-day view containing 30 rows.
 Calendar-linked holds are omitted from the separate room layer. Conflict output is
 range-bounded, but the underlying existing conflict engine still evaluates the full
-active set and requires realistic-scale profiling before release. Run all quality
-gates and the complete browser suite on the final Phase 7 commit before pushing for
-review; do not start Phase 8 without authorization.
+active set and requires realistic-scale profiling before release. The review SHA
+`ef86261593a24c51b2d9ad349340f82ab77ee0dd` passed typecheck, lint, 241 unit tests,
+210 database tests, production build and 116/116 Playwright tests without skips.
+The reviewer requires an occupancy-based conflict-indicator fix before approval.
+The remediation is the commit containing this checkpoint (`git log -1` reports its
+SHA); append-only migration `20261111100000_calendar_master_occupancy.sql` exposes
+immutable occupancy to staff and covers conflicts across displayed date boundaries.
+The initial full browser run exposed and prompted correction of an existing dark-mode
+notification-badge contrast failure when the new fixture brought unread notices to ten.
+Run all quality gates and the full browser suite on the final remediation SHA and
+push only the review branch. Do not start Phase 8 without authorization.
 
 **Phase 6 implementation and review remediation:** `20261108100000_calendar_reservation_guards.sql` adds
 the private reservation capability and a calendar-linked reservation guard; it exposes

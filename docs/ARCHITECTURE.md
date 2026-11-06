@@ -16,6 +16,12 @@ before production at realistic scale. No tables or indexes were added.
 The new read model was justified by a local 1,200-occurrence fixture: the existing
 per-submission RPC returned all 1,200 rows (615,601 JSON bytes) for a 30-day period
 containing 30 occurrences. No hosted migration or production rollout is implied.
+The follow-up `20261111100000_calendar_master_occupancy.sql` keeps that read intact
+and adds a staff-only version containing each submitted occurrence's immutable
+occupancy. Conflict indicators use the half-open occupancy interval, including
+setup and cleanup, while the calendar continues to display event times. Conflict
+lookup includes the adjacent 24 elapsed hours because setup and cleanup can each
+extend that far beyond an event. The conflict engine still needs scale profiling.
 
 Stonehill Seventh-day Adventist Church · `https://reservearoom.stonehillchurch.org`
 

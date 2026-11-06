@@ -1,0 +1,96 @@
+import { expect, test } from "@playwright/test";
+import { signInAs } from "./support/helpers";
+
+test("master calendar associates setup and cleanup conflicts with the correct dates", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const staff = await browser.newContext();
+  const visitor = await browser.newContext();
+  await signInAs(staff, "superAdmin");
+  const page = await staff.newPage();
+  const planner = await visitor.newPage();
+  const mockUrl = `http://127.0.0.1:${process.env.MOCK_SUPABASE_PORT ?? 54400}`;
+  const now = Date.now();
+  const day = (offset:number) => new Date(now + offset * 86400000).toISOString().slice(0, 10);
+  // Consecutive dates in one month keep both occurrences visible in agenda view.
+  const target = new Date(now); target.setUTCDate(10); target.setUTCMonth(target.getUTCMonth() + 2);
+  const first = target.toISOString().slice(0, 10);
+  const second = new Date(target.getTime() + 86400000).toISOString().slice(0, 10);
+  try {
+    await page.goto("/admin/church-calendar/setup");
+    const create = page.getByRole("region", { name:"Create a planning cycle" });
+    await create.getByLabel("Cycle name").fill("Occupancy regression cycle");
+    await create.getByLabel("Calendar start").fill(day(0));
+    await create.getByLabel("Calendar end").fill(day(180));
+    await create.getByLabel("Planning opens (America/Chicago)").fill(new Date(now - 86400000).toISOString().slice(0, 16));
+    await create.getByLabel("Planning deadline (America/Chicago)").fill(new Date(now + 30 * 86400000).toISOString().slice(0, 16));
+    await create.getByRole("button", { name:"Create draft cycle" }).click();
+    const cycle = page.getByRole("article").filter({ hasText:"Occupancy regression cycle" });
+    await cycle.getByRole("button", { name:"Open cycle" }).click();
+    await cycle.getByLabel("Participating ministry").selectOption({ index:1 });
+    await cycle.getByRole("button", { name:"Add ministry" }).click();
+    await cycle.getByText("Invite a planner").click();
+    const invitation = cycle.locator("details").filter({ hasText:"Invite a planner" });
+    await invitation.getByLabel("Name", { exact:true }).fill("Occupancy Planner");
+    await invitation.getByLabel("Email").fill("occupancy-planner@example.org");
+    await invitation.getByRole("button", { name:"Queue invitation" }).click();
+    await expect(cycle.getByText("Occupancy Planner")).toBeVisible();
+    const details = await (await fetch(`${mockUrl}/qa/calendar-invitation?email=occupancy-planner%40example.org`)).json() as { plan:string; grant:string; token:string };
+    expect((await fetch(`${mockUrl}/qa/calendar-legal`, { method:"POST", headers:{ "content-type":"application/json" }, body:JSON.stringify({ enabled:true }) })).ok).toBe(true);
+    await planner.goto(`/calendar-plan/${details.plan}?grant=${details.grant}&token=${details.token}`);
+    await planner.getByRole("button", { name:"Continue" }).click();
+    await planner.getByRole("checkbox", { name:/I agree to the Privacy Policy/ }).check();
+    await planner.getByRole("button", { name:"Continue to planning" }).click();
+
+    await planner.getByText("Add an event").click();
+    const editor = planner.locator("details").filter({ hasText:"Add an event" });
+    await editor.getByLabel("Event title").fill("Occupancy repeated event");
+    await editor.getByLabel("Setup minutes").fill("30");
+    await editor.getByLabel("Cleanup minutes").fill("30");
+    await editor.getByLabel("Schedule type").selectOption("specific_dates");
+    await editor.getByLabel("Start date", { exact:true }).first().fill(first);
+    await editor.getByLabel("End date (same as start for one day)").fill(second);
+    for (const [index, date] of [[1, first], [2, second]] as const) {
+      await editor.getByRole("button", { name:"Add selected date" }).click();
+      const selected = editor.getByRole("group", { name:`Selected date ${index}` });
+      await selected.getByLabel("Start date").fill(date);
+      await selected.getByLabel("End date").fill(date);
+      await selected.getByLabel("Start time").fill("14:00");
+      await selected.getByLabel("End time").fill("15:00");
+    }
+    await editor.getByRole("checkbox", { name:"Conference Room" }).check();
+    await editor.getByRole("button", { name:"Save event" }).click();
+    await expect(planner.getByText(/Occupancy repeated event · CAL-/)).toBeVisible();
+
+    for (const [title, start, end] of [["Setup overlap", "13:00", "13:45"], ["Cleanup overlap", "15:15", "16:00"]]) {
+      await planner.getByText("Add an event").click();
+      await editor.getByLabel("Event title").fill(title);
+      await editor.getByLabel("Start date", { exact:true }).first().fill(first);
+      await editor.getByLabel("End date (same as start for one day)").fill(first);
+      await editor.getByLabel("Start time", { exact:true }).fill(start);
+      await editor.getByLabel("End time", { exact:true }).fill(end);
+      await editor.getByRole("checkbox", { name:"Conference Room" }).check();
+      await editor.getByRole("button", { name:"Save event" }).click();
+      await expect(planner.getByText(new RegExp(`${title} · CAL-`))).toBeVisible();
+    }
+    await planner.getByRole("button", { name:"Submit plan" }).click();
+    await expect(planner.getByRole("status")).toContainText("submitted");
+    const base = `/admin/church-calendar?view=agenda&date=${first}&conflicts=1`;
+    await page.goto(base);
+    const occurrences = page.getByRole("link", { name:/Occupancy repeated event/ });
+    await expect(occurrences).toHaveCount(2);
+    await expect(occurrences.nth(0)).toContainText("2:00 PM");
+    await expect(occurrences.nth(1)).toContainText("2:00 PM");
+    await expect(occurrences.nth(0)).toContainText("Conflict or warning");
+    await expect(occurrences.nth(1)).not.toContainText("Conflict or warning");
+    await page.goto(`${base}&conflict_status=with`);
+    await expect(page.getByRole("link", { name:/Occupancy repeated event/ })).toHaveCount(1);
+    await expect(page.getByRole("link", { name:/Occupancy repeated event/ })).toContainText("Conflict or warning");
+    await page.goto(`${base}&conflict_status=without`);
+    await expect(page.getByRole("link", { name:/Occupancy repeated event/ })).toHaveCount(1);
+    await expect(page.getByRole("link", { name:/Occupancy repeated event/ })).not.toContainText("Conflict or warning");
+  } finally {
+    await fetch(`${mockUrl}/qa/calendar-legal`, { method:"POST", headers:{ "content-type":"application/json" }, body:JSON.stringify({ enabled:false }) });
+    await visitor.close();
+    await staff.close();
+  }
+});

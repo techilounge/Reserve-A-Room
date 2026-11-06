@@ -242,8 +242,22 @@ Verification completed for that fix before commit:
   provides bounded, staff-authorized calendar and conflict-indicator reads plus
   filter choices; no tables or indexes were added. Conflict indicators still invoke
   the existing whole-active-set conflict engine; profile realistic scale before release.
-- Next run typecheck, lint, unit and DB suites, production build and full Playwright
-  on the final Phase 7 commit. Push only `codex/church-calendar-phase1` and stop for
+- Phase 7 was reviewed at `ef86261593a24c51b2d9ad349340f82ab77ee0dd`; exact-SHA
+  verification passed typecheck, lint, 241 unit tests, 210 database tests, production
+  build and 116/116 Playwright tests with no skips. The reviewer required one fix:
+  associate conflict indicators and filters using each immutable occurrence's full
+  setup/event/cleanup occupancy, not its displayed event times. Phase 8 is blocked.
+- The remediation is the commit containing this checkpoint (see `git log -1` for its
+  exact SHA). Append-only migration `20261111100000_calendar_master_occupancy.sql`
+  exposes immutable occupancy in a staff-only bounded read, retains the earlier RPC,
+  and expands the conflict lookup for setup/cleanup across date boundaries. The
+  calendar continues displaying event times. Profile the existing whole-set conflict
+  engine at realistic scale before release.
+- The first full browser run exposed an existing dark-mode unread notification badge
+  contrast failure once the new fixture raised the count to ten. The badge now uses a
+  dark text color in dark mode; the full suite must pass with that fixture present.
+- Run typecheck, lint, unit and DB suites, production build and full Playwright
+  on the final remediation commit. Push only `codex/church-calendar-phase1` and stop for
   review. Never report earlier-iteration checks as exact-SHA evidence.
 
 ## Church Calendar Phase 6 review remediation — historical

@@ -8,6 +8,7 @@ import { hasPermission } from "@/lib/auth/guards";
 import { datesBetween, dayOfWeek, shiftAnchor, viewRange } from "@/lib/calendar";
 import { addDaysToLocalDate, addMonthsToLocalDate, formatLongDate, formatTime, isLocalDate, toLocalParts, todayInZone, type LocalDate } from "@/lib/datetime";
 import { loadCatalog } from "@/lib/data/catalog";
+import { hasOccurrenceConflict } from "@/lib/calendar/master-conflicts";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
@@ -15,7 +16,7 @@ import { cn } from "@/lib/utils";
 export const metadata: Metadata = { title: "Church Calendar" };
 const VIEWS = ["year", "month", "week", "day", "agenda"] as const;
 type View = (typeof VIEWS)[number];
-type RawEntry = Database["public"]["Functions"]["calendar_master_entries"]["Returns"][number];
+type RawEntry = Database["public"]["Functions"]["calendar_master_entries_with_occupancy"]["Returns"][number];
 type Entry = RawEntry & { first: LocalDate; last: LocalDate; time: string; conflict: boolean };
 type Option = { id: string; name: string };
 type Options = { cycles: Option[]; ministries: Option[]; rooms: Option[]; resources: Option[] };
@@ -65,7 +66,7 @@ export default async function ChurchCalendarPage({ searchParams }: PageProps<"/a
     : viewRange(view === "agenda" ? "month" : view, anchor);
   const supabase = await createSupabaseServerClient();
   const [result, choicesResult, conflictResult] = await Promise.all([
-    supabase.rpc("calendar_master_entries", { p_from:range.from,p_to:range.to,p_cycle:ids.cycle || undefined,p_ministry:ids.ministry || undefined,
+    supabase.rpc("calendar_master_entries_with_occupancy", { p_from:range.from,p_to:range.to,p_cycle:ids.cycle || undefined,p_ministry:ids.ministry || undefined,
       p_room:ids.room || undefined,p_resource:ids.resource || undefined,p_scope:scope || undefined,p_visibility:visibility || undefined,
       p_layer:selectedLayers.length === 1 && ["approved", "proposed", "rooms"].includes(selectedLayers[0]) ? selectedLayers[0] : "all" }),
     supabase.rpc("calendar_master_filter_options"),
@@ -79,10 +80,7 @@ export default async function ChurchCalendarPage({ searchParams }: PageProps<"/a
     return selectedLayers.includes(layer) && (!status || row.status === status);
   }).map(row => {
     const first=toLocalParts(row.starts_at,zone); const last=toLocalParts(new Date(new Date(row.ends_at).getTime()-1),zone).date;
-    const conflict=Boolean(row.event_id) && conflicts.some(c => (c.event_id===row.event_id || c.other_event_id===row.event_id ||
-      (c.details && typeof c.details === "object" && !Array.isArray(c.details) && Array.isArray(c.details.participants) &&
-        c.details.participants.some(p => p && typeof p === "object" && !Array.isArray(p) && p.event_id===row.event_id))) &&
-        new Date(c.starts_at).getTime()<new Date(row.ends_at).getTime() && new Date(c.ends_at).getTime()>new Date(row.starts_at).getTime());
+    const conflict=hasOccurrenceConflict(row, conflicts);
     return { ...row,first:first.date,last,time:formatTime(first.time),conflict };
   }).filter(entry => !conflictFilter || (conflictFilter === "with" ? entry.conflict : !entry.conflict));
   const byDay = new Map<LocalDate,Entry[]>();

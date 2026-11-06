@@ -84,6 +84,25 @@ describe("Church Calendar conflicts", () => {
     await expect(asRole(db,"anon",tx => tx.query("select * from public.calendar_master_conflicts($1,$1)",[date]))).rejects.toMatchObject({ code:"42501" });
     const indicators=await asRole(db,"authenticated",tx => tx.query<{ event_id:string }>("select * from public.calendar_master_conflicts($1,$1)",[date]),admin);
     expect(indicators.rows.length).toBeGreaterThan(0);
+    for (const offset of [-1,1]) {
+      const adjacent=await asRole(db,"authenticated",tx => tx.query<{event_id:string;other_event_id:string}>(
+        "select * from public.calendar_master_conflicts($1::date+$2::int,$1::date+$2::int)",[date,offset]),admin);
+      expect(adjacent.rows.some(row => [row.event_id,row.other_event_id].includes(events[0]))).toBe(true);
+    }
+    await expect(asRole(db,"anon",tx => tx.query("select * from public.calendar_master_entries_with_occupancy($1,$1)",[date]))).rejects.toMatchObject({ code:"42501" });
+    await expect(asRole(db,"service_role",tx => tx.query("select * from public.calendar_master_entries_with_occupancy($1,$1)",[date]))).rejects.toMatchObject({ code:"42501" });
+    await expect(asRole(db,"authenticated",tx => tx.query("select * from public.calendar_master_entries_with_occupancy($1,$1)",[date]),disabled)).rejects.toMatchObject({ code:"RAR09" });
+    const occupancy=await asRole(db,"authenticated",tx => tx.query<{event_id:string;entry_id:string;occupancy_start:Date;occupancy_end:Date;buffers_present:boolean}>(`
+      select m.event_id,m.entry_id,m.occupancy_start,m.occupancy_end,
+        m.occupancy_start<m.starts_at and m.occupancy_end>m.ends_at as buffers_present
+      from public.calendar_master_entries_with_occupancy($1,$1) m where m.event_id=any($2::uuid[])`,[date,events.slice(0,2)]),admin);
+    expect(occupancy.rows).toHaveLength(2);
+    expect(occupancy.rows.every(row => row.buffers_present)).toBe(true);
+    for (const row of occupancy.rows) {
+      const original=(await db.query<{occupancy_start:Date;occupancy_end:Date}>("select occupancy_start,occupancy_end from public.calendar_submission_occurrences where id=$1",[row.entry_id])).rows[0];
+      expect(row.occupancy_start).toEqual(original.occupancy_start);
+      expect(row.occupancy_end).toEqual(original.occupancy_end);
+    }
   });
 
   it("shows approved occurrences once and omits their linked reservation from the room layer", async () => {
