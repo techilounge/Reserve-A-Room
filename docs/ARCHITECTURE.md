@@ -8,6 +8,9 @@ protected cron also generates them in bounded batches. Reminder identity include
 grant/version, cycle deadline revision and milestone, with delivery status in the
 existing system-email outbox. The worker rechecks that the grant, cycle and plan remain
 eligible before sending. Dates are approximate because the cron is scheduled daily.
+`20261113100000_calendar_reminder_milestones.sql` shares one milestone calculation
+between queueing and delivery, and skips stale milestones or reminders at least seven
+days overdue before any send, including a delayed first attempt.
 Copies of prior submitted plans create only new drafts in a later cycle for the same
 ministry; dates, room/resource requests and commitments are never copied. A planner
 must explicitly confirm saved dates, tied to the current draft version, before the

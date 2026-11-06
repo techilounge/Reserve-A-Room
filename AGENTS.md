@@ -228,7 +228,12 @@ Verification completed for that fix before commit:
   deploy production, apply hosted migrations, or begin Phase 9 without authorization.
   Profile the existing full-set conflict engine at realistic scale before release.
 
-- Phase 8 work in progress on `codex/church-calendar-phase1`: the planning dashboard
+- Phase 8 was reviewed at `e58768a93f69a398c323c11f7d30c5e0380259a3`; the reviewer
+  accepted exact-SHA typecheck, lint, 245 unit tests, 213 database tests, production
+  build and 119/119 Playwright tests with no skips. Phase 8 is **approve with one
+  required fix**; Phase 9 is not authorized. Old queued reminder milestones must not
+  be delivered after the current milestone or the seven-day overdue window changes.
+- Phase 8 implementation on `codex/church-calendar-phase1`: the planning dashboard
   and staff-only aggregate RPC are in `20261112100000_calendar_planning_dashboard.sql`;
   reminders, deadline revisions and a service-only idempotent outbox queue are in
   `20261112110000_calendar_plan_reminders.sql`; safe prior-plan draft copies and a
@@ -237,10 +242,11 @@ Verification completed for that fix before commit:
   requirement. The cron queues due reminders before its existing email sweep and
   continues the sweep even if the reminder queue fails. Planner emails use Resend.
   No hosted migrations, production rollout, or Phase 9 work is authorized.
-- The isolated dashboard browser flow, focused database and authorization checks,
-  typecheck and lint have passed during development. Run complete checks on the final
-  committed SHA and record exact results in the handoff response. Phase 8 is not yet
-  approved; push the review branch only after the full gates pass, then stop for review.
+- Remediation migration `20261113100000_calendar_reminder_milestones.sql` uses one
+  private milestone helper for queueing and delivery. The context rejects stale
+  milestones and overdue messages at or beyond seven days, including first attempts.
+  Run complete checks on the final committed SHA and report exact results with the
+  SHA; push the review branch only after all gates pass, then stop for re-review.
 
 - Phase 6 is **approved** at `38d7ca381d2cd30bea9b55a68e089b10e135b3ad`.
   The reviewer accepted exact-SHA typecheck, lint, 241 unit tests, 208 database

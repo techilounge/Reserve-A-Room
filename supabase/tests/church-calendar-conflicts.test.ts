@@ -66,6 +66,60 @@ it("preserves pre-remediation decisions as untrusted legacy history during upgra
 afterAll(async () => { await db.close(); });
 
 describe("Church Calendar conflicts", () => {
+  it("uses identical reminder milestones when queueing and delivering, including delayed first attempts", async () => {
+    const rollback=new Error("rollback delayed reminder fixture");
+    await expect(db.transaction(async tx => {
+      await tx.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({role:"service_role"})]);
+      await tx.query("update public.calendar_cycles set submission_opens_at=now()-interval '60 days' where id=$1",[cycle]);
+      const grant=(await tx.query<{id:string;version:number;contact_email:string}>(
+        "select id,version,contact_email from public.calendar_plan_access where plan_id=$1 and revoked_at is null",[plans[2]])).rows[0];
+      const scenarios = [
+        { offset:13, old:"days30", current:"days14", valid:false, queue:true },
+        { offset:6, old:"days14", current:"days7", valid:false, queue:true },
+        { offset:-3, old:"overdue", current:"overdue", valid:true, queue:false },
+        { offset:-7, old:"overdue", current:"overdue", valid:false, queue:false },
+        { offset:-8, old:"overdue", current:"overdue", valid:false, queue:false },
+      ] as const;
+      for (const scenario of scenarios) {
+        const current=(await tx.query<{deadline:Date;revision:number}>(`update public.calendar_cycles
+          set submission_deadline=now()+$2::int*interval '1 day' where id=$1
+          returning submission_deadline as deadline,reminder_revision as revision`,[cycle,scenario.offset])).rows[0];
+        const reminder=(await tx.query<{id:string}>(`insert into public.calendar_plan_reminders
+          (plan_id,grant_id,grant_version,deadline_revision,kind,deadline,created_at)
+          values($1,$2,$3,$4,$5,$6,now()-interval '17 days') returning id`,
+          [plans[2],grant.id,grant.version,current.revision,scenario.old,current.deadline])).rows[0].id;
+        await tx.query("select private.queue_system_email($1,'calendar_plan_reminder','calendar_plan_reminder',$2)",[grant.contact_email,reminder]);
+        const email=(await tx.query<{id:string;attempt_count:number}>("select id,attempt_count from public.system_email_logs where entity_id=$1",[reminder])).rows[0];
+        expect(email.attempt_count).toBe(0);
+        expect(Boolean((await tx.query<{v:unknown}>("select public.calendar_reminder_context($1) v",[email.id])).rows[0].v)).toBe(scenario.valid);
+        if (scenario.queue) {
+          // Claim exactly this old message as the worker's first attempt; the
+          // database must still reject it before TypeScript considers retry age.
+          await tx.query("select * from public.claim_system_emails(1,$1)",[reminder]);
+          expect((await tx.query<{attempt_count:number}>("select attempt_count from public.system_email_logs where id=$1",[email.id])).rows[0].attempt_count).toBe(1);
+          expect((await tx.query<{v:unknown}>("select public.calendar_reminder_context($1) v",[email.id])).rows[0].v).toBeNull();
+          await tx.query("select public.complete_system_email($1,'skipped',null,null)",[email.id]);
+          expect((await tx.query<{n:number}>("select public.calendar_queue_due_reminders(50) n")).rows[0].n).toBe(1);
+          const deliverable=await tx.query<{kind:string}>(`select r.kind from public.system_email_logs e
+            join public.calendar_plan_reminders r on r.id=e.entity_id
+            where r.plan_id=$1 and r.deadline_revision=$2 and public.calendar_reminder_context(e.id) is not null`,[plans[2],current.revision]);
+          expect(deliverable.rows.map(row => row.kind)).toEqual([scenario.current]);
+          expect((await tx.query<{n:number}>("select public.calendar_queue_due_reminders(50) n")).rows[0].n).toBe(0);
+        } else if (scenario.offset <= -7) {
+          expect((await tx.query<{n:number}>("select public.calendar_queue_due_reminders(50) n")).rows[0].n).toBe(0);
+        }
+      }
+      throw rollback;
+    })).rejects.toBe(rollback);
+  });
+
+  it("classifies reminder milestone boundaries consistently", async () => {
+    const rows=await db.query<{kind:string}>(`select private.calendar_reminder_milestone('2027-02-01T00:00:00Z', t::timestamptz) kind
+      from unnest(array['2027-01-01T00:00:00Z','2027-01-02T00:00:00Z','2027-01-18T00:00:00Z',
+        '2027-01-25T00:00:00Z','2027-02-01T00:00:00Z']) with ordinality dates(t,n) order by n`);
+    expect(rows.rows.map(row => row.kind)).toEqual(["opened","days30","days14","days7","overdue"]);
+  });
+
   it("copies only prior submitted event details and requires an explicit current date review", async () => {
     await expect(asRole(db,"authenticated",tx => tx.query("select public.calendar_copy_prior_plan($1,$2)",[plans[0],plans[2]]),admin)).rejects.toMatchObject({code:"RAR09"});
     const rollback=new Error("rollback copy fixture");

@@ -10,7 +10,10 @@ carry approvals, conflict decisions, reservations, or allocations. Do not merge,
 deploy production, apply hosted migrations, or begin Phase 9 without authorization.
 Realistic-scale conflict-engine profiling remains required before release.
 
-**Phase 8 work in progress:** the planning dashboard uses an active-staff aggregate
+**Phase 8 review checkpoint:** reviewed at `e58768a93f69a398c323c11f7d30c5e0380259a3`.
+Exact-SHA typecheck, lint, 245 unit tests, 213 database tests, production build and
+119/119 Playwright tests passed without skips. The reviewer approved the architecture
+with one required reminder-delivery fix; Phase 9 is not authorized. The planning dashboard uses an active-staff aggregate
 RPC and exposes cycle/ministry progress, hard/planning conflict counts and warnings.
 `20261112110000_calendar_plan_reminders.sql` records one reminder identity per
 planner grant/version, deadline revision and milestone; the protected cron queues
@@ -20,7 +23,11 @@ reopenings advance the revision, and delivery rechecks current plan and grant st
 into an earlier-unsubmitted plan for the same ministry. Copied events start without
 dates, room/resource requests or commitments; an explicit planner date review tied to
 the current draft version is required by the database before submission, including
-duplicates. Full exact-SHA verification and reviewer approval remain outstanding.
+duplicates. Append-only remediation `20261113100000_calendar_reminder_milestones.sql`
+shares milestone calculation between queueing and delivery, rejects queued messages
+from an earlier milestone, and applies the seven-day overdue window on delivery, even
+on a first attempt. Full exact-SHA remediation verification and final Phase 8 reviewer
+approval remain outstanding; do not begin Phase 9.
 
 **Checkpoint:** Phase 6 is approved at `38d7ca381d2cd30bea9b55a68e089b10e135b3ad`. Exact-SHA verification passed typecheck, lint, **241 unit tests**, **208 database tests**, production build, **114/114 Playwright tests** with no skips, and the complete native PostgreSQL room, resource and exclusive-event approval, submission/approval and resource-allocation race matrices at all three isolation levels. Vercel reported success. **Phase 7 is authorized:** implement the Church Calendar view, filters/layers, year view, mobile agenda and accessible keyboard controls; rename the existing `/admin/calendar` to Room Schedule. No new schema unless a measured read-model/index requirement justifies an append-only migration. No merge, hosted migration or production rollout is authorized.
 
