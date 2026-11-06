@@ -10,6 +10,13 @@ Production: https://reservearoom.stonehillchurch.org
 
 ## What it does
 
+- Staff can use **Church Calendar** at `/admin/church-calendar` for year, month,
+  week, day and agenda views of approved events, proposals and room reservations.
+  Filter by cycle, ministry, room, resource, status, scope and visibility; conflict
+  indicators are optional. Calendar-created room holds appear with their event, not
+  twice in the room layer. Super Admins manage cycles, invitations and resources at
+  `/admin/church-calendar/setup`. The existing `/admin/calendar` is **Room Schedule**.
+  These Church Calendar changes are on the review branch and are not deployed.
 - Church members and guests reserve rooms **without creating an account**.
 - Each room has its own rules:
   - capacity

@@ -230,6 +230,21 @@ Verification completed for that fix before commit:
   `/admin/calendar` as Room Schedule. Avoid schema additions unless a measured
   read-model/index requirement justifies an append-only migration. Stop for review
   after Phase 7. Do not merge, deploy production or apply hosted migrations.
+- Phase 7 implementation: the staff master view is `/admin/church-calendar` and
+  the existing `/admin/calendar` is labelled Room Schedule. Super Admin cycle and
+  resource configuration moved to `/admin/church-calendar/setup`; its actions and
+  redirects use the new path. The master view includes year, month, week, day and
+  agenda modes, keyboard-accessible date links, mobile agenda, filters and layers.
+  Calendar-created room holds are omitted from the separate room overlay.
+- A local measurement showed that the existing staff occurrence RPC returned 1,200
+  rows / 615,601 JSON bytes for one event when only 30 days (30 rows) were requested.
+  Therefore append-only migration `20261110100000_calendar_master_read_model.sql`
+  provides bounded, staff-authorized calendar and conflict-indicator reads plus
+  filter choices; no tables or indexes were added. Conflict indicators still invoke
+  the existing whole-active-set conflict engine; profile realistic scale before release.
+- Next run typecheck, lint, unit and DB suites, production build and full Playwright
+  on the final Phase 7 commit. Push only `codex/church-calendar-phase1` and stop for
+  review. Never report earlier-iteration checks as exact-SHA evidence.
 
 ## Church Calendar Phase 6 review remediation — historical
 

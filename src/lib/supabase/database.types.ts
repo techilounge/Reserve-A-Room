@@ -2611,6 +2611,18 @@ export type Database = {
         Args: never;
         Returns: { fingerprint: string; classification: string; conflict_type: string; event_id: string; other_event_id: string; occurrence_id: string; starts_at: string; ends_at: string; timezone: string; details: Json; decision_type: string; selected_event_id: string; reason: string; decided_at: string }[];
       };
+      calendar_master_conflicts: {
+        Args: { p_from: string; p_to: string };
+        Returns: { event_id: string; other_event_id: string; starts_at: string; ends_at: string; details: Json }[];
+      };
+      calendar_master_entries: {
+        Args: { p_from: string; p_to: string; p_cycle?: string; p_ministry?: string; p_room?: string; p_resource?: string; p_scope?: string; p_visibility?: string; p_layer?: string };
+        Returns: { entry_id: string; event_id: string; submission_id: string; kind: string; status: string; title: string; starts_at: string; ends_at: string; all_day: boolean; timezone: string; cycle_id: string; cycle_name: string; ministry_id: string; ministry_name: string; scope: string; visibility: string; location_type: string; rooms: Json; resources: Json }[];
+      };
+      calendar_master_filter_options: {
+        Args: never;
+        Returns: Json;
+      };
       calendar_planner_conflicts: {
         Args: { p_plan_id: string; p_session_hash: string };
         Returns: { event_id: string; classification: string; conflict_type: string; starts_at: string; ends_at: string }[];

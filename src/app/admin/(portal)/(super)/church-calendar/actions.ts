@@ -10,7 +10,7 @@ import { scheduleSystemEmailDelivery } from "@/lib/email/schedule";
 import { getServerEnv } from "@/lib/env/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const BASE = "/admin/church-calendar";
+const BASE = "/admin/church-calendar/setup";
 const str = (form: FormData, key: string) => String(form.get(key) ?? "").trim();
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

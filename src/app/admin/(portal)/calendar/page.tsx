@@ -11,7 +11,7 @@ import { loadCatalog } from "@/lib/data/catalog";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "Calendar",
+  title: "Room Schedule",
 };
 
 const STATUS_STYLE = {
@@ -89,7 +89,7 @@ export default async function AdminCalendarPage({ searchParams }: PageProps<"/ad
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Calendar" description="Reservations by day. Select one to review it." />
+      <PageHeader title="Room Schedule" description="Reservations by day. Select one to review it." />
 
       <div className="flex flex-col gap-3 rounded-xl border bg-card p-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">

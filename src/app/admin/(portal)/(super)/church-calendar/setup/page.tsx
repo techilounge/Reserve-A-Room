@@ -9,9 +9,9 @@ import { calendarInstantToLocal, calendarLocalToInstant } from "@/lib/calendar-p
 import { formatInstant } from "@/lib/datetime";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-import { addMinistry, invitePlanner, removeMinistry, revokePlanner, rotatePlanner, saveCycle, saveResource, transitionCycle } from "./actions";
+import { addMinistry, invitePlanner, removeMinistry, revokePlanner, rotatePlanner, saveCycle, saveResource, transitionCycle } from "../actions";
 
-export const metadata: Metadata = { title: "Church Calendar" };
+export const metadata: Metadata = { title: "Calendar Setup" };
 const selectStyle = "min-h-10 w-full rounded-lg border border-input bg-background px-3 text-sm";
 const field = "flex flex-col gap-1 text-sm font-medium";
 const card = "space-y-4 rounded-xl border bg-card p-4 sm:p-5";
@@ -64,7 +64,7 @@ export default async function ChurchCalendarPage({ searchParams }: { searchParam
     supabase.rpc("get_admin_settings"),
   ]);
   if (cyclesResult.error || plansResult.error || grantsResult.error || resourcesResult.error || ministriesResult.error || deliveriesResult.error || settingsResult.error || !settingsResult.data?.timezone) {
-    return <div className="space-y-4"><PageHeader title="Church Calendar" />
+    return <div className="space-y-4"><PageHeader title="Calendar Setup" />
       <p role="alert">Calendar configuration is unavailable. Confirm the Phase 1 database migration has been applied to this environment.</p></div>;
   }
   const cycles = cyclesResult.data; const plans = plansResult.data; const grants = grantsResult.data;
@@ -76,7 +76,7 @@ export default async function ChurchCalendarPage({ searchParams }: { searchParam
   const availability = requestedResource && from && to
     ? await supabase.rpc("calendar_resource_availability", { p_resource: requestedResource.id, p_start: from, p_end: to }) : null;
   return <div className="space-y-6">
-    <PageHeader title="Church Calendar" description="Manage planning cycles, ministry invitations, and the resource catalog." />
+    <PageHeader title="Calendar Setup" description="Manage planning cycles, ministry invitations, and the resource catalog." />
     {query.message ? <p role="status" className="rounded-lg border border-green-600 p-3">{query.message}</p> : null}
     {query.error ? <p role="alert" className="rounded-lg border border-destructive p-3">{query.error}</p> : null}
     <section className={card} aria-labelledby="new-cycle"><h2 id="new-cycle" className="text-xl font-semibold">Create a planning cycle</h2>

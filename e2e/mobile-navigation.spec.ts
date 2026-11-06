@@ -44,11 +44,14 @@ test("admin mobile navigation exposes primary tasks and a permission-filtered Mo
     "href",
     "/admin/reservations/new",
   );
+  await expect(navigation.getByRole("link", { name: "Room Schedule" })).toHaveAttribute("href", "/admin/calendar");
 
   await navigation.getByRole("button", { name: "More admin navigation" }).click();
   const sheet = page.getByRole("dialog");
   await expect(sheet.getByRole("link", { name: "Notifications" })).toBeVisible();
   await expect(sheet.getByRole("link", { name: "Settings" })).toBeVisible();
+  await expect(sheet.getByRole("link", { name: "Church Calendar", exact: true })).toHaveAttribute("href", "/admin/church-calendar");
+  await expect(sheet.getByRole("link", { name: "Calendar Setup" })).toHaveAttribute("href", "/admin/church-calendar/setup");
   await expect(sheet.getByRole("link", { name: "Reservations" })).toHaveCount(0);
 
   await context.close();

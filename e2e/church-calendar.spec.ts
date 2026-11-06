@@ -15,7 +15,7 @@ test("staff can approve, revise and cancel calendar commitments", async ({ brows
   const now = Date.now();
   const day = (offset: number) => new Date(now + offset * 86400000).toISOString().slice(0, 10);
   try {
-    await page.goto("/admin/church-calendar");
+    await page.goto("/admin/church-calendar/setup");
     const create = page.getByRole("region", { name: "Create a planning cycle" });
     await create.getByLabel("Cycle name").fill("Approval browser cycle");
     await create.getByLabel("Calendar start").fill(day(0));
@@ -87,6 +87,25 @@ test("staff can approve, revise and cancel calendar commitments", async ({ brows
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await approval.getByRole("button", { name: "Approve event", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("approval was recorded");
+    const master = await staff.newPage();
+    await master.goto(`/admin/church-calendar?view=day&date=${day(62)}`);
+    await expect(master.getByRole("heading", { name:"Church Calendar", exact:true })).toBeVisible();
+    await expect(master.getByRole("link", { name:/Approval browser event/ })).toHaveCount(1);
+    await master.getByText("Filters and layers").click();
+    await master.getByLabel("Approved and cancelled events").uncheck();
+    await master.getByRole("button", { name:"Apply filters" }).click();
+    await expect(master.getByRole("link", { name:/Approval browser event/ })).toHaveCount(0);
+    await master.goto(`/admin/church-calendar?view=day&date=${day(62)}`);
+    await master.getByRole("link", { name:"year", exact:true }).click();
+    await expect(master.getByRole("navigation", { name:"Church Calendar view" }).getByRole("link", { name:"year" })).toHaveAttribute("aria-current","page");
+    expect(await master.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    expect((await new AxeBuilder({ page:master }).analyze()).violations).toEqual([]);
+    const yearDate = master.getByRole("link", { name:new RegExp(`${new Date(`${day(62)}T12:00:00Z`).toLocaleString("en-US", { month:"long",timeZone:"UTC" })}.*1 entries`) }).first();
+    await yearDate.focus();
+    await expect(yearDate).toBeFocused();
+    await master.keyboard.press("Enter");
+    await expect(master.getByRole("link", { name:/Approval browser event/ })).toHaveCount(1);
+    await master.close();
     const approved = page.getByRole("listitem").filter({ hasText: "Approval browser event" }).first();
     await approved.getByRole("link", { name: "View approved dates" }).click();
     const firstDate = page.getByRole("listitem").filter({ has: page.getByRole("button", { name: "Cancel this date" }) }).first();
@@ -137,7 +156,7 @@ test("Super Admins can edit a resource and inspect its demand", async ({ browser
   const context = await browser.newContext();
   await signInAs(context, "superAdmin");
   const page = await context.newPage();
-  await page.goto("/admin/church-calendar");
+  await page.goto("/admin/church-calendar/setup");
   const catalog = page.getByRole("region", { name: "Resource catalog" });
   await catalog.getByText("Add a resource").click();
   const create = catalog.locator("details").filter({ hasText: "Add a resource" });
@@ -166,7 +185,7 @@ test("a Super Admin configures a cycle and independently rotates one planner's a
   const staff = await browser.newContext({ viewport: { width: 390, height: 844 } });
   await signInAs(staff, "superAdmin");
   const page = await staff.newPage();
-  await page.goto("/admin/church-calendar");
+  await page.goto("/admin/church-calendar/setup");
   const create = page.getByRole("region", { name: "Create a planning cycle" });
   const now = Date.now();
   await create.getByLabel("Cycle name").fill("Browser test cycle");
@@ -418,7 +437,7 @@ test("cycle times use the configured timezone for saving and display", async ({ 
     expect((await changeTimezone("America/New_York")).ok).toBe(true);
     await signInAs(context, "superAdmin");
     const page = await context.newPage();
-    await page.goto("/admin/church-calendar");
+    await page.goto("/admin/church-calendar/setup");
     const create = page.getByRole("region", { name: "Create a planning cycle" });
     await expect(create.getByText(/configured church timezone: America\/New_York/)).toBeVisible();
     await create.getByLabel("Cycle name").fill("Timezone review cycle");
@@ -450,6 +469,8 @@ test("ordinary Admins cannot open Church Calendar management", async ({ browser 
   await signInAs(context, "admin");
   const page = await context.newPage();
   await page.goto("/admin/church-calendar");
+  await expect(page.getByRole("heading", { name:"Church Calendar", exact:true })).toBeVisible();
+  await page.goto("/admin/church-calendar/setup");
   await expect(page.getByText("Super Admin access required")).toBeVisible();
   await context.close();
 });

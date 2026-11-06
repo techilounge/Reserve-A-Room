@@ -1,5 +1,22 @@
 # Reserve-A-Room — Architecture & Decisions
 
+## Church Calendar master view (Phase 7 review branch)
+
+`/admin/church-calendar` is the staff master view; the existing room-reservation
+calendar remains `/admin/calendar` and is labelled Room Schedule. Calendar setup
+is at the Super Admin-only `/admin/church-calendar/setup`. A staff-only bounded read
+model in `20261110100000_calendar_master_read_model.sql` reads immutable occurrence
+snapshots and operational room reservations, excludes calendar-linked holds from the
+room overlay, and supports date, cycle, ministry, room, resource, scope and visibility
+filters. It caps each response at 5,001 so the page can warn instead of silently
+truncating. Conflict indicators use a bounded response from the existing conflict
+engine; the engine itself still computes its full active set and must be profiled
+before production at realistic scale. No tables or indexes were added.
+
+The new read model was justified by a local 1,200-occurrence fixture: the existing
+per-submission RPC returned all 1,200 rows (615,601 JSON bytes) for a 30-day period
+containing 30 occurrences. No hosted migration or production rollout is implied.
+
 Stonehill Seventh-day Adventist Church · `https://reservearoom.stonehillchurch.org`
 
 This document started as the Phase 0 architecture plan. It records the decisions every later

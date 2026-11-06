@@ -66,6 +66,46 @@ it("preserves pre-remediation decisions as untrusted legacy history during upgra
 afterAll(async () => { await db.close(); });
 
 describe("Church Calendar conflicts", () => {
+  it("returns bounded staff calendar entries and respects room and resource filters", async () => {
+    await expect(asRole(db,"anon",tx => tx.query("select * from public.calendar_master_entries($1,$1)",[date]))).rejects.toMatchObject({ code:"42501" });
+    await expect(asRole(db,"service_role",tx => tx.query("select * from public.calendar_master_entries($1,$1)",[date]))).rejects.toMatchObject({ code:"42501" });
+    const disabled=await createStaff(db,"admin",{ active:false });
+    await expect(asRole(db,"authenticated",tx => tx.query("select * from public.calendar_master_entries($1,$1)",[date]),disabled)).rejects.toMatchObject({ code:"RAR09" });
+    const all=await asRole(db,"authenticated",tx => tx.query<{ event_id:string; status:string; kind:string }>("select * from public.calendar_master_entries($1,$1)",[date]),admin);
+    expect(all.rows.some(row => row.event_id===events[0] && row.status==="proposed")).toBe(true);
+    expect(all.rows.some(row => row.event_id===events[3])).toBe(false);
+    const rooms=await asRole(db,"authenticated",tx => tx.query<{ event_id:string }>("select * from public.calendar_master_entries($1,$1,null,null,$2)",[date,room]),admin);
+    expect(rooms.rows.some(row => row.event_id===events[2])).toBe(false);
+    const resources=await asRole(db,"authenticated",tx => tx.query<{ event_id:string }>("select * from public.calendar_master_entries($1,$1,null,null,null,$2)",[date,resource]),admin);
+    expect(resources.rows.some(row => row.event_id===events[0])).toBe(true);
+    expect(resources.rows.some(row => row.event_id===events[2])).toBe(false);
+    await expect(asRole(db,"authenticated",tx => tx.query("select * from public.calendar_master_entries($1::date,$1::date+366)",[date]),admin)).rejects.toMatchObject({ code:"RAR10" });
+    await expect(asRole(db,"anon",tx => tx.query("select public.calendar_master_filter_options()"))).rejects.toMatchObject({ code:"42501" });
+    await expect(asRole(db,"anon",tx => tx.query("select * from public.calendar_master_conflicts($1,$1)",[date]))).rejects.toMatchObject({ code:"42501" });
+    const indicators=await asRole(db,"authenticated",tx => tx.query<{ event_id:string }>("select * from public.calendar_master_conflicts($1,$1)",[date]),admin);
+    expect(indicators.rows.length).toBeGreaterThan(0);
+  });
+
+  it("shows approved occurrences once and omits their linked reservation from the room layer", async () => {
+    const rollback=new Error("rollback master calendar approval");
+    await expect(db.transaction(async tx => {
+      await tx.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({ role:"service_role" })]);
+      const portal=(await tx.query<{ value:{ events:Record<string,unknown>[] } }>("select public.calendar_planner_portal($1,$2) as value",[refs[2],sessions[2]])).rows[0].value;
+      const event=portal.events.find(row => row.id===events[3])!;
+      await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)",[refs[2],sessions[2],events[3],JSON.stringify({ ...event,scope:"ministry",setup_minutes:0,cleanup_minutes:0,schedule:{ ...(event.schedule as object),start_time:"15:00",end_time:"16:00" } })]);
+      await tx.query("select public.calendar_submit_plan($1,$2,'',false)",[refs[2],sessions[2]]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({ role:"authenticated",sub:admin })]);
+      const commitment=(await tx.query<{ id:string }>("select public.calendar_approve_event($1,1,'Test','Planner','+15125550123') as id",[events[3]])).rows[0].id;
+      const entry=(await tx.query<{ kind:string; status:string; entry_id:string }>("select * from public.calendar_master_entries($1,$1) where event_id=$2",[date,events[3]])).rows;
+      expect(entry).toHaveLength(1); expect(entry[0]).toMatchObject({ kind:"event",status:"approved" });
+      expect((await tx.query<{ n:number }>("select count(*)::int n from public.calendar_master_entries($1,$1,null,null,null,null,null,null,'rooms') where entry_id in (select id from public.reservations where calendar_commitment_id=$2)",[date,commitment])).rows[0].n).toBe(0);
+      const occ=(await tx.query<{ id:string }>("select id from public.calendar_submission_occurrences where submission_id=(select submission_id from public.calendar_event_commitments where id=$1)",[commitment])).rows[0].id;
+      await tx.query("select public.calendar_cancel_event_occurrence($1,$2,$3,'Date cancelled')",[events[3],commitment,occ]);
+      expect((await tx.query<{ status:string }>("select * from public.calendar_master_entries($1,$1) where event_id=$2",[date,events[3]])).rows[0].status).toBe("cancelled");
+      throw rollback;
+    })).rejects.toBe(rollback);
+  });
+
   it.each([
     { name:"virtual", location:"virtual", resources:[] },
     { name:"offsite", location:"offsite", resources:[] },
@@ -223,6 +263,8 @@ describe("Church Calendar conflicts", () => {
           [conflict.fingerprint,conflict.classification==="planning" ? "advance" : "acknowledge",conflict.classification==="planning" ? events[3] : null]);
       }
       const replacement = (await tx.query<{ id: string }>("select private.calendar_approve_initial($1,2,'Test','Planner','+15125550123',$2) as id", [events[3],commitment])).rows[0].id;
+      const history=(await tx.query<{ status:string }>("select * from public.calendar_master_entries(current_date-1,current_date-1) where event_id=$1",[events[3]])).rows;
+      expect(history).toHaveLength(1); expect(history[0].status).toBe("approved");
       expect((await tx.query<{ status: string }>("select status from public.calendar_resource_allocations where id=$1", [pastAllocation])).rows[0].status).toBe("confirmed");
       expect((await tx.query<{ state: string }>("select state from public.calendar_event_commitments where id=$1", [commitment])).rows[0].state).toBe("replaced");
       expect((await tx.query<{ status: string }>("select status from public.reservations where calendar_commitment_id=$1", [commitment])).rows[0].status).toBe("cancelled");
@@ -432,6 +474,7 @@ describe("Church Calendar conflicts", () => {
       await tx.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role:"authenticated",sub:admin })]);
       const replacement = (await tx.query<{ id: string }>("select private.calendar_approve_initial($1,2,null,null,null,$2) as id", [events[3],commitment])).rows[0].id;
       expect((await tx.query<{ n: number }>("select count(*)::int as n from public.reservations where calendar_commitment_id=$1 and status='approved'", [replacement])).rows[0].n).toBe(0);
+      expect((await tx.query<{ status:string }>("select status from public.calendar_master_entries($1::date,$1::date+1) where event_id=$2 order by starts_at",[date,events[3]])).rows.map(row => row.status)).toEqual(["cancelled","approved"]);
       expect((await tx.query<{ logical_occurrence_id: string }>("select logical_occurrence_id from public.calendar_commitment_occurrence_cancellations where commitment_id=$1", [replacement])).rows[0].logical_occurrence_id).toBe(occurrences[0].logical_occurrence_id);
       throw rollback;
     })).rejects.toBe(rollback);

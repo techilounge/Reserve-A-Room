@@ -40,7 +40,8 @@ export const ADMIN_NAV: readonly NavGroup[] = [
       { href: "/admin", label: "Dashboard", icon: LayoutDashboard, permission: "reservations.viewAll" },
       { href: "/admin/reservations", label: "Reservations", icon: ClipboardList, permission: "reservations.viewAll" },
       { href: "/admin/recurring-requests", label: "Recurring Requests", icon: CalendarClock, permission: "reservations.viewAll" },
-      { href: "/admin/calendar", label: "Calendar", icon: CalendarDays, permission: "calendar.view" },
+      { href: "/admin/calendar", label: "Room Schedule", icon: CalendarDays, permission: "calendar.view" },
+      { href: "/admin/church-calendar", label: "Church Calendar", icon: CalendarDays, permission: "calendar.view" },
       { href: "/admin/calendar-submissions", label: "Calendar Plans", icon: ClipboardList, permission: "calendar.view" },
       { href: "/admin/calendar-conflicts", label: "Conflict Center", icon: AlertTriangle, permission: "calendar.view" },
       { href: "/admin/notifications", label: "Notifications", icon: Bell, permission: "notifications.receive" },
@@ -52,7 +53,7 @@ export const ADMIN_NAV: readonly NavGroup[] = [
     items: [
       { href: "/admin/rooms", label: "Rooms", icon: Building2, permission: "rooms.manage" },
       { href: "/admin/ministries", label: "Ministries", icon: UsersRound, permission: "ministries.manage" },
-      { href: "/admin/church-calendar", label: "Church Calendar", icon: CalendarDays, permission: "churchCalendar.manage" },
+      { href: "/admin/church-calendar/setup", label: "Calendar Setup", icon: CalendarDays, permission: "churchCalendar.manage" },
       { href: "/admin/users", label: "Users & Roles", icon: Users, permission: "users.manage" },
       { href: "/admin/settings", label: "Settings", icon: Settings, permission: "settings.manage" },
       { href: "/admin/audit", label: "Audit Log", icon: ScrollText, permission: "audit.view" },
@@ -73,5 +74,6 @@ export function navigationFor(actor: Actor, groups: readonly NavGroup[] = ADMIN_
 /** Exact match for section roots ("/admin"), prefix match for everything else. */
 export function isActivePath(pathname: string, href: string): boolean {
   if (href === "/" || href === "/admin") return pathname === href;
+  if (href === "/admin/church-calendar") return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }

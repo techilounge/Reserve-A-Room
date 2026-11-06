@@ -2,6 +2,19 @@
 
 **Checkpoint:** Phase 6 is approved at `38d7ca381d2cd30bea9b55a68e089b10e135b3ad`. Exact-SHA verification passed typecheck, lint, **241 unit tests**, **208 database tests**, production build, **114/114 Playwright tests** with no skips, and the complete native PostgreSQL room, resource and exclusive-event approval, submission/approval and resource-allocation race matrices at all three isolation levels. Vercel reported success. **Phase 7 is authorized:** implement the Church Calendar view, filters/layers, year view, mobile agenda and accessible keyboard controls; rename the existing `/admin/calendar` to Room Schedule. No new schema unless a measured read-model/index requirement justifies an append-only migration. No merge, hosted migration or production rollout is authorized.
 
+**Phase 7 implementation for review:** `/admin/church-calendar` is the staff master
+calendar; `/admin/calendar` remains the Room Schedule, and Super Admin configuration
+is at `/admin/church-calendar/setup`. The master view supports year, month, week,
+day and agenda, mobile navigation, date links, and filters/layers. Migration
+`20261110100000_calendar_master_read_model.sql` adds bounded staff-only reads without
+new tables or indexes: an isolated 1,200-occurrence fixture showed the old RPC
+returned 1,200 rows / 615,601 JSON bytes for a 30-day view containing 30 rows.
+Calendar-linked holds are omitted from the separate room layer. Conflict output is
+range-bounded, but the underlying existing conflict engine still evaluates the full
+active set and requires realistic-scale profiling before release. Run all quality
+gates and the complete browser suite on the final Phase 7 commit before pushing for
+review; do not start Phase 8 without authorization.
+
 **Phase 6 implementation and review remediation:** `20261108100000_calendar_reservation_guards.sql` adds
 the private reservation capability and a calendar-linked reservation guard; it exposes
 no approval or cancellation RPC. Snapshot room, occupancy and food are independently

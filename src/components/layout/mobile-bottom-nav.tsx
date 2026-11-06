@@ -38,7 +38,7 @@ const ADMIN_ITEMS: readonly BottomNavItem[] = [
   { href: "/admin", label: "Dashboard", icon: Home },
   { href: "/admin/reservations", label: "Reservations", icon: ClipboardList },
   { href: "/admin/reservations/new", label: "New", icon: CalendarPlus, prominent: true },
-  { href: "/admin/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/admin/calendar", label: "Room Schedule", icon: CalendarDays },
 ];
 
 function BottomNavLink({ item }: { item: BottomNavItem }) {
@@ -62,7 +62,7 @@ function BottomNavLink({ item }: { item: BottomNavItem }) {
       )}
     >
       <Icon className={cn("size-5", item.prominent && "size-6")} strokeWidth={active ? 2.5 : 2} aria-hidden />
-      <span className="max-w-full truncate">{item.label}</span>
+      <span className={cn("max-w-full truncate", item.label === "Room Schedule" && "whitespace-normal text-center leading-none")}>{item.label}</span>
       {active && !item.prominent ? (
         <span className="absolute inset-x-4 bottom-0 h-0.5 rounded-full bg-highlight" aria-hidden />
       ) : null}
