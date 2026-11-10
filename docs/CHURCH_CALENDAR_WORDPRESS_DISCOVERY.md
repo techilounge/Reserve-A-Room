@@ -9,6 +9,19 @@ provider-neutral publishing layer. Reserve-A-Room remains authoritative; the exi
 JSON and ICS feeds must remain independent of every external publisher. A future site
 may instead consume the JSON feed directly, without synchronization.
 
+The owner confirmed that no staging site currently exists. The hosting provider or
+website maintainer must be identified before choosing how to provision one. A separate
+local test installation could exercise generic adapter behavior, but does not by itself
+verify the church site's installed plugin versions, configuration, hooks or permissions.
+
+Ask the host or site maintainer for an isolated staging copy with a separate database
+and URL, access restricted to the testing team, real outgoing mail and external
+integrations disabled or redirected, and scheduled jobs disabled or isolated. Use
+disposable test events only and do not promote staging changes to production.
+WordPress recommends these safeguards in its [staging guide](https://make.wordpress.org/hosting/handbook/reliability/staging/).
+Setting `WP_ENVIRONMENT_TYPE` to `staging` identifies the environment to WordPress;
+it does not independently guarantee that every plugin or integration is isolated.
+
 ## Observed website surfaces
 
 - [Events archive](https://stonehillchurch.org/events/) renders The Events Calendar
