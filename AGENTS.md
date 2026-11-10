@@ -248,8 +248,8 @@ Verification completed for that fix before commit:
   identity/outbox model, safety invariants and test matrix. The staging URL, isolation,
   provider authentication and mutation/idempotency behavior remain unverified; complete
   the discovery gate before provider-specific schema, mapping or network dispatch.
-- The owner confirmed that no WordPress staging site currently exists. Identify the
-  website host or maintainer and arrange a separately isolated staging environment;
+- The owner confirmed HostGator hosts WordPress and no staging site currently exists.
+  Verify the account's staging options and arrange a separately isolated environment;
   a generic local installation cannot establish actual site/plugin behavior by itself.
 
 ## Church Calendar Phase 9 checkpoint — historical

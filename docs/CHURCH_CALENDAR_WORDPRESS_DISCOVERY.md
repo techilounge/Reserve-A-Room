@@ -9,8 +9,8 @@ provider-neutral publishing layer. Reserve-A-Room remains authoritative; the exi
 JSON and ICS feeds must remain independent of every external publisher. A future site
 may instead consume the JSON feed directly, without synchronization.
 
-The owner confirmed that no staging site currently exists. The hosting provider or
-website maintainer must be identified before choosing how to provision one. A separate
+The owner confirmed that no staging site currently exists and that HostGator hosts
+the WordPress site. The account's staging features and isolation remain unverified. A separate
 local test installation could exercise generic adapter behavior, but does not by itself
 verify the church site's installed plugin versions, configuration, hooks or permissions.
 
@@ -21,6 +21,9 @@ disposable test events only and do not promote staging changes to production.
 WordPress recommends these safeguards in its [staging guide](https://make.wordpress.org/hosting/handbook/reliability/staging/).
 Setting `WP_ENVIRONMENT_TYPE` to `staging` identifies the environment to WordPress;
 it does not independently guarantee that every plugin or integration is isolated.
+HostGator documents a [WordPress plugin Staging tab](https://www.hostgator.com/help/article/wordpress-hostgator-plugin)
+and, for applicable cPanel plans, [Softaculous cloning](https://www.hostgator.com/help/article/how-to-clone-an-installation-with-softaculous).
+Availability for this account is not yet confirmed.
 
 ## Observed website surfaces
 
