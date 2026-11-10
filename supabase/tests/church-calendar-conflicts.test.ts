@@ -2,6 +2,8 @@ import type { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { asRole, createRoom, createStaff, createTestDb, insertReservation, type Queryable } from "./support/db";
+import { createPublicIcal } from "../../src/lib/public-calendar/ical";
+import { publicCalendarSyncPayload } from "../../src/lib/public-calendar/types";
 
 let db: PGlite;
 let superAdmin: string, admin: string, room: string, resource: string, cycle: string, date: string;
@@ -70,6 +72,11 @@ describe("Church Calendar conflicts", () => {
     const rollback=new Error("rollback public calendar fixture");
     await expect(db.transaction(async tx => {
       const next=(await tx.query<{d:string}>("select ($1::date+1)::text d",[date])).rows[0].d;
+      const next2=(await tx.query<{d:string}>("select ($1::date+2)::text d",[date])).rows[0].d;
+      const flush=async () => {
+        await tx.exec("set constraints calendar_publication_commitment, calendar_publication_cancellation immediate");
+        await tx.exec("set constraints calendar_publication_commitment, calendar_publication_cancellation deferred");
+      };
       await tx.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({role:"service_role"})]);
       const portal=(await tx.query<{v:{events:Record<string,unknown>[]}}>("select public.calendar_planner_portal($1,$2) v",[refs[2],sessions[2]])).rows[0].v;
       const draft=portal.events.find(item => item.id===events[3])!;
@@ -77,13 +84,19 @@ describe("Church Calendar conflicts", () => {
         food_drinks_planned:false,description:"PRIVATE INTERNAL DESCRIPTION",requester_notes:"PRIVATE REQUESTER NOTES",
         virtual_url:"https://private.example/meeting",public_contact_email:"private@example.org",public_description:"Public description"};
       await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)",[refs[2],sessions[2],events[3],JSON.stringify({...common,title:"Public event",visibility:"public",
-        schedule:{kind:"specific_dates",timezone:"America/Chicago",start_date:date,end_date:next},
-        dates:[{start_date:date,end_date:date,start_time:"15:00",end_time:"16:00"},{start_date:next,end_date:next,start_time:"15:00",end_time:"16:00"}]})]);
+        schedule:{kind:"specific_dates",timezone:"America/Chicago",start_date:date,end_date:next2},
+        dates:[{start_date:date,end_date:date,start_time:"15:00",end_time:"16:00"},{start_date:next,end_date:next,start_time:"15:00",end_time:"16:00"},{start_date:next2,end_date:next2,start_time:"15:00",end_time:"16:00"}]})]);
       const internal=(await tx.query<{id:string}>("select public.calendar_save_event_draft($1,$2,null,$3::jsonb) id",[refs[2],sessions[2],JSON.stringify({...common,title:"PRIVATE INTERNAL EVENT",visibility:"internal",draft_version:null,
         schedule:{kind:"one_time",timezone:"America/Chicago",start_date:date,end_date:date,start_time:"17:00",end_time:"18:00"},dates:[]})])).rows[0].id;
       const read=async (limit=10,offset=0) => {
         await tx.exec("set local role anon");
-        const result=(await tx.query<{v:{events:{uid:string;title:string;description:string;sequence:number;starts_at:string}[];has_more:boolean}}>("select public.calendar_public_occurrences($1,$2,$3,$4) v",[date,next,limit,offset])).rows[0].v;
+        const result=(await tx.query<{v:{events:{uid:string;title:string;description:string;sequence:number;starts_at:string}[];has_more:boolean}}>("select public.calendar_public_occurrences($1,$2,$3,$4) v",[date,next2,limit,offset])).rows[0].v;
+        await tx.exec("reset role");
+        return result;
+      };
+      const sync=async () => {
+        await tx.exec("set local role anon");
+        const result=(await tx.query<{v:{events:({uid:string;status:string;sequence:number;last_modified:string} & Record<string,unknown>)[]}}>("select public.calendar_public_sync_feed($1,$2,200,0) v",[date,next2])).rows[0].v.events;
         await tx.exec("reset role");
         return result;
       };
@@ -92,9 +105,13 @@ describe("Church Calendar conflicts", () => {
       expect((await read()).events).toHaveLength(0); // submitted proposals
       await tx.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({role:"authenticated",sub:admin})]);
       let commitment=(await tx.query<{id:string}>("select public.calendar_approve_event($1,1,'','','') id",[events[3]])).rows[0].id;
-      await tx.query("select public.calendar_approve_event($1,1,'','','')",[internal]);
-      const page1=await read(1); const page2=await read(1,1);
-      expect(page1.has_more).toBe(true); expect(page2.has_more).toBe(false);
+      const internalCommitment=(await tx.query<{id:string}>("select public.calendar_approve_event($1,1,'','','') id",[internal])).rows[0].id;
+      await flush();
+      await tx.query("select public.calendar_cancel_event($1,$2,'Internal only cancellation')",[internal,internalCommitment]);
+      await flush();
+      const page1=await read(1); const page2=await read(1,1); const page3=await read(1,2);
+      expect(page1.has_more).toBe(true); expect(page2.has_more).toBe(true); expect(page3.has_more).toBe(false);
+      expect((await sync()).every(item => item.status === "published")).toBe(true); // internal event has no tombstone
       expect(page1.events[0]).toMatchObject({title:"Public event",description:"Public description"});
       expect(page1.events[0].uid).not.toBe(page2.events[0].uid);
       expect(JSON.stringify([page1,page2])).not.toMatch(/PRIVATE|private@example|private\.example|requester_notes|occupancy|resource/i);
@@ -107,19 +124,28 @@ describe("Church Calendar conflicts", () => {
       await tx.query("select public.calendar_request_plan_changes($1,'Update event time')",[plans[2]]);
       await tx.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({role:"service_role"})]);
       const revised=(await tx.query<{v:{events:Record<string,unknown>[]}}>("select public.calendar_planner_portal($1,$2) v",[refs[2],sessions[2]])).rows[0].v.events.find(item => item.id===events[3])!;
-      const revisedDates=(revised.dates as Record<string,unknown>[]).map((item,index) => index===0 ? {...item,start_time:"15:15",end_time:"16:15"} : item);
+      const revisedDates=(revised.dates as Record<string,unknown>[]).slice(0,2).map((item,index) => index===0 ? {...item,start_time:"15:15",end_time:"16:15"} : item);
       await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)",[refs[2],sessions[2],events[3],JSON.stringify({...revised,title:"Revised public event",dates:revisedDates})]);
       await tx.query("select public.calendar_submit_plan($1,$2,'',false)",[refs[2],sessions[2]]);
       expect((await read()).events[0].title).toBe("Public event");
       await tx.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({role:"authenticated",sub:admin})]);
       commitment=(await tx.query<{id:string}>("select public.calendar_approve_event($1,2,'','','',$2) id",[events[3],commitment])).rows[0].id;
+      await flush();
       const replaced=await read();
       expect(replaced.events[0]).toMatchObject({uid:page1.events[0].uid,title:"Revised public event"});
       expect(replaced.events[0].sequence).toBeGreaterThan(page1.events[0].sequence);
       expect(replaced.events[0].starts_at).not.toBe(page1.events[0].starts_at);
       expect(replaced.events[1].uid).toBe(page2.events[0].uid);
+      const removed=(await sync()).find(item => item.uid===page3.events[0].uid)!;
+      expect(removed.status).toBe("cancelled");
+      expect(removed.sequence).toBeGreaterThan(page3.events[0].sequence);
+      expect(JSON.stringify(removed)).not.toMatch(/Public event|description|location|PRIVATE|private\.example/i);
       const revisedOcc=(await tx.query<{id:string}>("select id from public.calendar_submission_occurrences where submission_id=(select submission_id from public.calendar_event_commitments where id=$1) and logical_occurrence_id=$2",[commitment,occ.logical_occurrence_id])).rows[0].id;
       await tx.query("select public.calendar_cancel_event_occurrence($1,$2,$3,'Date cancelled')",[events[3],commitment,revisedOcc]);
+      await flush();
+      const cancelled=(await sync()).find(item => item.uid===page1.events[0].uid)!;
+      expect(cancelled.status).toBe("cancelled");
+      expect(cancelled.sequence).toBeGreaterThan(replaced.events[0].sequence);
       expect((await read()).events.map(e => e.uid)).toEqual([page2.events[0].uid]);
       await tx.exec("set local role anon");
       expect((await tx.query<{v:unknown}>("select public.calendar_public_occurrence($1,$2) v",[events[3],occ.logical_occurrence_id])).rows[0].v).toBeNull();
@@ -130,8 +156,65 @@ describe("Church Calendar conflicts", () => {
       await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)",[refs[2],sessions[2],events[3],JSON.stringify({...unpublished,visibility:"internal"})]);
       await tx.query("select public.calendar_submit_plan($1,$2,'',false)",[refs[2],sessions[2]]);
       await tx.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({role:"authenticated",sub:admin})]);
-      await tx.query("select public.calendar_approve_event($1,3,'','','',$2)",[events[3],commitment]);
+      commitment=(await tx.query<{id:string}>("select public.calendar_approve_event($1,3,'','','',$2) id",[events[3],commitment])).rows[0].id;
+      await flush();
       expect((await read()).events).toHaveLength(0);
+      const privateWithdrawal=(await sync()).find(item => item.uid===page2.events[0].uid)!;
+      expect(privateWithdrawal.status).toBe("cancelled");
+      expect(privateWithdrawal.sequence).toBeGreaterThan(replaced.events[1].sequence);
+      expect(JSON.stringify(privateWithdrawal)).not.toMatch(/Revised public event|Public description|Online|PRIVATE|private\.example/i);
+      await tx.exec("set local role anon");
+      expect((await tx.query<{v:unknown}>("select public.calendar_public_occurrence($1,$2) v",
+        [events[3],page2.events[0].uid.slice(37,73)])).rows[0].v).toBeNull();
+      await tx.exec("reset role");
+      const feed=publicCalendarSyncPayload.parse({version:1,timezone:"America/Chicago",has_more:false,events:await sync()});
+      const ics=createPublicIcal(feed.events,"https://example.org").replace(/\r\n /g,"");
+      expect(ics).toContain(`UID:${page2.events[0].uid}`);
+      expect(ics).toContain("STATUS:CANCELLED");
+      expect(ics).not.toMatch(/SUMMARY:|DESCRIPTION:|LOCATION:|URL:|Revised public event|Public description|private\.example/i);
+      // Republishing the same logical identity must supersede the cancellation.
+      await tx.query("select public.calendar_request_plan_changes($1,'Publish again')",[plans[2]]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({role:"service_role"})]);
+      const republish=(await tx.query<{v:{events:Record<string,unknown>[]}}>("select public.calendar_planner_portal($1,$2) v",[refs[2],sessions[2]])).rows[0].v.events.find(item => item.id===events[3])!;
+      await tx.query("select public.calendar_save_event_draft($1,$2,$3,$4::jsonb)",[refs[2],sessions[2],events[3],JSON.stringify({...republish,visibility:"public"})]);
+      await tx.query("select public.calendar_submit_plan($1,$2,'',false)",[refs[2],sessions[2]]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({role:"authenticated",sub:admin})]);
+      commitment=(await tx.query<{id:string}>("select public.calendar_approve_event($1,4,'','','',$2) id",[events[3],commitment])).rows[0].id;
+      await flush();
+      const again=(await sync()).find(item => item.uid===page2.events[0].uid)!;
+      expect(again.status).toBe("published");
+      expect(again.sequence).toBeGreaterThan(privateWithdrawal.sequence);
+      expect((await read()).events[0].sequence).toBe(again.sequence);
+      await tx.query("select public.calendar_cancel_event($1,$2,'Event cancelled')",[events[3],commitment]);
+      await flush();
+      const whole=(await sync()).find(item => item.uid===again.uid)!;
+      expect(whole.status).toBe("cancelled"); expect(whole.sequence).toBeGreaterThan(again.sequence);
+      // Owner-only synthetic history isolates both retention arms and exact boundaries.
+      const synthetic=["a","b","c","d","e"].map(c => `${c.repeat(8)}-${c.repeat(4)}-4${c.repeat(3)}-8${c.repeat(3)}-${c.repeat(12)}`);
+      for (const [index,changedDays,endDays] of [[0,89,31],[1,91,29],[2,91,31],[3,90,31],[4,91,30]]) {
+        await tx.query(`insert into private.calendar_publication_history(event_id,logical_occurrence_id,sequence,status,commitment_id,
+          start_at,end_at,local_start_date,local_end_date,timezone,all_day,changed_at)
+          values($1,$2,1,'cancelled',$3,now()-($4::int+1)*interval '1 day',now()-$4::int*interval '1 day',
+          current_date-($4::int+1),current_date-$4::int,'America/Chicago',false,now()-$5::int*interval '1 day')`,
+          [synthetic[index],crypto.randomUUID(),commitment,endDays,changedDays]);
+      }
+      await tx.exec("set local role anon");
+      const retained=(await tx.query<{v:{events:{uid:string}[]}}>(`select public.calendar_public_sync_feed(
+        (now() at time zone 'America/Chicago')::date,(now() at time zone 'America/Chicago')::date,200,0) v`)).rows[0].v.events;
+      await tx.exec("reset role");
+      expect(retained.some(item => item.uid.startsWith(synthetic[0]))).toBe(true);
+      expect(retained.some(item => item.uid.startsWith(synthetic[1]))).toBe(true);
+      for (const id of synthetic.slice(2)) expect(retained.some(item => item.uid.startsWith(id))).toBe(false);
+      const access=(await tx.query<{anon:boolean;staff:boolean;service:boolean}>(`select
+        has_table_privilege('anon','private.calendar_publication_history','select') anon,
+        has_table_privilege('authenticated','private.calendar_publication_history','select') staff,
+        has_table_privilege('service_role','private.calendar_publication_history','select') service`)).rows[0];
+      expect(access).toEqual({anon:false,staff:false,service:false});
+      await tx.exec(`do $$ begin
+        begin update private.calendar_publication_history set sequence=sequence where event_id='${synthetic[0]}';
+        exception when sqlstate 'RAR09' then return; end;
+        raise exception 'Publication history accepted an update';
+      end $$`);
       throw rollback;
     })).rejects.toBe(rollback);
   });

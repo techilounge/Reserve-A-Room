@@ -24,8 +24,9 @@ Production: https://reservearoom.stonehillchurch.org
 - The review-branch public Church Calendar at `/calendar` lists approved public
   occurrences. It offers a subscription feed at `/api/calendar/public.ics` and a
   paginated JSON feed at `/api/calendar/public.json`. Feed date bounds use `from`
-  and `to` in `YYYY-MM-DD`; JSON also accepts `limit` and `offset`. Cancellation
-  subscription behavior remains subject to the owner's policy decision.
+  and `to` in `YYYY-MM-DD`; JSON also accepts `limit` and `offset`. Subscription
+  feeds contain minimal cancellation notices for previously public events; normal
+  calendar pages remove withdrawn events immediately.
 - Church members and guests reserve rooms **without creating an account**.
 - Each room has its own rules:
   - capacity

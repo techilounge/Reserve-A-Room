@@ -220,13 +220,31 @@ Verification completed for that fix before commit:
 
 ## Church Calendar Phase 9 checkpoint — current
 
+- The reviewer technically approved Phase 9 at `9b3989ceb78567acaa7dfbb3a127acb0a49b040d`
+  with 249 unit / 216 DB / 121 browser tests, and the owner approved the recommended
+  cancellation and unpublishing policy. Final Phase 9 approval and Phase 10 remain gated
+  on review of the implementation below. Do not merge, deploy, or apply hosted migrations.
+- Phase 9 follow-up implements append-only content-free publication history in
+  `20261115100000_calendar_publication_history.sql`. Previously public occurrences
+  get a minimal same-UID, higher-sequence cancellation in ICS and synchronization JSON
+  after cancellation, public-to-internal replacement, or removal from a later revision;
+  never-public occurrences get none. Retention is until the later of 90 days after
+  withdrawal or 30 days after the last public occurrence end. Republishing an identity
+  advances its sequence and supersedes the cancellation. The web calendar hides them.
+  Approval and withdrawal reconciliation is deferred to the end of the existing atomic
+  transaction, after replacement and copied cancellations settle. Historical data predating
+  migration is seeded only for currently public commitments; earlier visibility is unknown.
+  Run all gates on the final committed SHA, push only this review branch and stop for
+  review. Real provider email delivery and realistic-scale conflict profiling remain
+  pre-release gates. No hosted migration, production deployment or Phase 10 is authorized.
+
 - Phase 8 is **APPROVED** at `f1af1276cd34896d90eab71d8b9426d14d296e86`.
   Exact-SHA verification passed typecheck, lint, 245 unit tests, 215 database tests,
   production build and 119/119 Playwright tests without skips; Vercel passed.
 - Phase 9 is **authorized** for an accessible public calendar and privacy-safe ICS
   and JSON feeds from approved immutable commitments, stable occurrence identity,
-  timezone/all-day correctness and caching. Cancellation tombstones are not yet
-  authorized: owner policy and retention remain open. Stop for Phase 9 review. Do not
+  timezone/all-day correctness and caching. The owner subsequently authorized the
+  cancellation policy stated above. Stop for Phase 9 review. Do not
   merge to main, deploy production, apply hosted migrations or start Phase 10. Real
   provider delivery verification and realistic-scale conflict profiling remain release gates.
 
@@ -236,8 +254,8 @@ Verification completed for that fix before commit:
   stable occurrence details; `/api/calendar/public.json` and `/api/calendar/public.ics`
   provide bounded feeds. UIDs combine event and logical occurrence identities.
   Responses revalidate against the database with ETags, and the ICS feed fails rather
-  than silently truncating beyond 5,000 entries. Cancellation tombstones and their
-  retention are not implemented pending the owner's policy decision. Run all quality
+  than silently truncating beyond 5,000 entries. Cancellation tombstones were added
+  in the follow-up above. Run all quality
   gates on the final commit, push only this branch, and stop for Phase 9 review. No
   hosted migration, production deployment, merge, WordPress integration or Phase 10.
 

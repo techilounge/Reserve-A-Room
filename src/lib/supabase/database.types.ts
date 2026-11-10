@@ -2742,6 +2742,10 @@ export type Database = {
         Args: { p_from: string; p_to: string; p_limit?: number; p_offset?: number };
         Returns: Json;
       };
+      calendar_public_sync_feed: {
+        Args: { p_from: string; p_to: string; p_limit?: number; p_offset?: number };
+        Returns: Json;
+      };
       calendar_queue_due_reminders: {
         Args: { p_limit?: number };
         Returns: number;

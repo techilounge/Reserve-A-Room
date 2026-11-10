@@ -14,6 +14,9 @@ test("staff can approve, revise and cancel calendar commitments", async ({ brows
   const mockUrl = `http://127.0.0.1:${process.env.MOCK_SUPABASE_PORT ?? 54400}`;
   const now = Date.now();
   const day = (offset: number) => new Date(now + offset * 86400000).toISOString().slice(0, 10);
+  // The preceding occupancy test uses the 10th and 11th two months ahead.
+  // Keep these dates beyond that range so its submitted proposal cannot collide.
+  const firstApprovalDay=100, secondApprovalDay=101, publicEventDay=102;
   try {
     await page.goto("/admin/church-calendar/setup");
     const create = page.getByRole("region", { name: "Create a planning cycle" });
@@ -43,9 +46,9 @@ test("staff can approve, revise and cancel calendar commitments", async ({ brows
     const editor = planner.locator("details").filter({ hasText: "Add an event" });
     await editor.getByLabel("Event title").fill("Approval browser event");
     await editor.getByLabel("Schedule type").selectOption("specific_dates");
-    await editor.getByLabel("Start date", { exact: true }).first().fill(day(62));
-    await editor.getByLabel("End date (same as start for one day)").fill(day(63));
-    for (const [index, offset] of [[1, 62], [2, 63]]) {
+    await editor.getByLabel("Start date", { exact: true }).first().fill(day(firstApprovalDay));
+    await editor.getByLabel("End date (same as start for one day)").fill(day(secondApprovalDay));
+    for (const [index, offset] of [[1, firstApprovalDay], [2, secondApprovalDay]]) {
       await editor.getByRole("button", { name: "Add selected date" }).click();
       const selected = editor.getByRole("group", { name: `Selected date ${index}` });
       await selected.getByLabel("Start date").fill(day(offset));
@@ -63,8 +66,8 @@ test("staff can approve, revise and cancel calendar commitments", async ({ brows
     await editor.getByLabel("Description", {exact:true}).fill("PRIVATE INTERNAL EVENT DETAILS");
     await editor.getByLabel("Online meeting link, if applicable").fill("https://private.example/meeting");
     await editor.locator('select[name="location_type"]').selectOption("virtual");
-    await editor.getByLabel("Start date", { exact: true }).first().fill(day(64));
-    await editor.getByLabel("End date (same as start for one day)").fill(day(64));
+    await editor.getByLabel("Start date", { exact: true }).first().fill(day(publicEventDay));
+    await editor.getByLabel("End date (same as start for one day)").fill(day(publicEventDay));
     await editor.getByLabel("Start time", { exact: true }).fill("14:00");
     await editor.getByLabel("End time", { exact: true }).fill("15:00");
     await editor.getByRole("button", { name: "Save event" }).click();
@@ -75,13 +78,13 @@ test("staff can approve, revise and cancel calendar commitments", async ({ brows
     await page.goto("/admin/calendar-submissions");
     const anonymous=await browser.newContext({ viewport:{width:390,height:844} });
     const origin=new URL(page.url()).origin;
-    const feedUrl=`${origin}/api/calendar/public.json?from=${day(64)}&to=${day(64)}`;
+    const feedUrl=`${origin}/api/calendar/public.json?from=${day(publicEventDay)}&to=${day(publicEventDay)}`;
     const before=await anonymous.request.get(feedUrl);
     expect(before.status()).toBe(200);
     expect((await before.text())).not.toContain("Roomless browser event");
     expect((await anonymous.request.get(`${origin}/api/calendar/public.json?from=invalid`)).status()).toBe(400);
     expect((await anonymous.request.get(`${origin}/api/calendar/public.json?from=${day(0)}&to=${day(367)}`)).status()).toBe(400);
-    expect((await anonymous.request.get(`${origin}/api/calendar/public.json?from=${day(64)}&to=${day(64)}&limit=0`)).status()).toBe(400);
+    expect((await anonymous.request.get(`${origin}/api/calendar/public.json?from=${day(publicEventDay)}&to=${day(publicEventDay)}&limit=0`)).status()).toBe(400);
     const roomless = page.locator("details").filter({ has: page.locator("summary").filter({ hasText: "Roomless browser event" }) });
     await roomless.locator("summary").click();
     await roomless.getByRole("button", { name: "Review event approval" }).click();
@@ -100,7 +103,7 @@ test("staff can approve, revise and cancel calendar commitments", async ({ brows
     expect(published.description).toBe("A public event description.");
     expect(JSON.stringify(publicJson)).not.toMatch(/PRIVATE INTERNAL|private\.example|requester_notes|resources|planner/i);
     expect((await anonymous.request.get(feedUrl,{headers:{"if-none-match":etag}})).status()).toBe(304);
-    const ics=await anonymous.request.get(`${origin}/api/calendar/public.ics?from=${day(64)}&to=${day(64)}`);
+    const ics=await anonymous.request.get(`${origin}/api/calendar/public.ics?from=${day(publicEventDay)}&to=${day(publicEventDay)}`);
     expect(ics.status()).toBe(200);
     expect(ics.headers()["content-type"]).toContain("text/calendar");
     const icsEtag=ics.headers().etag;
@@ -109,7 +112,7 @@ test("staff can approve, revise and cancel calendar commitments", async ({ brows
     expect(icsText).not.toMatch(/PRIVATE INTERNAL|private\.example/i);
     const id=published.uid.slice(0,36); const occurrence=published.uid.slice(37,73);
     const publicPage=await anonymous.newPage();
-    await publicPage.goto(`/calendar?date=${day(64)}`);
+    await publicPage.goto(`/calendar?date=${day(publicEventDay)}`);
     await expect(publicPage.getByRole("link",{name:"Roomless browser event"})).toBeVisible();
     await publicPage.getByRole("link",{name:"Roomless browser event"}).click();
     await expect(publicPage.getByRole("heading",{name:"Roomless browser event"})).toBeVisible();
@@ -122,10 +125,17 @@ test("staff can approve, revise and cancel calendar commitments", async ({ brows
     await expect(page.getByRole("status")).toContainText("cancelled");
     const after=await anonymous.request.get(feedUrl,{headers:{"if-none-match":etag}});
     expect(after.status()).toBe(200);
-    expect(await after.text()).not.toContain("Roomless browser event");
-    const updatedIcs=await anonymous.request.get(`${origin}/api/calendar/public.ics?from=${day(64)}&to=${day(64)}`,{headers:{"if-none-match":icsEtag}});
+    const afterJson=await after.json() as {events:Record<string,unknown>[]};
+    const tombstone=afterJson.events.find(item => item.uid===published.uid)!;
+    expect(tombstone.status).toBe("cancelled");
+    expect(Object.keys(tombstone).sort()).toEqual(["last_modified","sequence","status","uid"]);
+    expect(JSON.stringify(afterJson)).not.toMatch(/Roomless browser event|A public event description|private\.example/);
+    const updatedIcs=await anonymous.request.get(`${origin}/api/calendar/public.ics?from=${day(publicEventDay)}&to=${day(publicEventDay)}`,{headers:{"if-none-match":icsEtag}});
     expect(updatedIcs.status()).toBe(200);
-    expect(await updatedIcs.text()).not.toMatch(/Roomless browser event|STATUS:CANCELLED/);
+    const cancelledIcs=(await updatedIcs.text()).replace(/\r\n /g,"");
+    expect(cancelledIcs).toContain(`UID:${published.uid}`);
+    expect(cancelledIcs).toContain("STATUS:CANCELLED");
+    expect(cancelledIcs).not.toMatch(/Roomless browser event|A public event description|private\.example|LOCATION:|DESCRIPTION:|SUMMARY:|URL:/);
     // Next.js can stream its not-found page with HTTP 200; privacy is the
     // invariant, so check the returned document no longer contains event data.
     const hiddenDetail=await anonymous.request.get(`${origin}/calendar/${id}/${occurrence}`);
@@ -143,19 +153,19 @@ test("staff can approve, revise and cancel calendar commitments", async ({ brows
     await approval.getByRole("button", { name: "Approve event", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("approval was recorded");
     const master = await staff.newPage();
-    await master.goto(`/admin/church-calendar?view=day&date=${day(62)}`);
+    await master.goto(`/admin/church-calendar?view=day&date=${day(firstApprovalDay)}`);
     await expect(master.getByRole("heading", { name:"Church Calendar", exact:true })).toBeVisible();
     await expect(master.getByRole("link", { name:/Approval browser event/ })).toHaveCount(1);
     await master.getByText("Filters and layers").click();
     await master.getByLabel("Approved and cancelled events").uncheck();
     await master.getByRole("button", { name:"Apply filters" }).click();
     await expect(master.getByRole("link", { name:/Approval browser event/ })).toHaveCount(0);
-    await master.goto(`/admin/church-calendar?view=day&date=${day(62)}`);
+    await master.goto(`/admin/church-calendar?view=day&date=${day(firstApprovalDay)}`);
     await master.getByRole("link", { name:"year", exact:true }).click();
     await expect(master.getByRole("navigation", { name:"Church Calendar view" }).getByRole("link", { name:"year" })).toHaveAttribute("aria-current","page");
     expect(await master.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     expect((await new AxeBuilder({ page:master }).analyze()).violations).toEqual([]);
-    const yearDate = master.getByRole("link", { name:new RegExp(`${new Date(`${day(62)}T12:00:00Z`).toLocaleString("en-US", { month:"long",timeZone:"UTC" })}.*1 entries`) }).first();
+    const yearDate = master.getByRole("link", { name:new RegExp(`${new Date(`${day(firstApprovalDay)}T12:00:00Z`).toLocaleString("en-US", { month:"long",timeZone:"UTC" })}.*1 entries`) }).first();
     await yearDate.focus();
     await expect(yearDate).toBeFocused();
     await master.keyboard.press("Enter");

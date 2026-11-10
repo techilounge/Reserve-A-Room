@@ -9,7 +9,10 @@ export const publicCalendarEvent = z.object({
   timezone:z.string().min(1).max(100),all_day:z.boolean(),sequence:z.number().int().nonnegative(),last_modified:instant,
 });
 export const publicCalendarPayload = z.object({version:z.literal(1),timezone:z.string().min(1).max(100),has_more:z.boolean(),events:z.array(publicCalendarEvent)});
+export const publicCalendarCancellation = publicCalendarEvent.pick({uid:true,sequence:true,last_modified:true,starts_at:true,ends_at:true,local_start_date:true,local_end_date:true,timezone:true,all_day:true}).extend({status:z.literal("cancelled")});
+export const publicCalendarSyncPayload = z.object({version:z.literal(1),timezone:z.string().min(1).max(100),has_more:z.boolean(),events:z.array(z.union([publicCalendarEvent.extend({status:z.literal("published")}),publicCalendarCancellation]))});
 export type PublicCalendarEvent = z.infer<typeof publicCalendarEvent>;
+export type PublicCalendarCancellation = z.infer<typeof publicCalendarCancellation>;
 export type PublicCalendarPayload = z.infer<typeof publicCalendarPayload>;
 
 export function publicEventPath(uid:string):string {

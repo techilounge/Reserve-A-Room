@@ -31,6 +31,14 @@ describe("public calendar feeds",() => {
     expect(ics).toContain("DTSTART;VALUE=DATE:20270314\r\n");
     expect(ics).toContain("DTEND;VALUE=DATE:20270315\r\n");
   });
+  it("emits only the stable identity, timing and cancellation metadata for withdrawals",() => {
+    const tombstone={...event,status:"cancelled" as const,sequence:3,last_modified:"2027-01-02T00:00:00Z"};
+    const ics=createPublicIcal([tombstone],"https://example.org").replace(/\r\n /g,"");
+    expect(ics).toContain(`UID:${event.uid}\r\n`);
+    expect(ics).toContain("STATUS:CANCELLED\r\n");
+    expect(ics).toContain("SEQUENCE:3\r\n");
+    expect(ics).not.toMatch(/SUMMARY:|DESCRIPTION:|LOCATION:|URL:|Children|Fellowship/);
+  });
   it("strips any unapproved fields from public output",() => {
     const parsed=publicCalendarPayload.parse({version:1,timezone:"America/Chicago",has_more:false,
       events:[{...event,requester_notes:"private",virtual_url:"https://private.example"}]});

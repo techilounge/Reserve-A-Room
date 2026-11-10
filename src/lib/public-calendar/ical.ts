@@ -1,4 +1,4 @@
-import { publicEventPath, type PublicCalendarEvent } from "./types";
+import { publicEventPath, type PublicCalendarEvent, type PublicCalendarCancellation } from "./types";
 
 /** RFC 5545 TEXT escaping; do not allow control characters to create properties. */
 export function escapeIcalText(value:string):string {
@@ -19,15 +19,21 @@ export function foldIcalLine(line:string):string {
 }
 const utc = (value:string) => new Date(value).toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z$/,"Z");
 const day = (value:string) => value.replaceAll("-","");
+const isCancellation = (event:PublicCalendarEvent | PublicCalendarCancellation):event is PublicCalendarCancellation =>
+  "status" in event && event.status === "cancelled";
 
-export function createPublicIcal(events:PublicCalendarEvent[],origin:string):string {
+export function createPublicIcal(events:(PublicCalendarEvent | PublicCalendarCancellation)[],origin:string):string {
   const lines=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Stonehill SDA Church//Reserve-A-Room//EN","CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:Stonehill Church Calendar"];
   for (const event of events) {
-    const url=new URL(publicEventPath(event.uid),origin);
     lines.push("BEGIN:VEVENT",`UID:${event.uid}`,`DTSTAMP:${utc(event.last_modified)}`,`LAST-MODIFIED:${utc(event.last_modified)}`,
       `SEQUENCE:${event.sequence}`,event.all_day ? `DTSTART;VALUE=DATE:${day(event.local_start_date)}` : `DTSTART:${utc(event.starts_at)}`,
-      event.all_day ? `DTEND;VALUE=DATE:${day(event.local_end_date)}` : `DTEND:${utc(event.ends_at)}`,
-      `SUMMARY:${escapeIcalText(event.title)}`);
+      event.all_day ? `DTEND;VALUE=DATE:${day(event.local_end_date)}` : `DTEND:${utc(event.ends_at)}`);
+    if (isCancellation(event)) {
+      lines.push("STATUS:CANCELLED","END:VEVENT");
+      continue;
+    }
+    const url=new URL(publicEventPath(event.uid),origin);
+    lines.push(`SUMMARY:${escapeIcalText(event.title)}`);
     if (event.description) lines.push(`DESCRIPTION:${escapeIcalText(event.description)}`);
     if (event.location) lines.push(`LOCATION:${escapeIcalText(event.location)}`);
     lines.push(`URL:${url.toString()}`,"END:VEVENT");

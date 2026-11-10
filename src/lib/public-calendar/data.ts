@@ -2,7 +2,7 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabasePublicConfig } from "@/lib/env/public";
 import type { Database } from "@/lib/supabase/database.types";
-import { publicCalendarEvent, publicCalendarPayload } from "./types";
+import { publicCalendarEvent, publicCalendarPayload, publicCalendarSyncPayload } from "./types";
 
 /** A cookie-free anon read. Always re-query so revoked visibility is not cached. */
 function publicClient() {
@@ -16,6 +16,11 @@ export async function readPublicCalendar(from:string,to:string,limit:number,offs
   const {data,error}=await publicClient().rpc("calendar_public_occurrences",{p_from:from,p_to:to,p_limit:limit,p_offset:offset});
   if (error) throw error;
   return publicCalendarPayload.parse(data);
+}
+export async function readPublicSyncFeed(from:string,to:string,limit:number,offset=0) {
+  const {data,error}=await publicClient().rpc("calendar_public_sync_feed",{p_from:from,p_to:to,p_limit:limit,p_offset:offset});
+  if (error) throw error;
+  return publicCalendarSyncPayload.parse(data);
 }
 
 export async function readPublicTimezone():Promise<string> {

@@ -10,8 +10,14 @@ logical occurrence IDs form a stable UID across ordinary approved edits. Timed I
 events are UTC; all-day events use exclusive local end dates. Range and page limits
 are enforced in PostgreSQL and the ICS feed rejects results exceeding 5,000 events.
 ETags are computed after an uncached database read so approval, cancellation and
-visibility changes invalidate stored representations. Cancellation tombstones are
-not implemented pending an owner decision on policy, retention and unpublishing.
+visibility changes invalidate stored representations. Append-only publication history
+tracks only previously public identities, sequences and timing. Withdrawals, including
+public-to-internal transitions, produce same-UID cancellation records without descriptive
+or internal data. The website omits them; ICS retains the last public timing for client
+compatibility, and JSON returns only UID, status, sequence and last-modified. Each notice
+remains until the later of 90 days after withdrawal or 30 days after its last public end;
+republication supersedes it with a higher sequence. Existing currently public approvals
+are seeded when the migration runs; earlier unknown public history is not reconstructed.
 No hosted migration, production rollout or WordPress integration is implied.
 
 ## Church Calendar planning dashboard and automation (Phase 8 review branch)

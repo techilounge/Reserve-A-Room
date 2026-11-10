@@ -2,6 +2,7 @@
 // Set CALENDAR_TEST_PSQL, CALENDAR_TEST_DATABASE_URL and optionally
 // CALENDAR_TEST_ISOLATION (read committed / repeatable read / serializable)
 // and CALENDAR_TEST_SCENARIO (room / resource / exclusive).
+// CALENDAR_TEST_VISIBILITY may be public to exercise publication-history triggers.
 import { spawn } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
@@ -10,8 +11,10 @@ const executable = process.env.CALENDAR_TEST_PSQL || "psql";
 const database = process.env.CALENDAR_TEST_DATABASE_URL;
 const isolation = process.env.CALENDAR_TEST_ISOLATION ?? "read committed";
 const scenario = process.env.CALENDAR_TEST_SCENARIO ?? "resource";
+const visibility = process.env.CALENDAR_TEST_VISIBILITY ?? "internal";
 if (!["read committed", "repeatable read", "serializable"].includes(isolation)) throw new Error("Unsupported isolation level.");
 if (!["room", "resource", "exclusive"].includes(scenario)) throw new Error("Unsupported race scenario.");
+if (!["internal", "public"].includes(visibility)) throw new Error("Unsupported event visibility.");
 if (!database) throw new Error("Set CALENDAR_TEST_DATABASE_URL to an empty local calendar_race_* database.");
 const url = new URL(database);
 if (url.protocol !== "postgresql:" || !["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) || url.search || url.hash || !/^\/calendar_race_[a-z0-9_]+$/.test(url.pathname)) {
@@ -69,10 +72,10 @@ begin
     insert into public.calendar_plan_access(plan_id,contact_name,contact_email,label,token_hash,token_seed,expires_at)
       values(plan_id,'Race','race'||i||'@example.org','additional',decode(repeat(i::text,64),'hex'),decode(repeat(i::text,32),'hex'),now()+interval '1 day') returning id into grant_id;
     insert into public.calendar_events(plan_id,title,scope,protection,visibility,location_type,estimated_attendance,status,revision)
-      values(plan_id,'Race event','ministry',case when '${scenario}'='exclusive' and i=1 then 'exclusive' else 'normal' end,'internal','church',1,'submitted',1) returning id into event_id;
+      values(plan_id,'Race event','ministry',case when '${scenario}'='exclusive' and i=1 then 'exclusive' else 'normal' end,'${visibility}','church',1,'submitted',1) returning id into event_id;
     insert into public.calendar_event_submissions(event_id,plan_revision,submitted_by_grant,title,category,scope,protection,visibility,
       location_type,estimated_attendance,food_drinks_planned,setup_minutes,cleanup_minutes,schedule_kind,timezone,start_date,end_date,start_time,end_time,all_day)
-      values(event_id,1,grant_id,'Race event','other','ministry',case when '${scenario}'='exclusive' and i=1 then 'exclusive' else 'normal' end,'internal','church',1,false,0,0,'one_time','America/Chicago',
+      values(event_id,1,grant_id,'Race event','other','ministry',case when '${scenario}'='exclusive' and i=1 then 'exclusive' else 'normal' end,'${visibility}','church',1,false,0,0,'one_time','America/Chicago',
         (start_at at time zone 'America/Chicago')::date,(start_at at time zone 'America/Chicago')::date,time '10:00',time '11:00',false) returning id into submission_id;
     insert into public.calendar_event_occurrences(event_id,source_key,schedule_revision,local_start,local_end,timezone,all_day,start_at,end_at,occupancy_start,occupancy_end)
       values(event_id,'single',1,start_at at time zone 'America/Chicago',(start_at+interval '1 hour') at time zone 'America/Chicago','America/Chicago',false,start_at,start_at+interval '1 hour',start_at,start_at+interval '1 hour') returning id into occurrence_id;
@@ -114,4 +117,6 @@ if (!blocked || a.code !== 0 || b.code === 0 || !/blocks first|exclusive on-site
 if (await sql("select count(*) from public.calendar_event_commitments where state='active';") !== "1") throw new Error("Expected exactly one active approved event.");
 if (scenario === "room" && await sql("select count(*) from public.reservations where status='approved' and calendar_commitment_id is not null;") !== "1") throw new Error("Expected exactly one active room hold.");
 if (scenario === "resource" && await sql("select count(*) from public.calendar_resource_allocations where status='confirmed';") !== "1") throw new Error("Expected exactly one confirmed allocation.");
-console.log(`Real PostgreSQL ${isolation} ${scenario} approval race passed.`);
+if (visibility === "public" && await sql("select count(*) from private.calendar_publication_history where status='published';") !== "1") throw new Error("Expected exactly one published occurrence and no history for the rejected approval.");
+if (visibility === "internal" && await sql("select count(*) from private.calendar_publication_history;") !== "0") throw new Error("Internal approvals must not produce public publication history.");
+console.log(`Real PostgreSQL ${isolation} ${scenario} ${visibility} approval race passed.`);

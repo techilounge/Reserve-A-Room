@@ -1,12 +1,27 @@
 # Church Calendar — Phase 0 architecture and implementation plan
 
+**Phase 9 review follow-up:** the reviewer technically approved `9b3989ceb78567acaa7dfbb3a127acb0a49b040d`;
+the owner approved minimal cancellation notices, including public-to-internal
+transitions. Final Phase 9 approval and Phase 10 remain pending follow-up review.
+Append-only `20261115100000_calendar_publication_history.sql` records only IDs,
+timing, state and sequence for publicly approved occurrences. Deferred reconciliation
+captures the final state of the atomic approval/replacement/cancellation transaction;
+it never copies private descriptions or reasons. ICS uses same-UID, higher-sequence
+`STATUS:CANCELLED` entries; JSON has only UID, status, sequence and last-modified.
+Normal public pages omit withdrawals. Retention is the later of 90 days after
+withdrawal and 30 days after the last public end. Republishing supersedes a tombstone
+with a higher sequence. Previously public identities unknown at migration time are
+not guessed; existing currently public commitments are initialized. Verify exact-SHA
+quality gates and push only the review branch. No hosted migrations, production
+deployment, merge, WordPress integration or Phase 10 work is authorized.
+
 **Current authorization:** Phase 8 is **approved** at
 `f1af1276cd34896d90eab71d8b9426d14d296e86`. Exact-SHA typecheck, lint,
 245 unit tests, 215 database tests, production build and 119/119 Playwright tests
 passed without skips; Vercel passed. **Phase 9 is authorized** for an accessible
 public calendar and privacy-safe ICS/JSON feeds of approved public commitments,
-stable identities, timezone/all-day correctness and caching. Do not finalize or expose
-cancellation tombstones before the owner decides cancellation behavior and retention.
+stable identities, timezone/all-day correctness and caching. The owner has approved
+the cancellation behavior and retention described above.
 Do not merge, deploy production, apply hosted migrations or start Phase 10 without
 authorization. Real-provider email checks and conflict-engine scale profiling remain
 pre-release requirements.
@@ -16,8 +31,8 @@ adds anonymous allowlisted reads over current approved public commitments. The
 responsive `/calendar` agenda links to stable logical occurrences; bounded JSON and
 ICS feeds use UTC timed events, exclusive all-day end dates, stable UIDs and sequence
 numbers. ETags revalidate against live database state; ICS fails explicitly above
-5,000 events rather than truncating. No cancellation tombstones are emitted pending the
-owner's decision about cancellation/unpublishing and retention. Full quality gates
+5,000 events rather than truncating. Cancellation tombstones are implemented in the
+follow-up above. Full quality gates
 must run on the final commit before pushing only the review branch for Phase 9 review.
 This change has not been applied to any hosted database.
 
@@ -232,7 +247,7 @@ The complete and current handoff is in `AGENTS.md`.
 - Limitations to verify before release: real Resend delivery, deployment request-log/query-string redaction, and genuinely concurrent Postgres transactions (PGlite serializes its local connection). No production deployment or hosted migration has occurred. Stop for owner review after Phase 1; legal language requires owner/legal approval before the Phase 2 portal is released.
 - The Phase 1 migration was changed in place only because it has not been applied to a hosted database. Once it is applied, use append-only migrations. Phase 2 review follow-ups: ask the owner whether Primary and Secondary are descriptive labels or must be unique (the reviewer recommends one of each and up to three Additional planners); provide an explicit planner Sign Out action for shared computers. These are not Phase 1 blockers and must not be implemented before Phase 2 is authorized.
 
-**Owner decisions:** cycle maximum three years; architectural occurrence maximum 1,200 for Phase 3; each plan allows at most **five active, unexpired, unrevoked independently managed planners**, including primary, secondary and additional contacts. Revoked or expired grants do not count. Only Super Admin may reopen a cycle, with a required audited reason. The Phase 5 review supplied initial on-site occupancy exclusivity and a configurable large-event threshold of 100; overnight, outside-hours and non-grid exceptions are disabled pending Phase 6 policy; public cancellation policy remains deferred to Phase 9. Plan per-planner/per-version first-access acknowledgment, with legal review of draft terms before Phase 2 release. WordPress writes are out of scope.
+**Owner decisions:** cycle maximum three years; architectural occurrence maximum 1,200 for Phase 3; each plan allows at most **five active, unexpired, unrevoked independently managed planners**, including primary, secondary and additional contacts. Revoked or expired grants do not count. Only Super Admin may reopen a cycle, with a required audited reason. The Phase 5 review supplied initial on-site occupancy exclusivity and a configurable large-event threshold of 100; overnight, outside-hours and non-grid exceptions are disabled pending Phase 6 policy; the Phase 9 public cancellation policy is recorded above. Plan per-planner/per-version first-access acknowledgment, with legal review of draft terms before Phase 2 release. WordPress writes are out of scope.
 
 **Repository at start of correction:** `codex/church-calendar-management` was clean at `03b721c00a2f8debc23603d9d663a0b6d8636c7e`; local `main`, `origin/main`, and the read-only GitHub `main` query all resolved to `1f287eecb0979f40339011a49ab3b99508ec6514`. The branch was **one commit ahead and zero behind** that main. `03b721c` combines this Phase 0 plan/ADR and handoff with unrelated dependency, Auth, abuse-control, email, cron, UI, test and migration changes. The same SHA was pushed to `preview/security-remediations-2026-10-27`, which Vercel reported as a successful Preview build; that does not prove the migration exists on the preview database or that runtime email is ready. The security migration `20261027100000_email_delivery_retry_guard.sql` is in the branch, but no hosted migration or production deployment was confirmed in this correction.
 
@@ -362,7 +377,7 @@ Public `/calendar` and versioned `/api/calendar/public.json` and `/api/calendar/
 
 **Stable public identity and regeneration:** assign each occurrence an immutable logical UUID independent of mutable schedule, time, room, resource, content and row revision. Derive a stable UID from `event_id + logical_occurrence_id` and a fixed domain, persist it when first published, and reuse it across an ordinary time/date/room/resource/description edit that is explicitly identified as the *same* logical occurrence. Update `LAST-MODIFIED` and revision/`SEQUENCE` for subscribers. An explicit-date entry maps to its stable entry identity; recurring expansion maps to existing logical IDs by stored provenance, not merely matching new dates. Do not automatically infer that a Wednesday occurrence is the same event as a Thursday occurrence when a recurrence rule is materially regenerated: a reviewed, deterministic mapping may preserve explicitly paired instances; otherwise mark affected **future** instances `superseded`, preserve their rows and old public IDs, and create new identities for replacements. Keep past occurrences and historical audit/allocations unchanged. An isolated cancellation similarly preserves its original ID and does not cancel other instances.
 
-Normal public listings and JSON exclude cancelled/superseded instances. An ICS subscription may need a **minimal, previously public cancellation tombstone** with the prior UID, incremented sequence, `STATUS:CANCELLED` and no private data; whether to publish tombstones, retention duration and handling unpublish/public-to-internal transitions are explicit owner/privacy decisions before Phase 9. Removing items from a feed alone is not guaranteed to remove them from existing subscribers' calendars. Never expose details of an event that was not previously public or expose internal content in a tombstone; validate the chosen cancellation semantics with representative calendar clients. Use RFC 5545 escaping/line folding, UTC timed events with timezone-aware inputs, correct all-day exclusive end dates, bounded ranges/JSON pagination, ETags and explicit invalidation after approval/edit/cancellation. Tests must cover stable UIDs for ordinary edits, recurrence replacements, cancellation/tombstone behavior, privacy, DST, escaping and cache invalidation.
+Normal public listings exclude cancelled/superseded instances; synchronization JSON and ICS include the minimal previously-public cancellation notices described in the Phase 9 checkpoint above. Removing items from a feed alone is not guaranteed to remove them from existing subscribers' calendars. Never expose details of an event that was not previously public or expose internal content in a tombstone; validate cancellation semantics with representative calendar clients before release. Use RFC 5545 escaping/line folding, UTC timed events with timezone-aware inputs, correct all-day exclusive end dates, bounded ranges/JSON pagination, ETags and explicit invalidation after approval/edit/cancellation. Tests must cover stable UIDs for ordinary edits, recurrence replacements, cancellation/tombstone behavior, privacy, DST, escaping and cache invalidation.
 
 ## 6. Stonehill website discovery and integration decision
 
@@ -402,10 +417,10 @@ These are recommendations and phase-specific decisions, not newly approved polic
 5. **Overnight occupancy:** owner chose disabled by default; decide whether an authorized exception exists and how continuous holds work before Phase 6.
 6. **Outside normal hours and non-grid times:** disabled by default; distinguish public booking hours from building access, and decide whether a separate override/actor/reason is required before Phase 6.
 7. **Planner contacts:** owner approved independent primary, secondary and additional grants, up to five active planners per plan; revoked or expired grants do not count.
-8. **Public cancellations:** remove from listings versus privacy-safe ICS cancellation tombstones, retention and public-to-internal behavior; decide before Phase 9 approval.
+8. **Public cancellations:** owner approved privacy-safe ICS/JSON cancellation notices, including public-to-internal transitions, with the retention policy described in the Phase 9 review follow-up.
 9. **Cycle reopening:** owner approved Super Admin only with a required reason and audit.
 10. **Planner Privacy/Terms:** owner approved the per-grant/per-version first-access acknowledgment design; obtain legal review and approval of draft terms before Phase 2 release.
 11. **Website sources:** determine whether the public website calendars share a source and verify plugin/API permissions before Phase 10.
 12. **Security workstream sequencing:** review its independent branch and preview/migration requirements before adopting it as a deployed calendar dependency; no production deploy is implied by this proposal.
 
-**Next action:** verify the Phase 9 implementation on the exact final SHA, push only the review branch, and stop for review and the public cancellation policy decision. Do not start Phase 10, merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.
+**Next action:** verify the Phase 9 cancellation follow-up on the exact final SHA, push only the review branch, and stop for review. Do not start Phase 10, merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.
