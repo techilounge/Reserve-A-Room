@@ -11,6 +11,14 @@ Phase 11, migrations/import/reconciliation, production deployment or merge.
 Representative calendar-client checks, real provider email, conflict-engine profiling
 and hosted runtime verification remain release gates.
 
+**Phase 10 discovery in progress:** public inspection found an Events Calendar archive
+and a separate Elementor calendar widget with an unknown configured source, differing
+visible results and an event-time discrepancy. Public event routes are advertised, but
+authenticated staging capabilities and safe create/update/cancel semantics are not
+yet verified. See [WordPress discovery and staging checklist](CHURCH_CALENDAR_WORDPRESS_DISCOVERY.md).
+Obtain the owner's target calendar and isolated staging details before selecting the
+provider-specific foundation; no live writes or hosted migrations are authorized.
+
 **Phase 9 review follow-up:** the reviewer technically approved `9b3989ceb78567acaa7dfbb3a127acb0a49b040d`;
 the owner approved minimal cancellation notices, including public-to-internal
 transitions. Final Phase 9 approval and Phase 10 authorization have since been granted.
@@ -433,4 +441,4 @@ These are recommendations and phase-specific decisions, not newly approved polic
 11. **Website sources:** determine whether the public website calendars share a source and verify plugin/API permissions before Phase 10.
 12. **Security workstream sequencing:** review its independent branch and preview/migration requirements before adopting it as a deployed calendar dependency; no production deploy is implied by this proposal.
 
-**Next action:** perform Phase 10 website and provider discovery first, then implement only the verified staging/dry-run foundation. Push only the review branch and stop for review; do not start Phase 11, merge to `main`, deploy production, apply hosted migrations, publish unapproved legal language, or enable live WordPress synchronization without separate authorization.
+**Next action:** obtain the target calendar and isolated staging details, complete the [discovery checklist](CHURCH_CALENDAR_WORDPRESS_DISCOVERY.md), then implement only the verified staging/dry-run foundation. Push only the review branch and stop for review; do not start Phase 11, merge to `main`, deploy production, apply hosted migrations, publish unapproved legal language, or enable live WordPress synchronization without separate authorization.

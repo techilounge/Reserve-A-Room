@@ -232,6 +232,15 @@ Verification completed for that fix before commit:
   writes or automatic publishing. Stop for owner/reviewer approval before Phase 11.
   No merge, hosted migration or production deployment. Real calendar-client and email
   delivery checks, conflict-scale profiling and hosted-runtime checks remain release gates.
+- Read-only discovery is recorded in `docs/CHURCH_CALENDAR_WORDPRESS_DISCOVERY.md`.
+  The `/events/` archive uses The Events Calendar; `/our-events/` embeds an Elementor
+  calendar with an unverified source. Their November results differ, and a recurring
+  event's displayed time differs from its API time. The public REST index advertises
+  event routes, but live write/authentication, source selection and an isolated staging
+  site remain unverified. Owner answers are needed before choosing or implementing a
+  provider-specific foundation. Do not put existing public meeting-access details in
+  fixtures or logs. Next: obtain the target page and staging URL; use the discovery
+  checklist, then resume the authorized dry-run-only foundation.
 
 ## Church Calendar Phase 9 checkpoint — historical
 
