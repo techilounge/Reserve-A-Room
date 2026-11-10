@@ -16,8 +16,11 @@ and a separate Elementor calendar widget with an unknown configured source, diff
 visible results and an event-time discrepancy. Public event routes are advertised, but
 authenticated staging capabilities and safe create/update/cancel semantics are not
 yet verified. See [WordPress discovery and staging checklist](CHURCH_CALENDAR_WORDPRESS_DISCOVERY.md).
-Obtain the owner's target calendar and isolated staging details before selecting the
-provider-specific foundation; no live writes or hosted migrations are authorized.
+The owner selected `/events/` and requires a provider-neutral publisher interface with
+The Events Calendar as the first replaceable adapter; Reserve-A-Room and its JSON/ICS
+feeds remain authoritative and independent. Obtain isolated staging details and verify
+provider-specific behavior before implementing the foundation; no live writes or
+hosted migrations are authorized.
 
 **Phase 9 review follow-up:** the reviewer technically approved `9b3989ceb78567acaa7dfbb3a127acb0a49b040d`;
 the owner approved minimal cancellation notices, including public-to-internal
@@ -438,7 +441,7 @@ These are recommendations and phase-specific decisions, not newly approved polic
 8. **Public cancellations:** owner approved privacy-safe ICS/JSON cancellation notices, including public-to-internal transitions, with the retention policy described in the Phase 9 review follow-up.
 9. **Cycle reopening:** owner approved Super Admin only with a required reason and audit.
 10. **Planner Privacy/Terms:** owner approved the per-grant/per-version first-access acknowledgment design; obtain legal review and approval of draft terms before Phase 2 release.
-11. **Website sources:** determine whether the public website calendars share a source and verify plugin/API permissions before Phase 10.
+11. **Website sources:** `/events/` is the selected initial target. Verify plugin/API permissions and staging behavior before implementation; whether other website calendars share its source remains unknown.
 12. **Security workstream sequencing:** review its independent branch and preview/migration requirements before adopting it as a deployed calendar dependency; no production deploy is implied by this proposal.
 
-**Next action:** obtain the target calendar and isolated staging details, complete the [discovery checklist](CHURCH_CALENDAR_WORDPRESS_DISCOVERY.md), then implement only the verified staging/dry-run foundation. Push only the review branch and stop for review; do not start Phase 11, merge to `main`, deploy production, apply hosted migrations, publish unapproved legal language, or enable live WordPress synchronization without separate authorization.
+**Next action:** obtain isolated staging details, complete the [discovery checklist](CHURCH_CALENDAR_WORDPRESS_DISCOVERY.md), then implement the provider-neutral staging/dry-run foundation targeting `/events/`. Push only the review branch and stop for review; do not start Phase 11, merge to `main`, deploy production, apply hosted migrations, publish unapproved legal language, or enable live WordPress synchronization without separate authorization.

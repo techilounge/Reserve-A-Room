@@ -4,6 +4,11 @@ Status: **discovery in progress; provider and staging contract not verified**.
 Observed on 2026-11-09 using read-only public pages and WordPress REST metadata.
 No website content was created, edited, imported, deleted, or synchronized.
 
+The owner selected `/events/` as the initial publishing destination and requires a
+provider-neutral publishing layer. Reserve-A-Room remains authoritative; the existing
+JSON and ICS feeds must remain independent of every external publisher. A future site
+may instead consume the JSON feed directly, without synchronization.
+
 ## Observed website surfaces
 
 - [Events archive](https://stonehillchurch.org/events/) renders The Events Calendar
@@ -19,8 +24,9 @@ No website content was created, edited, imported, deleted, or synchronized.
   filtering, caching or configuration may explain the difference. Essential Addons
   supports multiple source types, including manual entries, Google Calendar and
   The Events Calendar. [Vendor overview](https://essential-addons.com/event-calendar/).
-- The owner must identify which page or pages are the intended publication target
-  and whether the widget and any homepage event listing share that target's source.
+- `/events/` is the selected initial publication target. Whether the Elementor widget
+  or homepage event listing also uses that source remains unknown and must not be
+  assumed or changed as part of this work.
 
 ## Public API observations
 
@@ -36,6 +42,13 @@ No website content was created, edited, imported, deleted, or synchronized.
 - A read-only GET of `/wp-json/tec/v1/events` returned
   `missing_experimental_endpoint_acknowledgement`. No header override or write was
   attempted. Do not infer that this experimental endpoint is ready for integration.
+- The vendor's current v1 source documents [create](https://docs.theeventscalendar.com/reference/classes/tribe__events__rest__v1__endpoints__single_event/create/)
+  returning an event response with HTTP 201, [update](https://docs.theeventscalendar.com/reference/classes/tribe__events__rest__v1__endpoints__single_event/update/)
+  returning HTTP 200, and [delete](https://docs.theeventscalendar.com/reference/classes/tribe__events__rest__v1__endpoints__single_event/delete/)
+  normally moving a post to Trash, with filters able to override that behavior. These
+  describe upstream code, not verified behavior of the church's installed version,
+  hooks, account capabilities, recurring series, or staging installation. In particular,
+  do not equate this delete operation with the owner's public cancellation policy.
 - The REST index returned an empty `authentication` list. That does **not** prove
   which login methods work: application passwords, security plugins, capabilities,
   proxies and staging access need administrator verification. WordPress documents
@@ -57,10 +70,10 @@ silently adopt a fixed offset for future sync, especially across DST.
 
 ## Owner/staging discovery checklist
 
-1. Identify the intended public calendar page(s) and the authoritative source for
-   the Elementor widget. In WordPress, inspect **Pages → Events → Edit with
-   Elementor → Event Calendar widget → Content/Events**; record its selected source
-   and relevant calendar identifier, without saving changes.
+1. The owner selected `/events/`. If the site owner later wants the Elementor widget
+   included, inspect **Pages → Events → Edit with Elementor → Event Calendar widget →
+   Content/Events** and record its selected source without saving changes. That widget
+   is not the initial integration target.
 2. In **Plugins → Installed Plugins**, record exact active versions of The Events
    Calendar, Events Calendar Pro, Filter Bar, Essential Addons, and any security/API
    plugins that affect authentication. Asset versions above are only hints.
@@ -87,3 +100,56 @@ silently adopt a fixed offset for future sync, especially across DST.
    Live publishing, production migration, import/reconciliation and Phase 11 remain
    unauthorized. Representative calendar-client checks, real email-provider delivery,
    realistic-scale conflict profiling, and hosted-runtime validation remain release gates.
+
+## Provider-neutral implementation contract
+
+This is the owner-approved design direction, not a claim that the provider's write
+API or staging environment has been verified. Do not add provider-specific schema or
+live dispatch before the discovery gate above is satisfied.
+
+- **Boundary:** public approved occurrence state flows from Reserve-A-Room into a
+  provider-neutral publishing layer, then an adapter. The first adapter targets
+  The Events Calendar behind `/events/`. WordPress-specific URLs, credentials,
+  request fields, IDs, error interpretation and provider metadata stay inside that
+  adapter/mapping boundary. Calendar approval, cancellation, publication history,
+  JSON and ICS must work without an adapter or a reachable provider.
+- **Contract:** define a `CalendarPublisher` capability with create, update, cancel,
+  unpublish and health-check operations, using canonical occurrence data and opaque
+  provider references. Express unsupported operations and provider capabilities
+  explicitly; do not assume that deleting, cancelling, unpublishing or recreating an
+  occurrence have equivalent provider behavior. Implement the Events Calendar adapter
+  only against verified staging behavior. Preserve timezone, all-day exclusive-end
+  meaning, stable local logical occurrence identity, and visibility semantics.
+- **Generic records:** once justified by discovery, use append-only migrations for
+  generic provider/destination, external-calendar and external-event identity,
+  event/logical-occurrence identity, desired revision/state and applied revision,
+  operation, job status, attempt count, lease, next attempt, timestamps, sanitized
+  response/reference and bounded error classification. Scope uniqueness by provider,
+  destination and logical occurrence; enforce external-ID uniqueness within its
+  actual provider/destination namespace. Provider-specific details belong in bounded,
+  sanitized adapter metadata, never in core domain records or public feed payloads.
+- **Reliability:** derive eligible work from approved public state/publication history
+  in a separate, replayable producer so external availability and queue-worker failure
+  cannot roll back a Church Calendar approval. Advance a durable checkpoint only in
+  the transaction that persists its corresponding jobs. Enforce ordered processing
+  and current-state rechecks for each occurrence/destination, bounded retry/backoff,
+  lease recovery, audit and staff-visible failures. Never allow a stale publish job
+  to overwrite a later withdrawal. A lease timeout does not cancel an in-flight
+  provider request: if a create may have succeeded but its response was lost, mark
+  the outcome uncertain and reconcile using a verified provider-side correlation or
+  idempotency mechanism before retrying. Do not invent exactly-once guarantees.
+- **Security and rollout:** the first implementation is explicitly dry-run/staging
+  only and must be unable to issue writes to production even with misconfigured
+  credentials. Confirm the staging hostname, database, account permissions, mail and
+  webhooks are isolated before any staging mutation. Keep credentials server-only,
+  prevent SSRF/redirect credential leakage, redact logs, bound retained provider
+  metadata and use synthetic fixtures. The adapter must never forward planner data,
+  internal notes, private URLs or unapproved content.
+- **Required verification:** publication, ordinary changed time/title, individual
+  cancellation, whole-event withdrawal, public-to-internal, removed occurrence,
+  republication, duplicate jobs, stale or reordered work, crash/lease recovery,
+  ambiguous provider outcomes, bounded retries, partial failures, safe audit and
+  redaction, unsupported provider capabilities, DST/all-day dates, authorization,
+  concurrency and disabled live-dispatch behavior. Validate the real provider
+  contract only with disposable staging records. The website's existing production
+  events must not be imported, modified or overwritten in Phase 10.

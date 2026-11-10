@@ -236,11 +236,18 @@ Verification completed for that fix before commit:
   The `/events/` archive uses The Events Calendar; `/our-events/` embeds an Elementor
   calendar with an unverified source. Their November results differ, and a recurring
   event's displayed time differs from its API time. The public REST index advertises
-  event routes, but live write/authentication, source selection and an isolated staging
-  site remain unverified. Owner answers are needed before choosing or implementing a
-  provider-specific foundation. Do not put existing public meeting-access details in
-  fixtures or logs. Next: obtain the target page and staging URL; use the discovery
-  checklist, then resume the authorized dry-run-only foundation.
+  event routes, but write/authentication behavior and an isolated staging
+  site remain unverified. A staging URL and isolation details are needed before
+  implementing a provider-specific foundation. Do not put existing public
+  meeting-access details in fixtures or logs. Next: obtain staging details; use the
+  discovery checklist, then resume the authorized dry-run-only foundation.
+- Owner selected `/events/` as the current target and requires a provider-neutral
+  `CalendarPublisher` boundary: Reserve-A-Room is authoritative, The Events Calendar
+  is one replaceable adapter, and the public JSON/ICS feeds never depend on external
+  synchronization. The discovery document now records the approved contract, generic
+  identity/outbox model, safety invariants and test matrix. The staging URL, isolation,
+  provider authentication and mutation/idempotency behavior remain unverified; complete
+  the discovery gate before provider-specific schema, mapping or network dispatch.
 
 ## Church Calendar Phase 9 checkpoint — historical
 
