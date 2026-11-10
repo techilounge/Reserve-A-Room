@@ -218,12 +218,27 @@ Verification completed for that fix before commit:
 - Verification: typecheck and lint passed with no warnings; 33 unit-test files / 227 tests passed; 12 database-test files / 147 tests passed; the production build passed; the complete Playwright suite passed 103/103. A restored-state check at 1000px, 320px and in dark mode showed no axe violations and no horizontal overflow.
 - Status: committed locally; not yet pushed or deployed.
 
-## Church Calendar Phase 9 checkpoint — current
+## Church Calendar Phase 10 checkpoint — current
+
+- Phase 9 is **APPROVED** at `70470867d9b6560839457a5fe34bde93e2e2fdde`.
+  Accepted exact-SHA checks: typecheck, lint, 250 unit tests, 216 database tests,
+  production build, 121/121 Playwright tests with no skips, and all nine real
+  PostgreSQL public-approval races. Vercel reported success.
+- Phase 10 is authorized **for WordPress foundation only**. First verify the actual
+  church website's calendar source, installed plugin/version, API and authentication,
+  event model, write/cancel semantics, recurrence and whether calendars share a source.
+  Only after discovery justifies the design, implement isolated staging/dry-run mapping,
+  durable idempotent outbox, bounded retries, visibility and audit. No live WordPress
+  writes or automatic publishing. Stop for owner/reviewer approval before Phase 11.
+  No merge, hosted migration or production deployment. Real calendar-client and email
+  delivery checks, conflict-scale profiling and hosted-runtime checks remain release gates.
+
+## Church Calendar Phase 9 checkpoint — historical
 
 - The reviewer technically approved Phase 9 at `9b3989ceb78567acaa7dfbb3a127acb0a49b040d`
   with 249 unit / 216 DB / 121 browser tests, and the owner approved the recommended
-  cancellation and unpublishing policy. Final Phase 9 approval and Phase 10 remain gated
-  on review of the implementation below. Do not merge, deploy, or apply hosted migrations.
+  cancellation and unpublishing policy. Final approval and Phase 10 authorization were
+  subsequently granted at `70470867`, as recorded above.
 - Phase 9 follow-up implements append-only content-free publication history in
   `20261115100000_calendar_publication_history.sql`. Previously public occurrences
   get a minimal same-UID, higher-sequence cancellation in ICS and synchronization JSON
@@ -235,8 +250,8 @@ Verification completed for that fix before commit:
   transaction, after replacement and copied cancellations settle. Historical data predating
   migration is seeded only for currently public commitments; earlier visibility is unknown.
   Run all gates on the final committed SHA, push only this review branch and stop for
-  review. Real provider email delivery and realistic-scale conflict profiling remain
-  pre-release gates. No hosted migration, production deployment or Phase 10 is authorized.
+  review. The reviewer approved this follow-up at `70470867`. No hosted migration or
+  production deployment is authorized.
 
 - Phase 8 is **APPROVED** at `f1af1276cd34896d90eab71d8b9426d14d296e86`.
   Exact-SHA verification passed typecheck, lint, 245 unit tests, 215 database tests,
@@ -244,8 +259,8 @@ Verification completed for that fix before commit:
 - Phase 9 is **authorized** for an accessible public calendar and privacy-safe ICS
   and JSON feeds from approved immutable commitments, stable occurrence identity,
   timezone/all-day correctness and caching. The owner subsequently authorized the
-  cancellation policy stated above. Stop for Phase 9 review. Do not
-  merge to main, deploy production, apply hosted migrations or start Phase 10. Real
+  cancellation policy stated above. Phase 9 is now approved. Do not
+  merge to main, deploy production or apply hosted migrations. Real
   provider delivery verification and realistic-scale conflict profiling remain release gates.
 
 - Phase 9 implementation for review: `20261114100000_calendar_public_feed.sql`
@@ -256,8 +271,8 @@ Verification completed for that fix before commit:
   Responses revalidate against the database with ETags, and the ICS feed fails rather
   than silently truncating beyond 5,000 entries. Cancellation tombstones were added
   in the follow-up above. Run all quality
-  gates on the final commit, push only this branch, and stop for Phase 9 review. No
-  hosted migration, production deployment, merge, WordPress integration or Phase 10.
+  gates on the final commit and review were completed as recorded above. No
+  hosted migration, production deployment, merge, or live WordPress publishing.
 
 - Historical: Phase 7 is **APPROVED** at `7b46d46a97e0cb262adf578db72fd581e70e7fd2`.
   The reviewer accepted exact-SHA typecheck, lint, 243 unit tests, 210 database

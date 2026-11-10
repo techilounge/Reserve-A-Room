@@ -1,8 +1,19 @@
 # Church Calendar — Phase 0 architecture and implementation plan
 
+**Current checkpoint — Phase 10 discovery:** Phase 9 is **approved** at
+`70470867d9b6560839457a5fe34bde93e2e2fdde`. Accepted exact-SHA results: typecheck,
+lint, 250 unit tests, 216 database tests, production build, 121/121 Playwright tests
+without skips, and nine real PostgreSQL public-approval races; Vercel succeeded.
+Phase 10 is authorized for the WordPress foundation only: discovery first, then
+provider-justified append-only sync metadata, mapping, durable bounded outbox and
+staging/dry-run tests. No live publishing. Stop for owner/reviewer approval before
+Phase 11, migrations/import/reconciliation, production deployment or merge.
+Representative calendar-client checks, real provider email, conflict-engine profiling
+and hosted runtime verification remain release gates.
+
 **Phase 9 review follow-up:** the reviewer technically approved `9b3989ceb78567acaa7dfbb3a127acb0a49b040d`;
 the owner approved minimal cancellation notices, including public-to-internal
-transitions. Final Phase 9 approval and Phase 10 remain pending follow-up review.
+transitions. Final Phase 9 approval and Phase 10 authorization have since been granted.
 Append-only `20261115100000_calendar_publication_history.sql` records only IDs,
 timing, state and sequence for publicly approved occurrences. Deferred reconciliation
 captures the final state of the atomic approval/replacement/cancellation transaction;
@@ -11,9 +22,9 @@ it never copies private descriptions or reasons. ICS uses same-UID, higher-seque
 Normal public pages omit withdrawals. Retention is the later of 90 days after
 withdrawal and 30 days after the last public end. Republishing supersedes a tombstone
 with a higher sequence. Previously public identities unknown at migration time are
-not guessed; existing currently public commitments are initialized. Verify exact-SHA
-quality gates and push only the review branch. No hosted migrations, production
-deployment, merge, WordPress integration or Phase 10 work is authorized.
+not guessed; existing currently public commitments are initialized. Exact-SHA
+quality gates and review are complete. No hosted migrations, production deployment,
+merge or live WordPress publishing is authorized.
 
 **Current authorization:** Phase 8 is **approved** at
 `f1af1276cd34896d90eab71d8b9426d14d296e86`. Exact-SHA typecheck, lint,
@@ -22,8 +33,7 @@ passed without skips; Vercel passed. **Phase 9 is authorized** for an accessible
 public calendar and privacy-safe ICS/JSON feeds of approved public commitments,
 stable identities, timezone/all-day correctness and caching. The owner has approved
 the cancellation behavior and retention described above.
-Do not merge, deploy production, apply hosted migrations or start Phase 10 without
-authorization. Real-provider email checks and conflict-engine scale profiling remain
+Do not merge, deploy production or apply hosted migrations. Real-provider email checks and conflict-engine scale profiling remain
 pre-release requirements.
 
 **Phase 9 implementation for review:** `20261114100000_calendar_public_feed.sql`
@@ -423,4 +433,4 @@ These are recommendations and phase-specific decisions, not newly approved polic
 11. **Website sources:** determine whether the public website calendars share a source and verify plugin/API permissions before Phase 10.
 12. **Security workstream sequencing:** review its independent branch and preview/migration requirements before adopting it as a deployed calendar dependency; no production deploy is implied by this proposal.
 
-**Next action:** verify the Phase 9 cancellation follow-up on the exact final SHA, push only the review branch, and stop for review. Do not start Phase 10, merge to `main`, deploy production, apply a hosted migration, publish unapproved legal language, or enable WordPress synchronization without separate instruction.
+**Next action:** perform Phase 10 website and provider discovery first, then implement only the verified staging/dry-run foundation. Push only the review branch and stop for review; do not start Phase 11, merge to `main`, deploy production, apply hosted migrations, publish unapproved legal language, or enable live WordPress synchronization without separate authorization.
